@@ -1,8 +1,9 @@
 # Phase 5 validation — offline PWA, robustness, accessibility
 
-Status: implementation complete; the final independent verifier was run against
-commit `3463318`. This file records the measured numbers and the checks that
-can be repeated. Verifier findings are appended below.
+Status: implementation complete. A fresh read-only verifier found four defects;
+all are fixed at commit `29c79bf` and the re-check is in progress. This file
+records the measured numbers and the checks that can be repeated. Verifier
+findings and fixes are appended below.
 
 ## Research findings that changed the plan
 
