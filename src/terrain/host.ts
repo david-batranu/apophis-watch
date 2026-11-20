@@ -19,6 +19,9 @@ export interface TerrainHostApi {
   setGroundElevationM(m: number): void;
   setTimeUtcMs(ms: number): void;
   setStatus(message: string | null): void;
+  /** Optional host actions used by the consolidated observer card. */
+  setPreset?(id: string): void;
+  useBrowserLocation?(onResult?: (ok: boolean) => void): void;
   /**
    * Optional Phase 3 extension. The required API has no eye-height setter, so
    * the terrain tab keeps its own eye height and calls this when the host

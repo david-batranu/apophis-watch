@@ -103,7 +103,7 @@ describe('bundled-before-network ordering', () => {
     });
 
     expect(result.source).toBe('bundled');
-    expect(result.sourceLabel).toBe('Bundled area: Brasov');
+    expect(result.sourceLabel).toBe('Saved area: Brasov');
     expect(result.fileName).toBe('brasov.geojson');
     expect(result.buildings).toHaveLength(1);
     expect(result.buildings[0].heightSource).toBe('height');
@@ -157,7 +157,7 @@ describe('bundled-before-network ordering', () => {
     expect(urls.some((url) => url.endsWith('.geojson'))).toBe(false);
     expect(
       progress.some((message) =>
-        message.includes('No bundled area covers this view'),
+        message.includes('No saved building data covers this view'),
       ),
     ).toBe(true);
   });

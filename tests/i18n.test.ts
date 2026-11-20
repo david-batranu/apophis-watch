@@ -34,12 +34,12 @@ describe('i18n catalogue', () => {
         lat: '45.64270',
         lon: '25.58870',
       }),
-    ).toBe('78% clear (pessimistic) at 45.64270°, 25.58870°');
+    ).toBe('78% clear (cautious estimate) at 45.64270°, 25.58870°');
     expect(t('ar.sensorCompassAccuracy', { accuracy: '0.5' })).toBe(
       'Compass heading, device reports ±0.5°.',
     );
     // Unknown placeholders are left visible instead of silently disappearing.
-    expect(t('shell.rangeSub')).toBe('{ratio} lunar distances');
+    expect(t('shell.rangeSub')).toBe('{ratio} × Moon distance');
   });
 
   it('keeps the critical English wording used by existing tests', () => {
@@ -69,10 +69,10 @@ describe('i18n catalogue', () => {
     expect(t('ar.sensorStatusDenied')).toBe('Sensors denied');
     expect(t('ar.cameraDenied')).toMatch(/^Camera permission denied\./);
     expect(t('terrain.bestStatusCompletePrefix')).toBe('Search complete: ');
-    expect(t('shell.scrubAria')).toBe('Time scrub');
-    expect(t('shell.refractionSubAirless')).toBe('airless');
+    expect(t('shell.scrubAria')).toBe('Time slider');
+    expect(t('shell.refractionSubAirless')).toBe('straight line of sight');
     expect(t('terrain.headerTitle')).toBe(
-      'Terrain, buildings &amp; best spot',
+      'Your view, terrain &amp; clear spots',
     );
   });
 });

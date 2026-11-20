@@ -305,17 +305,30 @@ Changes:
   threshold to 0°.
 - The metric value no longer ellipsizes “In visibility window”; the chip button
   font no longer inherits 16 px.
+- Observer controls were consolidated into **Local 3D → Your location & map**
+  (quick places, Use my location, map picking, coordinates, eye height). The
+  duplicate lower observer panel was removed; “Enter coordinates” opens and
+  focuses the map card.
+- If this origin already has location permission, the app starts at the browser
+  location without showing the location card or triggering a prompt.
+- Primary explanations were rewritten in plain language across location, the
+  live readout, time controls, terrain, clear-spot search and offline saving;
+  formulas and provenance stay under “How heights and coordinates are
+  calculated”, About and the notices.
+- Unsaved latitude/longitude edits are no longer overwritten when eye height is
+  changed.
 
-Verification after the pass: **215/215** unit tests, **26/26** merged Playwright
+Verification after the pass: **215/215** unit tests, **29/29** merged Playwright
 tests, **12/12** AR mock tests, **1/1** production offline test, typecheck and
 build clean. The merged suite includes new checks for 320/390 px overflow,
-44 px targets, time-dock scrubbing, first-run geolocation suppression, onboarding
+44 px targets, time-dock scrubbing, first-run geolocation suppression,
+granted-location startup, the consolidated observer card, onboarding
 dismissal/forgetting, AR restore suppression, preference persistence and the
 Share payload.
 
-Build: initial JS **805.06 kB** (218.03 kB gzip), terrain 287.76 kB (81.77 kB
-gzip), AR 79.99 kB (23.35 kB gzip), best-spot worker 13.63 kB; precache 22
-entries, 1,268.90 KiB. Sky frame timing under the existing 4× CPU test remained
+Build: initial JS **801.52 kB** (216.97 kB gzip), terrain 290.05 kB (82.28 kB
+gzip), AR 79.99 kB (23.33 kB gzip), best-spot worker 13.63 kB; precache 22
+entries, 1,268.15 KiB. Sky frame timing under the existing 4× CPU test remained
 vsync-bound (p95 16.80 ms over 180 frames).
 
 The existing real-phone caveats still apply; this pass was verified in headless

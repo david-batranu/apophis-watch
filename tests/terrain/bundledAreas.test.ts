@@ -390,7 +390,7 @@ describe('bundled area loading', () => {
       { fetchImpl: fetchMock as unknown as typeof fetch },
     );
     expect(result.source).toBe('bundled');
-    expect(result.sourceLabel).toBe('Bundled area: Brasov');
+    expect(result.sourceLabel).toBe('Saved area: Brasov');
     expect(result.sourceUrl).toBe('https://sidecar.example/interpreter');
     expect(result.sourceQuery).toBe('sidecar query');
     expect(result.retrievedAt).toBe('2026-11-20T12:00:00.000Z');

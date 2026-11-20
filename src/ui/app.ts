@@ -68,6 +68,13 @@ function fmtArcsec(value: number): string {
   return `${value.toFixed(3)}″`;
 }
 
+function compass8(azimuthDeg: number): string {
+  const names = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  const index =
+    Math.round((((azimuthDeg % 360) + 360) % 360) / 45) % names.length;
+  return names[index];
+}
+
 function esc(value: string): string {
   return value.replace(/[&<>"']/g, (c) => {
     switch (c) {
@@ -97,7 +104,6 @@ export class AppUi {
   private lastPlotKey = '';
   private lastStripKey = '';
   private lastStripHtml = '';
-  private lastObserverKey = '';
   private ar: ArWorkstream | null = null;
   private arLoading = false;
   private terrain: TerrainWorkstream | null = null;
@@ -351,28 +357,7 @@ export class AppUi {
             </section>
           </section>
           <section class="controls-grid">
-            <section class="panel" data-ref="observer-panel">
-              <h2>${t('shell.observerTitle')}</h2>
-              <div class="field">
-                <label for="preset-select">${t('shell.observerPreset')}</label>
-                <select id="preset-select" data-ref="preset-select">
-                  <option value="">${t('shell.observerCustom')}</option>
-                </select>
-              </div>
-              <div class="field-grid" style="margin-top: 8px">
-                <div class="field"><label for="lat">${t('shell.observerLat')}</label><input id="lat" data-ref="lat" inputmode="decimal" placeholder="45.6427" /></div>
-                <div class="field"><label for="lon">${t('shell.observerLon')}</label><input id="lon" data-ref="lon" inputmode="decimal" placeholder="25.5887" /></div>
-                <div class="field"><label for="elev">${t('shell.observerGroundElevation')}</label><input id="elev" data-ref="elev" inputmode="decimal" placeholder="${t('shell.observerGroundPlaceholder')}" /></div>
-                <div class="field"><label for="eye">${t('shell.observerEyeHeight')}</label><input id="eye" data-ref="eye" inputmode="decimal" value="1.7" /></div>
-              </div>
-              <div class="bar" style="margin-top: 8px">
-                <button class="btn" data-ref="apply-observer" type="button">${t('shell.observerApply')}</button>
-                <button class="btn ghost" data-ref="use-location" type="button">${t('shell.observerUseLocation')}</button>
-              </div>
-              <p class="status-line" data-ref="location-status">—</p>
-              <p class="status-line">${t('shell.observerNote')}</p>
-            </section>
-            <section class="panel">
+            <section class="panel controls-wide">
               <h2>${t('shell.displayTitle')}</h2>
               <div class="toggle-grid">
                 <label class="toggle"><input type="checkbox" data-ref="toggle-refraction" /> ${t('shell.displayRefraction')}</label>
@@ -450,21 +435,15 @@ export class AppUi {
   }
 
   private populatePresets(): void {
-    const options = [
-      ['', t('shell.observerCustom')],
-      ...Object.entries({
-        brasov: t('shell.presetBrasov'),
-        'cape-town': t('shell.presetCapeTown'),
-        tenerife: t('shell.presetTenerife'),
-        longyearbyen: t('shell.presetLongyearbyen'),
-      }),
-    ];
-    (this.ref('preset-select') as HTMLSelectElement).innerHTML = options
-      .map(([value, label]) => `<option value="${value}">${label}</option>`)
-      .join('');
+    const options = Object.entries({
+      brasov: t('shell.presetBrasov'),
+      'cape-town': t('shell.presetCapeTown'),
+      tenerife: t('shell.presetTenerife'),
+      longyearbyen: t('shell.presetLongyearbyen'),
+    });
     (this.ref('dialog-preset') as HTMLSelectElement).innerHTML = [
       ['', t('location.dialogPresetPlaceholder')],
-      ...options.slice(1),
+      ...options,
     ]
       .map(([value, label]) => `<option value="${value}">${label}</option>`)
       .join('');
@@ -584,14 +563,6 @@ export class AppUi {
     this.ref('dock-ca').addEventListener('click', () => {
       this.app.jumpTo('topocentricCa');
     });
-    this.ref('preset-select').addEventListener('change', (event) => {
-      const value = (event.target as HTMLSelectElement).value;
-      if (value) this.app.setPreset(value);
-    });
-    this.ref('apply-observer').addEventListener('click', () => this.applyManual());
-    this.ref('use-location').addEventListener('click', () => {
-      this.app.useBrowserLocation();
-    });
     this.ref('min-good').addEventListener('input', (event) => {
       this.app.setMinGoodElevation(Number((event.target as HTMLInputElement).value));
     });
@@ -618,6 +589,24 @@ export class AppUi {
     }
     if (attempt < 25) {
       window.setTimeout(() => this.scrollToOfflineCard(attempt + 1), 100);
+    }
+  }
+
+  private scrollToTerrainObserverCard(attempt = 0): void {
+    const card = this.ref('terrain-host').querySelector<HTMLElement>(
+      '[data-ref="observer-card"]',
+    );
+    if (card) {
+      card.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      const lat = card.querySelector<HTMLInputElement>('[data-ref="lat"]');
+      window.setTimeout(() => lat?.focus({ preventScroll: true }), 300);
+      return;
+    }
+    if (attempt < 30) {
+      window.setTimeout(
+        () => this.scrollToTerrainObserverCard(attempt + 1),
+        100,
+      );
     }
   }
 
@@ -654,13 +643,8 @@ export class AppUi {
     });
     this.ref('dialog-coordinates').addEventListener('click', () => {
       this.closeLocationDialog();
-      this.ref('observer-panel').scrollIntoView({
-        block: 'start',
-        behavior: 'smooth',
-      });
-      window.setTimeout(() => {
-        (this.ref('lat') as HTMLInputElement).focus({ preventScroll: true });
-      }, 300);
+      this.app.setViewMode('local');
+      this.scrollToTerrainObserverCard();
     });
     forget.addEventListener('click', () => {
       this.app.forgetSavedLocation();
@@ -797,26 +781,6 @@ export class AppUi {
     }, 3_200);
   }
 
-  private applyManual(): void {
-    const latRaw = (this.ref('lat') as HTMLInputElement).value.trim();
-    const lonRaw = (this.ref('lon') as HTMLInputElement).value.trim();
-    if (latRaw === '' || lonRaw === '') {
-      this.setError(t('shell.enterCoordinates'));
-      return;
-    }
-    const lat = Number(latRaw);
-    const lon = Number(lonRaw);
-    const elevRaw = (this.ref('elev') as HTMLInputElement).value.trim();
-    const eye = Number((this.ref('eye') as HTMLInputElement).value);
-    const error = this.app.setManualObserver({
-      latitudeDeg: lat,
-      longitudeDeg: lon,
-      groundElevationM: elevRaw === '' ? null : Number(elevRaw),
-      eyeHeightM: Number.isFinite(eye) ? eye : 1.7,
-    });
-    this.setError(error);
-  }
-
   private setError(message: string | null): void {
     const node = this.ref('error-line');
     node.textContent = message ?? '';
@@ -909,41 +873,11 @@ export class AppUi {
       t('shell.locationChipAria', { label: locationLabel }),
     );
     this.ref('location-chip').title = `${locationLabel} — ${state.locationStatus}`;
-    this.ref('location-status').textContent = state.locationStatus;
     if (this.locationDialog.open) {
       this.ref('dialog-status').textContent =
         this.dialogMessage ?? state.locationStatus;
       (this.ref('dialog-forget') as HTMLButtonElement).hidden =
         !this.app.hasSavedLocation();
-    }
-    if (state.observer) {
-      const observerKey = [
-        state.observer.latitudeDeg,
-        state.observer.longitudeDeg,
-        state.observer.groundElevationM,
-        state.observer.eyeHeightM,
-      ].join('|');
-      if (observerKey !== this.lastObserverKey) {
-        this.lastObserverKey = observerKey;
-        const active = document.activeElement;
-        const setIfIdle = (id: string, value: string) => {
-          const input = this.ref(id) as HTMLInputElement;
-          if (active !== input) input.value = value;
-        };
-        setIfIdle('lat', state.observer.latitudeDeg.toFixed(5));
-        setIfIdle('lon', state.observer.longitudeDeg.toFixed(5));
-        setIfIdle(
-          'elev',
-          state.observer.groundElevationM === null
-            ? ''
-            : String(state.observer.groundElevationM),
-        );
-        setIfIdle('eye', state.observer.eyeHeightM.toFixed(1));
-      }
-    }
-    if (state.observer) {
-      const preset = this.presetIdFor(state.observer);
-      (this.ref('preset-select') as HTMLSelectElement).value = preset;
     }
     for (const view of ['sky', 'space', 'local', 'ar'] as const) {
       const active = state.viewMode === view;
@@ -1079,6 +1013,8 @@ export class AppUi {
         setTimeUtcMs: (ms) => this.app.setUtc(ms),
         setStatus: (message) => this.app.setStatus(message),
         setEyeHeightM: (m) => this.app.setEyeHeightM(m),
+        setPreset: (id) => this.app.setPreset(id),
+        useBrowserLocation: (onResult) => this.app.useBrowserLocation(onResult),
       });
       workstream.mount();
       workstream.update(this.app.getState());
@@ -1148,6 +1084,7 @@ export class AppUi {
       this.app.getSession()?.isInVisibilityWindow(jdTdbFromDate(new Date(state.utcMs ?? 0))) ?? false;
     const above = sky.elevationDeg > 0;
     this.ref('metric-az').textContent = fmtDeg(sky.azimuthDeg, 3);
+    this.ref('metric-az-sub').textContent = compass8(sky.azimuthDeg);
     this.ref('metric-el').textContent = fmtDeg(sky.elevationDeg, 3);
     this.ref('metric-el-sub').textContent = state.toggles.refraction
       ? t('shell.refractionSubRefracted')
@@ -1162,6 +1099,7 @@ export class AppUi {
     this.ref('metric-mag').textContent = t('shell.magnitudeValue', {
       magnitude: sky.magnitude.toFixed(2),
     });
+    this.ref('metric-mag-sub').textContent = t('shell.magnitudeSub');
     this.ref('metric-size').textContent = `${sky.angularDiameterArcsec.toFixed(3)}″`;
     this.ref('metric-size-sub').textContent = t('shell.sizeSub');
     this.ref('metric-moon').textContent = moonSep === null ? '—' : fmtDeg(moonSep, 2);
@@ -1170,9 +1108,11 @@ export class AppUi {
       : inWindow
         ? t('shell.viewInWindow')
         : t('shell.viewNotDark');
-    this.ref('metric-view-sub').textContent = inWindow
-      ? t('shell.viewSubPhase1')
-      : t('shell.viewSubNotMet');
+    this.ref('metric-view-sub').textContent = !above
+      ? t('shell.viewSubBelow')
+      : inWindow
+        ? t('shell.viewSubPhase1')
+        : t('shell.viewSubNotMet');
     this.ref('sky-refraction-badge').textContent = state.toggles.refraction
       ? t('shell.badgeDisplayRefracted')
       : t('shell.badgeAirless');

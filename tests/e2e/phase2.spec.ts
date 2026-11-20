@@ -358,34 +358,40 @@ test('clamps out-of-range time and never extrapolates', async ({ page }) => {
     '2029-04-14 21:45:03 UTC',
   );
   await expect(page.locator('[data-ref="error-line"]')).toContainText(
-    'outside the committed ±24 h data window',
+    'outside the available range',
   );
 });
 
 test('preset and manual observer inputs update the session', async ({ page }) => {
   await gotoAt(page, '2029-04-13T20:45:00Z');
-  await page.locator('[data-ref="preset-select"]').selectOption('cape-town');
-  await expect(page.locator('[data-ref="location-status"]')).toContainText(
+  await page.locator('[data-ref="location-chip"]').click();
+  await page.locator('[data-ref="dialog-preset"]').selectOption('cape-town');
+  await expect(page.locator('[data-ref="location-chip"]')).toContainText(
     'Cape Town',
   );
   await expect(page.locator('[data-ref="location-chip"]')).toContainText('-33.92');
-  await page.locator('#lat').fill('10');
-  await page.locator('#lon').fill('20');
-  await page.locator('#elev').fill('100');
-  await page.locator('#eye').fill('2');
-  await page.locator('[data-ref="apply-observer"]').click();
-  await expect(page.locator('[data-ref="location-status"]')).toContainText(
-    'Manual location',
-  );
+
+  await page.getByRole('tab', { name: 'Local 3D', exact: true }).click();
+  const card = page.locator('[data-ref="observer-card"]');
+  await expect(card).toBeVisible();
+  await card.locator('[data-ref="lat"]').fill('10');
+  await card.locator('[data-ref="lon"]').fill('20');
+  await card.locator('[data-ref="eye"]').fill('2');
+  await card.locator('[data-action="apply-observer"]').click();
   await expect(page.locator('[data-ref="location-chip"]')).toContainText('10.00');
+  await expect(card.locator('[data-ref="eye-note"]')).toContainText('2.0 m');
 });
 
-test('refraction toggle labels the readout as airless', async ({ page }) => {
+test('refraction toggle labels the readout as a straight line of sight', async ({
+  page,
+}) => {
   await gotoAt(page, '2029-04-13T22:40:00Z');
   await expect(page.locator('[data-ref="debug-overlay"]')).toContainText('refracted');
   await page.locator('[data-ref="toggle-refraction"]').click();
   await expect(page.locator('[data-ref="debug-overlay"]')).toContainText('airless');
-  await expect(page.locator('[data-ref="readout-note"]')).toContainText('Airless');
+  await expect(page.locator('[data-ref="readout-note"]')).toContainText(
+    'straight line of sight',
+  );
 });
 
 test('measured sky frame time at 4x CPU throttle', async ({ page }) => {

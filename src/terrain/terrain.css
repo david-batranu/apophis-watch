@@ -279,6 +279,29 @@
   color: var(--tw-accent-2);
 }
 
+.tw-location-row {
+  align-items: flex-end;
+}
+
+.tw-details {
+  border-top: 1px solid var(--tw-border);
+  padding-top: 8px;
+}
+
+.tw-details summary {
+  color: var(--tw-accent-2);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.tw-details[open] summary {
+  margin-bottom: 6px;
+}
+
+.tw-details .tw-note + .tw-note {
+  margin-top: 6px;
+}
+
 .tw-credits {
   margin-top: 3px;
   padding-top: 8px;
@@ -548,6 +571,14 @@
   }
   .tw-chart {
     height: 200px;
+  }
+}
+
+@media (max-width: 680px), (pointer: coarse) {
+  .tw-btn,
+  .tw-row input:not([type='range']),
+  .tw-row select {
+    min-height: 44px;
   }
 }
 

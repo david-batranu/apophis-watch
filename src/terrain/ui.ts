@@ -7,6 +7,7 @@
 
 import { formatLocal, formatUtc } from '../ui/timeFormat';
 import { t } from '../i18n';
+import { PRESETS } from '../state/appTypes';
 import type { UiState } from '../state/store';
 import {
   buildingsFromSnapshot,
@@ -122,6 +123,30 @@ function fmtKm(value: number, digits = 2): string {
   return `${(value / 1000).toFixed(digits)} km`;
 }
 
+function presetLabel(id: string): string | null {
+  switch (id) {
+    case 'brasov':
+      return t('shell.presetBrasov');
+    case 'cape-town':
+      return t('shell.presetCapeTown');
+    case 'tenerife':
+      return t('shell.presetTenerife');
+    case 'longyearbyen':
+      return t('shell.presetLongyearbyen');
+    default:
+      return null;
+  }
+}
+
+function presetIdFor(lat: number, lon: number): string {
+  const preset = PRESETS.find(
+    (item) =>
+      Math.abs(item.latitudeDeg - lat) < 1e-4 &&
+      Math.abs(item.longitudeDeg - lon) < 1e-4,
+  );
+  return preset?.id ?? '';
+}
+
 export class TerrainUi implements TerrainWorkstream {
   private readonly root: HTMLElement;
   private readonly api: TerrainHostApi;
@@ -158,6 +183,7 @@ export class TerrainUi implements TerrainWorkstream {
   private viewpointInsideBuilding: PreparedBuilding | null = null;
 
   private lastObserverLocationKey = '';
+  private locationFormDirty = false;
   private lastStateGround: number | null = null;
   private mapPick: { lat: number; lon: number } | null = null;
   private recenterOnNextUpdate = false;
@@ -232,8 +258,23 @@ export class TerrainUi implements TerrainWorkstream {
       <div class="tw-status" data-ref="status" role="status" aria-live="polite">${t('terrain.statusReady')}</div>
 
       <div class="tw-grid tw-grid-2">
-        <section class="tw-card">
+        <section class="tw-card" data-ref="observer-card">
           <h3>${t('terrain.observerTitle')}</h3>
+          <p class="tw-note">${t('terrain.observerIntro')}</p>
+          <div class="tw-row tw-row-wrap tw-location-row">
+            <label class="tw-field tw-grow">${t('terrain.observerPreset')}
+              <select data-ref="preset">
+                <option value="">${t('terrain.observerPresetCustom')}</option>
+                ${PRESETS.map((preset) => {
+                  const label = presetLabel(preset.id);
+                  return label
+                    ? `<option value="${preset.id}">${label}</option>`
+                    : '';
+                }).join('')}
+              </select>
+            </label>
+            <button class="tw-btn primary" data-action="use-browser-location" type="button">${t('terrain.observerUseLocation')}</button>
+          </div>
           <div class="tw-map" data-ref="map" aria-label="${t('terrain.observerMapAria')}"></div>
           <div class="tw-row tw-row-wrap">
             <label class="tw-field">${t('terrain.observerLat')}
@@ -243,8 +284,9 @@ export class TerrainUi implements TerrainWorkstream {
               <input data-ref="lon" inputmode="decimal" placeholder="25.5887" />
             </label>
             <button class="tw-btn" data-action="apply-observer" type="button">${t('terrain.observerApply')}</button>
-            <button class="tw-btn ghost" data-action="use-browser-location" type="button">${t('terrain.observerRecenter')}</button>
+            <button class="tw-btn ghost" data-action="recenter-map" type="button">${t('terrain.observerRecenter')}</button>
           </div>
+          <p class="tw-note" data-ref="observer-status" role="status" aria-live="polite">${t('terrain.observerStatusIdle')}</p>
           <div class="tw-row tw-row-wrap">
             <label class="tw-field">${t('terrain.eyeHeight')}
               <input data-ref="eye" type="number" min="0" max="200" step="0.1" value="1.7" />
@@ -262,7 +304,11 @@ export class TerrainUi implements TerrainWorkstream {
           </div>
           <p class="tw-note" data-ref="eye-note">${t('terrain.eyeNoteInitial')}</p>
           <p class="tw-note tw-ground-note" data-ref="ground-note">${t('terrain.groundWaiting')}</p>
-          <p class="tw-note">${t('terrain.groundNote')}</p>
+          <details class="tw-details">
+            <summary>${t('terrain.observerDetails')}</summary>
+            <p class="tw-note">${t('terrain.observerMethod')}</p>
+            <p class="tw-note">${t('terrain.groundNote')}</p>
+          </details>
         </section>
 
         <section class="tw-card">
@@ -407,6 +453,9 @@ export class TerrainUi implements TerrainWorkstream {
           this.applyManualObserver();
           break;
         case 'use-browser-location':
+          this.useBrowserLocation();
+          break;
+        case 'recenter-map':
           this.map?.setObserver(
             this.state?.observer?.latitudeDeg ?? 45.6427,
             this.state?.observer?.longitudeDeg ?? 25.5887,
@@ -464,6 +513,10 @@ export class TerrainUi implements TerrainWorkstream {
         return;
       }
       switch (target.dataset.ref) {
+        case 'lat':
+        case 'lon':
+          this.locationFormDirty = true;
+          break;
         case 'eye':
           this.setEyeHeightFromInput(target.value);
           break;
@@ -545,6 +598,32 @@ export class TerrainUi implements TerrainWorkstream {
         this.eyeCustomised = true;
         this.applyEyeMode();
       }
+      if (target.dataset.ref === 'preset' && target.value) {
+        this.locationFormDirty = false;
+        this.recenterOnNextUpdate = true;
+        this.api.setPreset?.(target.value);
+      }
+    });
+  }
+
+  private useBrowserLocation(): void {
+    if (!this.api.useBrowserLocation) {
+      this.setStatus(t('terrain.observerLocationUnavailable'), 'warn');
+      return;
+    }
+    const button = this.root.querySelector<HTMLButtonElement>(
+      '[data-action="use-browser-location"]',
+    );
+    if (button) button.disabled = true;
+    this.locationFormDirty = false;
+    this.recenterOnNextUpdate = true;
+    this.ref('observer-status').textContent = t('terrain.observerLocating');
+    this.api.useBrowserLocation((ok) => {
+      if (button) button.disabled = false;
+      if (!ok) {
+        this.ref('observer-status').textContent =
+          this.api.getState().locationStatus;
+      }
     });
   }
 
@@ -556,6 +635,7 @@ export class TerrainUi implements TerrainWorkstream {
       this.map = new TerrainMap(this.ref('map'), {
         onObserverPick: (lat, lon) => {
           this.mapPick = { lat, lon };
+          this.locationFormDirty = false;
           this.api.setObserver(lat, lon);
         },
         onResultPick: (index) => this.selectResult(index),
@@ -656,8 +736,26 @@ export class TerrainUi implements TerrainWorkstream {
     this.lastObserverLocationKey = key;
     const latInput = this.ref<HTMLInputElement>('lat');
     const lonInput = this.ref<HTMLInputElement>('lon');
-    if (document.activeElement !== latInput) latInput.value = observer.latitudeDeg.toFixed(5);
-    if (document.activeElement !== lonInput) lonInput.value = observer.longitudeDeg.toFixed(5);
+    if (!this.locationFormDirty) {
+      if (document.activeElement !== latInput) {
+        latInput.value = observer.latitudeDeg.toFixed(5);
+      }
+      if (document.activeElement !== lonInput) {
+        lonInput.value = observer.longitudeDeg.toFixed(5);
+      }
+    }
+    const presetSelect = this.ref<HTMLSelectElement>('preset');
+    if (this.locationFormDirty) {
+      presetSelect.value = '';
+    } else if (document.activeElement !== presetSelect) {
+      presetSelect.value = presetIdFor(
+        observer.latitudeDeg,
+        observer.longitudeDeg,
+      );
+    }
+    if (this.ref('observer-status').textContent !== state.locationStatus) {
+      this.ref('observer-status').textContent = state.locationStatus;
+    }
     const fromMap =
       this.mapPick !== null &&
       Math.abs(this.mapPick.lat - observer.latitudeDeg) < 1e-7 &&
@@ -808,6 +906,7 @@ export class TerrainUi implements TerrainWorkstream {
       this.setStatus(t('terrain.observerErrorLon'), 'bad');
       return;
     }
+    this.locationFormDirty = false;
     this.recenterOnNextUpdate = true;
     this.api.setObserver(lat, lon);
   }
@@ -920,15 +1019,13 @@ export class TerrainUi implements TerrainWorkstream {
         : this.eyeMode === 'rooftop'
           ? t('terrain.eyeNoteRooftop', { height: fmtM(this.eyeHeightM) })
           : t('terrain.eyeNoteGround', { height: fmtM(this.eyeHeightM) });
-    const hostNote = this.api.setEyeHeightM
-      ? t('terrain.eyeHostAvailable')
-      : t('terrain.eyeHostUnavailable');
-    this.ref('eye-note').textContent = t('terrain.eyeNoteCombined', {
+    this.ref('eye-note').textContent = [
       base,
-      extra: extra ?? '',
-      suffix: t('terrain.eyeNoteSuffix'),
-      host: hostNote,
-    });
+      extra ?? '',
+      t('terrain.eyeNoteSuffix'),
+    ]
+      .filter(Boolean)
+      .join(' ');
   }
 
   private terrainRadius(): number {
@@ -1111,7 +1208,7 @@ export class TerrainUi implements TerrainWorkstream {
     }
     const localGround = grid ? sceneGroundElevationM(grid) : sharedGround;
     const difference = localGround - sharedGround;
-    if (Number.isFinite(localGround) && Math.abs(difference) > 0.1) {
+    if (Number.isFinite(localGround) && Math.abs(difference) > 1) {
       this.ref('ground-note').textContent = t('terrain.groundMismatch', {
         local: fmtM(localGround),
         shared: fmtM(sharedGround),
@@ -2227,6 +2324,7 @@ export class TerrainUi implements TerrainWorkstream {
   private useCandidateAsObserver(index: number): void {
     const result = this.bestSpot?.candidates.find((item) => item.index === index);
     if (!result) return;
+    this.locationFormDirty = false;
     this.recenterOnNextUpdate = true;
     this.api.setObserver(
       result.latitudeDeg,

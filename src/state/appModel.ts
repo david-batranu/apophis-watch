@@ -32,7 +32,12 @@ import {
 } from './preferences';
 import { PRESETS, type PresetLocation } from './appTypes';
 
-type InitialLocationSource = 'url' | 'stored' | 'offline' | 'fallback';
+type InitialLocationSource =
+  | 'url'
+  | 'stored'
+  | 'offline'
+  | 'geolocation'
+  | 'fallback';
 
 const VIEW_MODES: ViewMode[] = ['sky', 'space', 'local', 'ar'];
 
@@ -190,30 +195,43 @@ export class AppModel {
           eyeHeightM: snapshot.area.eyeHeightM,
         }
       : null;
+    // If this origin already has location permission, start at the user's
+    // actual location without showing a permission prompt. First-time visitors
+    // still get the explicit location card.
+    const autoObserver =
+      !this.usingOfflineData && !urlObserver && !storedObserver
+        ? await this.defaultBrowserObserver()
+        : null;
     const observer = this.usingOfflineData
       ? urlObserver ?? offlineObserver ?? fallback
-      : urlObserver ?? storedObserver ?? fallback;
+      : urlObserver ?? storedObserver ?? autoObserver ?? fallback;
     const source: LocationSource = this.usingOfflineData
       ? 'offline'
       : urlObserver
         ? 'url'
         : storedObserver
           ? 'manual'
-          : 'fallback';
+          : autoObserver
+            ? 'geolocation'
+            : 'fallback';
     this.initialLocationSource = this.usingOfflineData
       ? 'offline'
       : urlObserver
         ? 'url'
         : storedObserver
           ? 'stored'
-          : 'fallback';
+          : autoObserver
+            ? 'geolocation'
+            : 'fallback';
     const status = this.usingOfflineData
       ? this.offlineLocationStatus(observer, urlObserver !== null)
       : urlObserver
         ? t('location.fromUrl')
         : storedObserver
           ? t('location.restoredStatus')
-          : t('location.previewStatus');
+          : autoObserver
+            ? t('location.usingBrowser')
+            : t('location.previewStatus');
     this.applyObserver(observer, source, status, false, false);
 
     if (this.usingOfflineData && snapshot?.stars) {
@@ -413,6 +431,49 @@ export class AppModel {
       }
       this.persistPreferences();
     }
+  }
+
+  /**
+   * Use the browser location only when permission was already granted.
+   * Never trigger a permission prompt during startup.
+   */
+  private async defaultBrowserObserver(): Promise<ObserverConfig | null> {
+    if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
+      return null;
+    }
+    try {
+      if (
+        !navigator.permissions ||
+        typeof navigator.permissions.query !== 'function'
+      ) {
+        return null;
+      }
+      const permission = await navigator.permissions.query({
+        name: 'geolocation',
+      });
+      if (permission.state !== 'granted') return null;
+    } catch {
+      return null;
+    }
+    return new Promise((resolve) => {
+      const timer = window.setTimeout(() => resolve(null), 3_500);
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          window.clearTimeout(timer);
+          resolve({
+            latitudeDeg: position.coords.latitude,
+            longitudeDeg: position.coords.longitude,
+            groundElevationM: null,
+            eyeHeightM: 1.7,
+          });
+        },
+        () => {
+          window.clearTimeout(timer);
+          resolve(null);
+        },
+        { enableHighAccuracy: false, timeout: 3_000, maximumAge: 600_000 },
+      );
+    });
   }
 
   private requestGeolocation(onResult?: (ok: boolean) => void): void {

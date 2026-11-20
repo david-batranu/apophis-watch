@@ -8,7 +8,7 @@ test('Local 3D tab mounts the Leaflet map with OSM attribution and DEM controls'
     '/?lat=45.6427&lon=25.5887&elev=600&eye=1.7&utc=2029-04-13T20:45:00Z&view=local&debug=1',
   );
   await expect(page.locator('.tw-root')).toBeVisible();
-  await expect(page.getByText('Terrain, buildings & best spot')).toBeVisible();
+  await expect(page.getByText('Your view, terrain & clear spots')).toBeVisible();
   await expect(page.locator('.leaflet-container')).toBeVisible();
   await expect(page.getByText('© OpenStreetMap contributors').first()).toBeVisible();
   await expect(page.getByText('Light pollution', { exact: false }).first()).toBeVisible();

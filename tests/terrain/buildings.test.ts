@@ -172,7 +172,7 @@ describe('Overpass response parsing', () => {
 
   it('rejects a response without elements', () => {
     expect(() => parseOverpassBuildings({}, 45, 25, 1_000)).toThrow(
-      /elements/,
+      /no building data/,
     );
   });
 

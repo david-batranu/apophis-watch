@@ -89,6 +89,39 @@ test('time dock scrubs, plays and jumps to closest approach', async ({ page }) =
   await expect(page.locator('[data-ref="time-dock"]')).toBeHidden();
 });
 
+test('observer controls live with the Local 3D map', async ({ page }) => {
+  await page.goto(`/?${OBSERVER}&view=local`);
+  const card = page.locator('[data-ref="observer-card"]');
+  await expect(card).toBeVisible();
+  await expect(card.locator('[data-ref="preset"]')).toBeVisible();
+  const useLocation = card.getByRole('button', {
+    name: 'Use my location',
+    exact: true,
+  });
+  await expect(useLocation).toBeVisible();
+  expect(
+    await useLocation.evaluate(
+      (element) => element.getBoundingClientRect().height,
+    ),
+  ).toBeGreaterThanOrEqual(43.5);
+  await expect(page.locator('[data-ref="lat"]')).toHaveCount(1);
+  await expect(page.locator('[data-ref="observer-panel"]')).toHaveCount(0);
+});
+
+test('Enter coordinates opens the Local 3D observer card', async ({ page }) => {
+  await page.goto('/');
+  const dialog = page.locator('[data-ref="location-dialog"]');
+  await expect(dialog).toBeVisible();
+  await page.getByRole('button', { name: 'Enter coordinates' }).click();
+  await expect(page.locator('#tab-local')).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  const card = page.locator('[data-ref="observer-card"]');
+  await expect(card).toBeVisible();
+  await expect(card.locator('[data-ref="lat"]')).toBeFocused();
+});
+
 test('first visit asks for a location without triggering geolocation', async ({
   page,
 }) => {
@@ -209,6 +242,29 @@ test('a saved location can be forgotten from the location dialog', async ({
 
   await page.reload();
   await expect(dialog).toBeVisible();
+});
+
+test.describe('location permission already granted', () => {
+  test.use({
+    permissions: ['geolocation'],
+    geolocation: { latitude: 40.4168, longitude: -3.7038 },
+  });
+
+  test('starts at the user location without opening the location card', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await expect(page.locator('[data-ref="location-dialog"]')).toBeHidden();
+    await expect(page.locator('[data-ref="location-chip"]')).toContainText(
+      'My location',
+    );
+    await expect(page.locator('[data-ref="location-chip"]')).toContainText(
+      '40.42',
+    );
+    await expect(page.locator('[data-ref="location-chip"]')).not.toContainText(
+      'Brasov preview',
+    );
+  });
 });
 
 test('share uses the current location, time and view', async ({ page }) => {

@@ -18,13 +18,13 @@ export const en = {
   },
 
   jump: {
-    topocentricCa: 'Topocentric CA',
-    geocentricCa: 'Geocentric CA',
-    rise: 'Rise',
-    set: 'Set',
-    maxElevation: 'Max elevation',
-    visibilityStart: 'Visibility start',
-    visibilityEnd: 'Visibility end',
+    topocentricCa: 'Closest to you',
+    geocentricCa: 'Closest to Earth',
+    rise: 'Rises',
+    set: 'Sets',
+    maxElevation: 'Highest',
+    visibilityStart: 'Visible from',
+    visibilityEnd: 'Visible until',
   },
 
   shell: {
@@ -61,17 +61,17 @@ export const en = {
     tabSpace: 'Space view',
     tabLocal: 'Local 3D',
     tabAr: 'AR',
-    dataWindowPlaceholder: 'Data window: —',
+    dataWindowPlaceholder: 'Available time: —',
     dataWindowValue: '{start} → {end} UTC',
-    skyAria: 'Stereographic sky dome',
+    skyAria: 'Sky dome map',
     skyCanvasAria:
       'Sky dome. Drag or use arrow keys to look; plus and minus zoom; zero resets.',
     spaceCanvasAria:
       'Space view: Apophis, Earth and Moon to scale. Camera preset buttons are beside the view.',
     plotCanvasAria:
-      'Elevation and magnitude of Apophis versus time. The same values are in the live readout.',
+      'Height and brightness of Apophis over time. The same values are in the live readout.',
     skyHint: 'Drag to look · pinch/scroll to zoom · double-click reset',
-    badgeRefracted: 'refracted',
+    badgeRefracted: 'light bent (display)',
     spaceCameraEarth: 'Earth',
     spaceCameraFlyby: 'Flyby',
     spaceCameraMoon: 'Moon orbit',
@@ -81,60 +81,48 @@ export const en = {
       '1 scene unit = 1,000 km · Earth radius 6,378 km · GEO ring 42,164 km · Moon orbit 384,400 km',
     spaceLegendTrueScale:
       'Apophis is a true-scale point; its 340 m disc is invisible at this scale.',
-    readoutTitle: 'Live readout',
-    metricAzimuth: 'Azimuth',
-    metricElevation: 'Elevation',
-    metricRange: 'Range',
-    metricRate: 'Angular rate',
-    metricMagnitude: 'V magnitude',
-    metricSize: 'Angular size',
-    metricMoonSeparation: 'Moon separation',
-    metricVisibility: 'Visibility',
+    readoutTitle: 'Right now',
+    metricAzimuth: 'Direction',
+    metricElevation: 'Height in sky',
+    metricRange: 'Distance',
+    metricRate: 'How fast it moves',
+    metricMagnitude: 'Brightness',
+    metricSize: 'Apparent size',
+    metricMoonSeparation: 'Distance from Moon',
+    metricVisibility: 'Can you see it?',
     timeTitle: 'Time',
     play: '▶ Play',
     pause: '⏸ Pause',
     speed: 'Speed',
-    scrubAria: 'Time scrub',
+    scrubAria: 'Time slider',
     localClock: '{label} {zone} ({iana})',
-    plotTitle: 'Elevation &amp; magnitude vs time',
+    plotTitle: 'Height and brightness over time',
     plotCaption:
-      'Elevation line is airless geometric elevation (the readout may be refracted) · magnitude line (lower is brighter) · shaded: Phase 1 visibility (Sun &lt; −6°) · dashed: good-viewing threshold.',
-    sizeTitle: 'Size honesty',
-    observerTitle: 'Observer',
-    observerPreset: 'Preset',
-    observerCustom: 'Custom / browser location',
-    observerLat: 'Latitude °',
-    observerLon: 'Longitude °',
-    observerGroundElevation: 'Ground elev. m (optional)',
-    observerGroundPlaceholder: 'unknown',
-    observerEyeHeight: 'Eye height m',
-    observerApply: 'Apply coordinates',
-    observerUseLocation: 'Use my location',
-    observerNote:
-      'Height is eye height above ground. In Local 3D the ground elevation comes from the DEM and eye height is added; browser GPS altitude is only a cross-check and is ignored.',
+      'Orange: how high Apophis is above the horizon. Blue: how bright it is (higher on the chart is brighter). Shaded: the sky is dark enough to see it. Dashed: the height you set as easy to see.',
+    sizeTitle: 'How big will it look?',
     displayTitle: 'Display',
-    displayRefraction: 'Refraction (display only)',
+    displayRefraction: 'Bend light near the horizon (display only)',
     displayConstellations: 'Constellation lines',
-    displayEnlarged: 'Enlarged marker',
+    displayEnlarged: 'Enlarge the marker',
     displayEnlargedBadge: 'not to scale',
     displayNightMode: 'Night mode (red)',
-    displayMinGoodLabel: 'Good-viewing minimum elevation: ',
+    displayMinGoodLabel: 'Highlight above this height: ',
     displayMinGoodNote:
-      'The Phase 1 visibility window (above horizon + Sun &lt; −6°) is unchanged; this threshold only highlights the easier part of the path.',
+      'This only changes the highlight. Visibility is still based on the horizon and on how dark the sky is.',
     aboutSummary: 'About, data, offline storage &amp; licences',
     aboutBuildTitle: 'Build &amp; data source',
     aboutOfflineTitle: 'Prepared offline area',
     aboutAreasTitle: 'Bundled building areas',
     checkUpdates: 'Check for updates',
-    aboutNotPrepared: 'Not prepared.',
+    aboutNotPrepared: 'Not saved.',
     storageNotChecked: 'Storage status not checked yet.',
     checking: 'Checking…',
     footerNote:
-      'Everything is computed from the committed JPL Horizons state vectors and astronomy-engine. The view is a simulation for planning, not a live feed. Offline base maps are rendered from cached terrain tiles; OpenStreetMap raster tiles are never bulk-downloaded.',
+      'Positions are calculated from NASA/JPL data in your browser. This is a planning simulation, not a live feed. Offline maps use stored terrain data; OpenStreetMap street tiles are not downloaded in bulk.',
     pwaUpdateReady:
       'A new version is ready. Reload when convenient; the prepared offline area is kept.',
     pwaOfflineReady:
-      'App shell saved for offline use. You can prepare terrain for a chosen area later in Local 3D.',
+      'App saved for offline use. You can save terrain for a chosen area later in Local 3D.',
     pwaServiceWorkerError: 'Service worker: {error}',
     pwaChecking: 'Checking for a new build…',
     pwaNewBuildReady: 'A new build is ready; use Reload in the banner.',
@@ -142,38 +130,40 @@ export const en = {
     pwaReload: 'Reload',
     pwaGotIt: 'Got it',
     pwaLater: 'Later',
-    offlineAreaNotPrepared: 'Offline: area not prepared',
+    offlineAreaNotPrepared: 'Offline: area not saved',
     offlineReady: 'Offline: ready',
-    offlinePrepared: 'Offline: prepared',
-    offlineNotPrepared: 'Offline: not prepared',
+    offlinePrepared: 'Offline: saved',
+    offlineNotPrepared: 'Offline: area not saved',
     offlineMode: 'Offline mode.',
-    refractionSubRefracted: 'refracted',
-    refractionSubAirless: 'airless',
-    rangeSub: '{ratio} lunar distances',
-    rateValue: '{rate}°/min',
-    magnitudeValue: '{magnitude} (est.)',
-    sizeSub: 'true angular size',
-    viewBelow: 'Below horizon',
-    viewInWindow: 'In visibility window',
-    viewNotDark: 'Above horizon, not dark',
-    viewSubPhase1: 'Phase 1 (Sun < −6°)',
-    viewSubNotMet: 'Sun criterion not met',
-    badgeDisplayRefracted: 'refracted (display)',
-    badgeAirless: 'airless',
+    refractionSubRefracted: 'light bent near the horizon',
+    refractionSubAirless: 'straight line of sight',
+    rangeSub: '{ratio} × Moon distance',
+    rateValue: '{rate}° per minute',
+    magnitudeValue: '{magnitude} (estimated)',
+    magnitudeSub: 'lower numbers are brighter',
+    sizeSub: 'how wide it looks',
+    viewBelow: 'Below the horizon',
+    viewInWindow: 'Visible now',
+    viewNotDark: 'Up, but the sky is too bright',
+    viewSubPhase1: 'Sun at least 6° below the horizon',
+    viewSubNotMet: 'Sun is still too high',
+    viewSubBelow: 'It is below the horizon now',
+    badgeDisplayRefracted: 'light bent (display)',
+    badgeAirless: 'straight line',
     badgeVisibilityBelow: 'below horizon',
-    badgeVisibilityVisible: 'visible · Sun < −6°',
-    badgeVisibilityNotDark: 'above horizon · not dark',
+    badgeVisibilityVisible: 'visible · sky dark enough',
+    badgeVisibilityNotDark: 'up · sky too bright',
     readoutNoteRefracted:
-      'Refracted azimuth/elevation · range/rate/size are geometric · magnitude is an H-G estimate · marker glow encodes magnitude, not the 1.7″ physical disc.',
+      'Direction and height are adjusted for air bending near the horizon. Distance, speed and size are direct calculations. Brightness is an estimate. The glow shows brightness, not the real 1.7″ size.',
     readoutNoteAirless:
-      'Airless azimuth/elevation · range/rate/size are geometric · magnitude is an H-G estimate · marker glow encodes magnitude, not the 1.7″ physical disc.',
-    trailTicksTitle: '5-min trail ticks (local, thinned on dome):',
+      'Direction and height use a straight line of sight. Distance, speed and size are direct calculations. Brightness is an estimate. The glow shows brightness, not the real 1.7″ size.',
+    trailTicksTitle: 'Trail times (local):',
     trailTicksNone:
-      '5-min trail ticks: none above the horizon in this ±3 h window.',
+      'No trail times above the horizon in this ±3 h window.',
     sizeBadge: 'Apophis {arcsec}″',
     sizeAtRange: 'at {range}',
     sizeTableObject: 'Object',
-    sizeTableAngular: 'Angular',
+    sizeTableAngular: 'How wide',
     sizeTableVsApophis: 'vs Apophis',
     sizeObjectMoon: 'Moon',
     sizeObjectApophis: 'Apophis',
@@ -181,7 +171,7 @@ export const en = {
     sizeObjectFootball: 'Football pitch (length)',
     sizeObjectIss: 'ISS (solar-array span)',
     sizeNote:
-      'Every angular figure is calculated as 2·atan(radius/distance) at the current Apophis range. The Moon is shown as if it were at that distance, not its real 384,400 km. Apophis’ real size is {arcsec}″; the true-scale marker is a point, and the dashed marker is labelled “not to scale”.',
+      'Apophis is only {arcsec}″ wide here — a point of light, not a disc. The Moon is shown as if it were at Apophis’ distance, so the comparison is fair; its real distance is much farther away. The dashed marker is enlarged and labelled “not to scale”.',
     presetBrasov: 'Brasov, Romania',
     presetCapeTown: 'Cape Town, South Africa',
     presetTenerife: 'Teide Observatory, Tenerife',
@@ -196,15 +186,15 @@ export const en = {
     aboutQueryLink: ' <a href="{url}">Exact Horizons query</a>.',
     aboutDevelopment: 'development',
     aboutOfflineNone:
-      '<p>No offline area is prepared. Open <strong>Local 3D</strong> and press <strong>Prepare for offline</strong>.</p>',
+      '<p>No offline area is saved. Open <strong>Local 3D</strong> and press <strong>Save this area offline</strong>.</p>',
     aboutOfflinePresent:
-      '<p><strong>Prepared</strong> {prepared} · {bytes}</p>\n        <p><strong>Area</strong> {area} · search radius {searchRadius} m · buildings within {buildingRadius} m</p>\n        <p><strong>Ephemeris</strong> solution {solution} · retrieved {retrieved} · {ephemerisBytes}</p>\n        <p><strong>Stars</strong> {stars}</p>\n        <p><strong>Terrain</strong> {tileCount} DEM tiles (z{zoom}) · {terrainBytes} · {attribution}</p>\n        <p><strong>Buildings</strong> {buildings}</p>\n        <p><strong>Base map</strong> {baseMapNote}</p>\n        {warnings}\n        <p><strong>Data source</strong> {provider} · solution {solution}.</p>',
+      '<p><strong>Saved</strong> {prepared} · {bytes}</p>\n        <p><strong>Area</strong> {area} · search radius {searchRadius} m · buildings within {buildingRadius} m</p>\n        <p><strong>Sky data</strong> retrieved {retrieved} · {ephemerisBytes}</p>\n        <p><strong>Stars</strong> {stars}</p>\n        <p><strong>Terrain</strong> {tileCount} terrain tiles · {terrainBytes} · {attribution}</p>\n        <p><strong>Buildings</strong> {buildings}</p>\n        <p><strong>Map</strong> {baseMapNote}</p>\n        {warnings}\n        <p><strong>Data source</strong> {provider} · solution {solution}.</p>',
     aboutStarsValue: '{source} · {bytes}',
     aboutNotStored: 'not stored',
     aboutBuildingsValue:
-      '{count} OSM ways · {defaultCount} default height · {bytes} · {source}{sourceLabel} · retrieved {retrieved}',
+      '{count} buildings · {defaultCount} with estimated height · {bytes} · {source}{sourceLabel} · retrieved {retrieved}',
     aboutBuildingsMissing:
-      'not stored (best-spot scores marked incomplete)',
+      'not saved (clear-spot scores marked incomplete)',
     aboutSourceLabel: ' ({label})',
     aboutWarnings: '<p class="status-line warn">{warnings}</p>',
     aboutStorageUnsupported:
@@ -250,32 +240,33 @@ export const en = {
   event: {
     title: 'Event day',
     subtitle:
-      'A short plan generated from the current observer, ephemeris and visibility window.',
+      'A short plan based on your location, the sky data and when Apophis is visible.',
     badge: '13 April 2029',
     yourPlan: 'Your plan',
     checklist: 'Checklist',
-    waitingSession: 'Waiting for the simulation session.',
+    waitingSession: 'Preparing the simulation…',
     footer:
-      'The object is a point of light. The app’s marker is enlarged only when you turn on “Enlarged marker”; the true angular size is shown in the readout.',
-    waitingObserver: 'Waiting for the ephemeris and observer.',
-    noWindowFallback: 'No physical Phase 1 visibility window at this location.',
+      'The object is a point of light. The marker is enlarged only when you turn on “Enlarge the marker”; the real apparent size is shown below.',
+    waitingObserver: 'Waiting for the sky data and your location.',
+    noWindowFallback:
+      'Apophis is not visible from this location during the pass.',
     chooseAnother:
-      'Choose another observer or check the Sun/Moon geometry.',
+      'Try another location, or check whether the Sun or Moon is in the way.',
     spotNote:
-      'Run the best-spot search in Local 3D, tap a result and press “Make this the observer” to make this plan spot-specific.',
+      'Run the clear-spot search in Local 3D, tap a result and press “Use this spot” to make this plan specific to that place.',
     plan:
-      '<dl class="event-plan-list">\n        <dt>Location</dt>\n        <dd>{location}</dd>\n        <dt>Closest approach</dt>\n        <dd><strong>{caUtc}</strong> · {caLocal} · range {range}</dd>\n        <dt>Look at closest approach</dt>\n        <dd><strong>{azimuth}° ({compass})</strong>, elevation <strong>{elevation}°</strong></dd>\n        <dt>Visible window</dt>\n        <dd>{window}</dd>\n        <dt>Highest</dt>\n        <dd>{highest}</dd>\n        <dt>Path direction</dt>\n        <dd>{direction}</dd>\n        <dt>What you will see</dt>\n        <dd>{what}</dd>\n        <dt>Spot</dt>\n        <dd>{spot}</dd>\n      </dl>',
+      '<dl class="event-plan-list">\n        <dt>Location</dt>\n        <dd>{location}</dd>\n        <dt>Closest approach</dt>\n        <dd><strong>{caUtc}</strong> · {caLocal} · distance {range} km</dd>\n        <dt>Look at closest approach</dt>\n        <dd><strong>{azimuth}° ({compass})</strong>, height <strong>{elevation}°</strong></dd>\n        <dt>Visible</dt>\n        <dd>{window}</dd>\n        <dt>Highest in sky</dt>\n        <dd>{highest}</dd>\n        <dt>Direction</dt>\n        <dd>{direction}</dd>\n        <dt>What you will see</dt>\n        <dd>{what}</dd>\n        <dt>Spot</dt>\n        <dd>{spot}</dd>\n      </dl>',
     locationLine: '{lat}°, {lon}° · ground {ground} · eye {eye} m',
     groundUnknown: 'unknown',
     visibleWindow: '{start} → {end}',
     highest: '{time} ({local}) at {elevation}°',
-    pathDirection: '{direction} · elevation {min}° → {max}°',
+    pathDirection: '{direction} · height {min}° → {max}°',
     whatYouSee:
-      'A fast-moving point of light (V ≈ {magnitude}, true size {size}″). It will not look like a disc or a movie asteroid. The trail and motion are the signature.',
+      'A fast-moving point of light (brightness {magnitude}, apparent size {size}″). It will not look like a disc or a movie asteroid; its motion is the giveaway.',
     checklistItems: {
       charge: {
         label: 'Charge the phone and bring a power bank',
-        detail: 'Cold batteries drain faster; AR and GPS are power-hungry.',
+        detail: 'Cold batteries drain faster; AR and GPS use a lot of power.',
       },
       update: {
         label: 'Update the app and open it once while online',
@@ -283,18 +274,19 @@ export const en = {
           'A new build is offered as a reload prompt; do not update in the field.',
       },
       install: {
-        label: 'Install the PWA / Add to Home Screen',
+        label: 'Install the app / Add to Home Screen',
         detail:
-          'On iOS this is what keeps offline data from being evicted after 7 days without a tap.',
+          'On iPhone/iPad, this stops Safari from deleting offline data after 7 days without opening it.',
       },
       prepare: {
-        label: 'Prepare the offline area for the chosen spot',
-        detail: 'Local 3D → Prepare for offline. Wait for “Offline area ready”.',
+        label: 'Save the offline area for your chosen spot',
+        detail:
+          'Local 3D → Save this area offline. Wait for “Offline area ready”.',
       },
       calibrate: {
-        label: 'Calibrate AR on the Moon or a bright planet',
+        label: 'Line up AR using the Moon or a bright planet',
         detail:
-          'Do this before it gets dark, while the object is easy to identify.',
+          'Do this before it gets dark, while the object is easy to find.',
       },
       early: {
         label: 'Go outside at least 30–45 minutes early',
@@ -308,116 +300,130 @@ export const en = {
       expectation: {
         label: 'Expect a fast-moving point of light, not a disc',
         detail:
-          'At flyby the angular size is only a few arcseconds; the trail is the giveaway.',
+          'It will look like a moving star, not a disc; the motion is the giveaway.',
       },
     },
   },
 
   plot: {
-    goodThreshold: 'good ≥ {degrees}°',
-    axisElevation: 'Elevation',
-    axisMagnitude: 'V mag',
+    goodThreshold: 'easy to see above {degrees}°',
+    axisElevation: 'Height',
+    axisMagnitude: 'Brightness',
   },
 
   terrain: {
-    headerTitle: 'Terrain, buildings &amp; best spot',
+    headerTitle: 'Your view, terrain &amp; clear spots',
     headerIntro:
-      'Local horizon from the AWS Terrarium DEM and OpenStreetMap buildings, with the Phase 1 Apophis path.',
-    badgeDem: 'DEM: —',
+      'See what blocks the view from your spot, and find a place with a clearer horizon.',
+    badgeDem: 'Terrain: —',
     badgeBuildings: 'Buildings: —',
-    badgeDemNotPrepared: 'DEM: not prepared',
+    badgeDemNotPrepared: 'Terrain: not saved',
     offlineTerrainNotPrepared:
-      'Offline: terrain is not prepared for this location. Sky and AR still work. Reconnect or move to the prepared area.',
+      'Offline: terrain was not saved for this location. Sky and AR still work. Reconnect or move to the saved area.',
     buildingsOfflineStatus:
-      'Offline: no cached or bundled buildings cover this view. Best-spot scores will be marked incomplete. Reconnect or import a building file.',
-    statusReady: 'Ready. Pick a point on the map or enter coordinates.',
-    observerTitle: 'Observer &amp; map',
+      'Offline: no building data covers this view. Clear-spot scores will be marked incomplete. Reconnect or import a file.',
+    statusReady: 'Ready. Pick a point on the map or use your location.',
+    observerTitle: 'Your location &amp; map',
+    observerIntro:
+      'Use your current location, choose a quick place, or tap the map. This sets the sky, times and what blocks your view.',
     observerMapAria: 'OpenStreetMap location picker',
+    observerPreset: 'Quick choice',
+    observerPresetCustom: 'Custom / map point',
+    observerUseLocation: 'Use my location',
+    observerStatusIdle: 'Choose a location to update the sky and horizon.',
+    observerLocating: 'Finding your location…',
+    observerLocationFailed:
+      'Could not get your location. Check the browser permission or pick a point on the map.',
+    observerLocationUnavailable:
+      'This browser cannot provide your location. Pick a point on the map or enter coordinates.',
+    observerDetails: 'How heights and coordinates are calculated',
+    observerMethod:
+      'Ground height comes from terrain data. Eye height is added on top. On a floor, we assume 3 m per floor; on a roof, we use the tallest nearby building. Phone GPS height is never used.',
     observerLat: 'Latitude °',
     observerLon: 'Longitude °',
-    observerApply: 'Apply',
-    observerRecenter: 'Re-center on map',
-    eyeHeight: 'Eye height (m)',
-    eyeMode: 'Viewpoint',
-    eyeModeGround: 'Ground / custom eye height',
-    eyeModeFloor: 'Floor N',
-    eyeModeRooftop: 'Rooftop (tallest OSM building)',
-    eyeFloor: 'Floor N',
+    observerApply: 'Use this point',
+    observerRecenter: 'Show on map',
+    eyeHeight: 'Your eye height (m)',
+    eyeMode: 'Where you are standing',
+    eyeModeGround: 'On the ground',
+    eyeModeFloor: 'In a building, on a floor',
+    eyeModeRooftop: 'On the roof',
+    eyeFloor: 'Floor number',
     eyeNoteInitial:
-      'Eye height 1.7 m above DEM ground. Floor N uses (N−1)×3 m + 1.7 m; rooftop uses the tallest OSM building at the point + 1.7 m.',
-    groundWaiting: 'Ground elevation: waiting for DEM.',
+      'We add your eye height to the ground height. On a floor, we assume 3 m per floor. On a roof, we use the tallest nearby building.',
+    groundWaiting: 'Ground height: waiting for terrain data.',
     groundNote:
-      'Ground elevation is taken from the DEM. Browser GPS altitude is only a cross-check and is never used. Eye height is added above the DEM ground for the shared sky/AR observer.',
+      'Ground height comes from terrain data for this point. Phone GPS height is not used.',
     demTitle: 'Terrain &amp; buildings',
-    demNotLoaded: 'DEM: not loaded.',
-    demReload: 'Reload DEM',
-    demClearCache: 'Clear tile cache',
-    demDetailIdle: 'AWS Terrarium z15 max; tiles cached in IndexedDB.',
+    demNotLoaded: 'Terrain: not loaded.',
+    demReload: 'Reload terrain',
+    demClearCache: 'Clear terrain cache',
+    demDetailIdle: 'Terrain data is cached in this browser.',
     buildingsNotLoaded: 'Buildings: not loaded.',
-    buildingsFetch: 'Fetch buildings',
-    buildingsClearCache: 'Clear cache',
-    buildingsRadius: 'Building radius (m)',
-    buildingsImportLabel: 'Import GeoJSON / Overpass JSON',
+    buildingsFetch: 'Load buildings',
+    buildingsClearCache: 'Clear building cache',
+    buildingsRadius: 'Buildings within (m)',
+    buildingsImportLabel: 'Import a building file',
     buildingsImportIdle:
-      'Optional fallback: import a building file exported from Overpass or another tool. ODbL attribution applies.',
+      'Optional: import building outlines exported from OpenStreetMap or another tool. Map data © OpenStreetMap contributors.',
     buildingsDetailIdle:
-      'Bundled area first, then one debounced live query per settled view; no polling.',
+      'Buildings are loaded once for the area you are viewing.',
     creditsTerrain:
       '<strong>Terrain:</strong> Terrain Tiles by Mapzen / AWS Open Data. Sources include Copernicus EU-DEM, USGS 3DEP/NED, GMTED2010 and SRTM, NOAA ETOPO1, ArcticDEM (DigitalGlobe/NSF), Geoscience Australia, Austria DGM, Canada OGL, INEGI Mexico, LINZ New Zealand, Kartverket Norway and the UK Environment Agency. <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noreferrer">Full attribution</a>.',
     creditsBuildings:
       '<strong>Buildings:</strong> © OpenStreetMap contributors, ODbL. Overpass API.',
     creditsHeightPriority:
       '<strong>Height priority:</strong> <code>building:height</code> → <code>height</code> → <code>building:levels</code>×3 → 8 m default.',
-    sceneTitle: 'Local 3D view',
-    sceneSubtitle: 'eye-height view',
+    sceneTitle: 'View from your spot',
+    sceneSubtitle: 'at eye height',
     sceneAria: 'Local 3D terrain and building view',
     sceneLook: 'Look at Apophis',
     sceneNavN: 'N',
     sceneNavE: 'E',
     sceneNavS: 'S',
     sceneNavW: 'W',
-    sceneFov: 'FOV',
+    sceneFov: 'Field of view',
     sceneTime: 'Time',
-    sceneTimeAria: 'Time scrub',
+    sceneTimeAria: 'Time slider',
     timeLabelLocal: '{utc}Z · {local} local',
     sceneHint:
-      'Drag to look, scroll/pinch to zoom. The horizon and Apophis trail are depth-tested against the terrain and buildings.',
+      'Drag to look around; scroll or pinch to zoom. Terrain and buildings block the view where they are higher than the line to Apophis.',
     sceneNote:
-      'The trail uses the once-per-area path. Light pollution is <strong>not</strong> modelled; visibility here is geometric skyline clearance only.',
-    horizonTitle: 'Horizon profile',
-    horizonSubtitle: '1° bins',
-    horizonAria: 'Horizon elevation angle by azimuth',
-    horizonEmpty: 'Load a DEM to compute the local horizon.',
-    pathWaiting: 'Apophis path: waiting for the simulation session.',
-    parallaxWaiting: 'Parallax check: —',
-    bestTitle: 'Best spot',
-    bestSubtitle: 'Apophis path computed once per area',
+      'This shows whether the ground or buildings block the view. Light pollution, weather, haze and trees are not included.',
+    horizonTitle: 'Horizon around you',
+    horizonSubtitle: 'how high the skyline is',
+    horizonAria: 'How high the skyline is in each direction',
+    horizonEmpty: 'Load terrain data to see the local horizon.',
+    pathWaiting: 'Path: waiting for the simulation.',
+    parallaxWaiting: 'Distance check: —',
+    bestTitle: 'Find a clear spot',
+    bestSubtitle: 'checks the view around you',
     bestSearchRadius: 'Search radius (m)',
     bestSpacing: 'Grid spacing (m)',
-    bestMargin: 'Minimum elevation margin (°)',
-    bestRun: 'Run search',
+    bestMargin: 'Extra height above the horizon (°)',
+    bestRun: 'Search this area',
     bestCancel: 'Cancel',
     bestStatusIdle:
-      'No search yet. The score is the fraction of the physical Phase 1 visibility window above the local horizon plus the margin.',
+      'No search yet. The score is the share of the pass that would be above the local skyline, with the extra margin you set.',
     bestHeatmapNote:
-      'Heatmap: red = 0% clear, green = 100% clear. Tap a numbered result to teleport the local 3D camera and map. The app-wide observer is not changed unless you use “Make this the observer”.',
+      'Red means the view is blocked; green means it is clear. Tap a numbered result to look from that spot on the map and in 3D. It does not change your main location unless you choose “Use this spot”.',
     bestDisclaimer:
-      'Light pollution, sky brightness, weather and trees are not modelled. Buildings come from OSM and may be missing or stale; default-height buildings are marked amber in 3D. Score is geometric skyline clearance only.',
+      'This only checks whether terrain or buildings block the view. Light pollution, weather, haze and trees are not included. Building heights from OpenStreetMap may be missing or out of date; estimated heights are shown in amber in 3D.',
     offlineTitle: 'Offline',
-    offlineSubtitle: 'prepare the selected area',
-    offlineStatusNone: 'No offline area prepared.',
-    offlinePrepare: 'Prepare for offline',
+    offlineSubtitle: 'save this area for later',
+    offlineStatusNone: 'No offline area saved.',
+    offlinePrepare: 'Save this area offline',
     offlineCancel: 'Cancel',
-    offlineClear: 'Clear prepared area',
-    offlineStoragePending: 'Storage status not checked yet.',
+    offlineClear: 'Delete saved area',
+    offlineStoragePending: 'Checking storage…',
     offlineStoredNote:
-      '<strong>Stored:</strong> ephemeris, star catalogue, AWS Terrarium DEM tiles and OSM building footprints for this area. <strong>Not stored:</strong> OpenStreetMap raster tiles — tile.openstreetmap.org forbids bulk/offline use. The offline base map is a local hillshade plus building footprints. On iOS, Add to Home Screen and open the app weekly; Safari may evict site data after 7 days without a tap.',
+      '<strong>Saved for offline use:</strong> sky data, stars, terrain and building outlines for this area. <strong>Not saved:</strong> OpenStreetMap street tiles, because their service does not allow bulk downloads. The offline map is a simple shaded terrain map with building outlines. On iPhone/iPad, add the app to your Home Screen and open it at least once a week so Safari does not delete the data.',
     footerMethod:
-      '<strong>Method:</strong> AWS Terrarium DEM (Mapzen/joerd) → local ENU mesh with Earth curvature; Overpass <code>way["building"](around:…);out geom;</code>; horizon ray march at 1° azimuth; Phase 1 topocentric Apophis path computed once at the search centre. The 5 km parallax is tens of arcseconds, far below the 1° horizon bin. <strong>Light pollution is not modelled.</strong>',
+      '<strong>How this works:</strong> terrain data builds a local 3D skyline, OpenStreetMap buildings are added, and the horizon is checked in every direction. Light pollution, weather and trees are not included.',
     footerLicences:
-      '<strong>Licences:</strong> Terrain Tiles by Mapzen / AWS Open Data · © OpenStreetMap contributors (ODbL) · Overpass API. Map tiles © OpenStreetMap contributors. See the project notices for full source attribution.',
+      '<strong>Data licences:</strong> Terrain Tiles by Mapzen / AWS Open Data · © OpenStreetMap contributors (ODbL) · Overpass API. See the project notices for full attribution.',
     footerBuildInfo:
-      'Terrain workstream · phases: DEM, buildings, horizon, best spot, local 3D',
+      'Terrain view · terrain, buildings, horizon, clear-spot search, 3D',
     fieldCheckTitle: 'Field check — top 3 spots',
     fieldCheckNote:
       'Record what you actually see on site. Stored only in this browser.',
@@ -431,103 +437,99 @@ export const en = {
       'Run a best-spot search to field-check the top 3 spots.',
     fieldCheckItemTitle: '#{rank} · {lat}°, {lon}°',
     invalidateBuildingRadius:
-      'Building radius changed; run the search again.',
-    invalidateSearchRadius: 'Search radius changed; run the search again.',
-    invalidateSpacing: 'Grid spacing changed; run the search again.',
-    invalidateMargin: 'Elevation margin changed; run the search again.',
-    invalidateObserver: 'Observer changed; run the search again.',
+      'Building distance changed; run the search again.',
+    invalidateSearchRadius: 'Search area changed; run the search again.',
+    invalidateSpacing: 'Search detail changed; run the search again.',
+    invalidateMargin: 'Height margin changed; run the search again.',
+    invalidateObserver: 'Location changed; run the search again.',
     invalidateEyeHeight: 'Eye height changed; run the search again.',
     invalidateBuildingsUpdated: 'Buildings updated; run the search again.',
     invalidateBuildingsImported: 'Buildings imported; run the search again.',
     observerMissing:
-      'No observer is set. Enter coordinates or pick a point on the map.',
-    badgeDemLoading: 'DEM: loading…',
+      'Choose a location first. Enter coordinates or pick a point on the map.',
+    badgeDemLoading: 'Terrain: loading…',
     observerErrorLat: 'Latitude must be between −90° and +90°.',
     observerErrorLon: 'Longitude must be between −180° and +180°.',
     eyeErrorRooftopNoBuildings:
-      'Rooftop needs building data at the observer. Fetch buildings first.',
+      'Roof height needs building data. Load buildings first.',
     eyeErrorRooftopNoFootprint:
-      'No OSM building footprint at this point; rooftop unavailable. Using the ground eye height.',
+      'There is no building outline at this point, so roof height is unavailable. Using ground level instead.',
     eyeRooftopDetail:
-      'Rooftop of OSM way {id}: {height} m ({source}) + 1.7 m eye.',
-    eyeDefaultHeight: 'default 8 m height',
+      'The tallest nearby building here is {height} m high.',
+    eyeDefaultHeight: 'estimated height',
     eyeNoteFloor:
-      'Floor {floor}: {height} above DEM ground ((N−1)×3 m + 1.7 m).',
-    eyeNoteRooftop: 'Rooftop: {height} above DEM ground.',
-    eyeNoteGround: 'Eye height {height} above DEM ground.',
-    eyeHostAvailable:
-      'The shared session eye height is updated through the optional host setter.',
-    eyeHostUnavailable:
-      'The shared session has no eye-height setter in the required API, so this value is local to the terrain tab; the sky tab keeps its own eye height.',
+      'Floor {floor}: your eye is {height} above the ground.',
+    eyeNoteRooftop: 'Roof: your eye is {height} above the ground.',
+    eyeNoteGround: 'Your eye is {height} above the ground.',
     eyeNoteSuffix:
-      'Floor N uses (N−1)×3 m + 1.7 m; rooftop uses the tallest OSM building + 1.7 m.',
-    eyeNoteCombined: '{base} {extra} {suffix} {host}',
-    statusDemLoading: 'Loading DEM tiles around {lat}°, {lon}°…',
+      'For a floor, we assume 3 m per floor; for a roof, we use the tallest nearby building.',
+    eyeNoteCombined: '{base} {extra} {suffix}',
+    statusDemLoading: 'Loading terrain around {lat}°, {lon}°…',
     statusDemReady:
-      'DEM ready: z{zoom}, {spacing} m/px, {tiles} tiles ({failed} failed). Ground elevation {ground}.',
+      'Terrain ready: {spacing} m per pixel, {tiles} tiles. Ground height {ground}.',
     unknown: 'unknown',
-    statusHostDemReady: 'Terrain DEM z{zoom} at {spacing} m/px loaded.',
+    statusHostDemReady: 'Terrain loaded at {spacing} m per pixel.',
     statusDemFailed:
-      'DEM load failed: {message}. Check the tile service and retry.',
-    badgeDemFailed: 'DEM: failed',
-    badgeDemProgress: 'DEM: {loaded}/{total}',
+      'Terrain could not load: {message}. Check your connection and try again.',
+    badgeDemFailed: 'Terrain: failed',
+    badgeDemProgress: 'Terrain: {loaded}/{total}',
     groundUnknown:
-      'Ground elevation: unknown until the DEM loads. GPS altitude is not used.',
+      'Ground height is unknown until terrain loads. Phone GPS height is not used.',
     groundMismatch:
-      'Local scene ground (ENU anchor): {local}; shared astronomy ground (Mercator sample): {shared}. Difference {difference}: the horizon profile, 3D mesh and eye height use the local anchor, while the shared ephemeris/session uses the Mercator ground. GPS altitude is ignored. Local eye altitude: {altitude}.',
+      'Ground height: {local} for the 3D view, {shared} for the sky view (difference {difference}). The 3D view uses {local}. Phone GPS height is ignored.',
     groundOk:
-      'Ground elevation from DEM: {ground} above sea level. Local scene anchor and shared astronomy ground agree within 0.1 m. Browser GPS altitude is ignored; it is only a cross-check. Effective eye altitude: {altitude}.',
+      'Ground height from terrain data: {ground}. Eye altitude: {altitude}. Phone GPS height is ignored.',
     demInfo:
-      'DEM: z{zoom} · {spacing} m/px · {width} × {height} km · {tiles} tiles ({cached} cached, {network} network, {failed} failed) · Mercator ground {ground}.',
-    badgeDemValue: 'DEM: z{zoom} {spacing} m/px',
+      'Terrain: {spacing} m per pixel · {width} × {height} km · {tiles} tiles ({cached} cached, {network} downloaded, {failed} failed) · ground {ground}.',
+    badgeDemValue: 'Terrain: {spacing} m per pixel',
     demDetailFailed:
-      '{count} tiles failed; gaps are transparent in 3D and skipped in the horizon. Use Reload DEM to retry.',
+      '{count} terrain tiles failed. Gaps are left empty in 3D and skipped in the horizon. Try Reload terrain.',
     demDetailOk:
-      'Tile-aligned Web Mercator grid resampled to a local ENU frame; Earth curvature applied for distances > 5 km.',
+      'Terrain is shown as a local 3D view, including Earth curvature for distant ground.',
     buildingsOfflineBadge: 'Buildings: offline',
     buildingsOfflineDetail:
-      'Offline: no building snapshot was stored for this area. The horizon uses terrain only; import a file or re-prepare online.',
-    importNoObserver: 'Set an observer before importing building data.',
-    importWaitDem: 'Wait for the DEM to load, then import the building file.',
+      'Offline: building data was not saved for this area. The horizon uses terrain only. Reconnect or import a file.',
+    importNoObserver: 'Choose a location first.',
+    importWaitDem: 'Wait for terrain to load, then import the file.',
     importNoPolygons:
-      'The file contains no usable building polygons. Nothing was replaced.',
+      'The file contains no usable buildings. Nothing was replaced.',
     importSuccessStatus:
-      'Imported {count} buildings from {file}; {defaultCount} use the 8 m default. ODbL attribution applies.',
-    importSuccessHost: 'Imported {count} building ways from {file}.',
+      'Imported {count} buildings from {file}; {defaultCount} use an estimated 8 m height.',
+    importSuccessHost: 'Imported {count} buildings from {file}.',
     importFailedStatus: 'Import failed: {message}',
     importFailedHost: 'Building import failed: {message}',
     buildingsAlreadyLoaded:
-      'Buildings already loaded for this view ({count} ways).',
+      'Buildings are already loaded for this view ({count}).',
     badgeBuildingsLoading: 'Buildings: loading…',
     buildingsLoadedStatus:
-      'Buildings: {count} ways within {radius}; {defaultCount} use the {defaultHeight} m default.',
-    buildingsLoadedHost: 'Terrain buildings loaded: {count} OSM ways.',
-    badgeBuildingsCooldown: 'Buildings: cooldown',
+      'Buildings: {count} within {radius}; {defaultCount} use an estimated {defaultHeight} m height.',
+    buildingsLoadedHost: 'Buildings loaded: {count} from OpenStreetMap.',
+    badgeBuildingsCooldown: 'Buildings: wait',
     buildingsRateLimitDetail:
-      'Overpass returned HTTP 429. No automatic retry will be made; wait for the cooldown, then press Fetch buildings.',
+      'The map service asked us to slow down. Wait for the countdown, then press Load buildings again.',
     buildingsTimeoutStatus:
-      '{message} No automatic retry; press Fetch buildings to try again.',
-    badgeBuildingsTimeout: 'Buildings: timeout',
+      '{message} Press Load buildings to try again.',
+    badgeBuildingsTimeout: 'Buildings: slow',
     buildingsTimeoutDetail:
-      'Overpass timed out or was slow. Data may be incomplete; the best-spot search can still run with existing buildings.',
-    overpassError: 'Overpass error: {message}',
+      'The map service was slow. Building data may be incomplete, but the clear-spot search can still run with what is loaded.',
+    overpassError: 'Map service error: {message}',
     badgeBuildingsError: 'Buildings: error',
-    buildingFetchFailed: 'Building fetch failed: {message}',
+    buildingFetchFailed: 'Could not load buildings: {message}',
     buildingsInfo:
-      'Buildings: {count} ways · {tagged} tagged · {defaultCount} default ({percent}%) · query {radius} · {source}{sourceLabel}{retrieved}{osm}.',
+      'Buildings: {count} within {radius}. {defaultCount} ({percent}%) use an estimated height.',
     buildingsSourceLabel: ' ({label})',
     buildingsRetrieved: ' · retrieved {time}',
-    buildingsOsm: ' · OSM {time}',
-    badgeBuildingsValue: 'Buildings: {count} ({percent}% default)',
+    buildingsOsm: ' · OpenStreetMap {time}',
+    badgeBuildingsValue: 'Buildings: {count} ({percent}% estimated)',
     buildingsNoneDetail:
-      'No building ways found in this radius. The horizon will use terrain only.',
+      'No buildings found in this radius. The horizon will use terrain only.',
     buildingsDefaultDetail:
-      '{defaultCount} of {total} ways ({percent}%) use the 8 m fallback height; these extrude amber in 3D. Height priority: building:height → height → building:levels×3 → 8 m. ODbL © OpenStreetMap contributors.',
+      '{defaultCount} of {total} buildings ({percent}%) have no height in OpenStreetMap, so we assume 8 m; they are shown in amber in 3D. © OpenStreetMap contributors.',
     buildingsCooldownFinished:
-      'Overpass cooldown finished. Press Fetch buildings to query once.',
+      'The wait is over. Press Load buildings to try again.',
     badgeBuildingsReady: 'Buildings: ready',
     buildingsCooldown:
-      'Overpass cooldown: {seconds} s remaining. No automatic retry.',
+      'Please wait {seconds} s before loading buildings again.',
     badgeBuildingsCountdown: 'Buildings: {seconds}s',
     cacheTerrainCleared: 'Terrain tile cache cleared.',
     cacheBuildingCleared: 'Building cache cleared.',
@@ -536,122 +538,122 @@ export const en = {
     pathNoSession: 'Apophis path: the simulation session is not ready.',
     pathNoSessionYet: 'Apophis path: no simulation session yet.',
     pathInfo:
-      'Apophis path (Phase 1, airless): <strong>{sector}</strong>; elevation {min}°–{max}°, max at {maxUtc}. Physical visibility {start} → {end}; {samples} samples at 30 s. The path is computed <strong>once</strong> for this search area, not per candidate.',
+      'Path: <strong>{sector}</strong>; height {min}°–{max}°, highest at {maxUtc}. Visible {start} → {end}. The path is calculated once for this search area.',
     parallaxInfo:
-      'Parallax over a 5 km baseline: {arcsec}″ at {range} km (worst on the visible path); {geocentricArcsec}″ at {geocentricRange} km (geocentric CA). This is <1° horizon-bin width and shifts edge-of-ridge timing by seconds, not the ranking.',
-    horizonBuildingSource: 'building way {id}',
-    horizonCandidate: 'candidate {lat}°, {lon}°',
-    horizonObserver: 'observer',
+      'Moving 5 km changes the view by only {arcsec}″ — far less than one horizon step.',
+    horizonBuildingSource: 'building {id}',
+    horizonCandidate: 'spot {lat}°, {lon}°',
+    horizonObserver: 'you',
     horizonInside:
-      ' The viewpoint is inside OSM building way {id} ({height} high); the ground 3D view is inside its walls. Choose Rooftop or move the point.',
+      ' You are inside a mapped building ({height} high). Choose Roof or move the point.',
     horizonAnchor:
-      ' Local ENU anchor; shared astronomy ground is {ground} (Mercator).',
+      ' The shared sky view uses a slightly different ground reading: {ground}.',
     horizonInfo:
-      'Horizon at {location}: ground {ground} + eye {eye} = {total}; 360 bins at 1°; highest obstruction {elevation}° at az {azimuth}° ({source}{distance}); {buildings} buildings considered (within {radius}). Terrain ray distance is limited by the DEM patch.{anchor}{inside}',
+      'Horizon at {location}: ground {ground} + eye {eye} = {total}. The skyline is highest at {elevation}° in direction {azimuth}° ({source}{distance}). {buildings} buildings checked within {radius}.{anchor}{inside}',
     horizonDistance: ', {distance} away',
     sceneMarkerUnavailable: 'Apophis marker unavailable.',
     sceneMarker:
-      'Apophis az {az}° el {el}°; horizon {horizon}° → {state}.',
-    sceneStateBelow: 'below horizon',
-    sceneStateOccluded: 'occluded by terrain/buildings',
+      'Apophis: direction {az}°, height {el}°; skyline {horizon}° → {state}.',
+    sceneStateBelow: 'below the horizon',
+    sceneStateOccluded: 'blocked by terrain or buildings',
     sceneStateVisible: 'visible',
-    sceneCamera: 'Camera az {az}° el {el}° · FOV {fov}°. {marker}',
+    sceneCamera: 'Looking {az}° / {el}° · field of view {fov}°. {marker}',
     bestErrorNeedsDem:
-      'Best spot needs a loaded DEM and a simulation session. Wait for the DEM, then retry.',
-    bestErrorNoWindow: 'No physical visibility window at this observer.',
+      'The clear-spot search needs terrain data and a loaded simulation. Wait for terrain, then try again.',
+    bestErrorNoWindow: 'Apophis is not visible from this location during the pass.',
     bestStatusPreparing:
-      'Preparing the search area and building coverage…',
+      'Checking the area and nearby buildings…',
     bestStatusFetchingBuildings:
-      'Fetching buildings covering the search area ({radius})…',
+      'Loading buildings for the search area ({radius})…',
     bestWarningBuildingsIncomplete:
-      'Building data could not be expanded to cover the whole search area. Scores may be optimistic; buildings from the previous query are still used where available.',
+      'Building data did not cover the whole area, so some scores may be too optimistic. Buildings that were already loaded are still used.',
     bestWarningCancelled:
-      'Observer or DEM changed during the building fetch; search cancelled. Run it again.',
+      'The location or terrain changed during the search, so it was cancelled. Run it again.',
     bestErrorNoCandidates:
-      'No candidate grid points fall inside the DEM. Reload the DEM or choose a smaller radius.',
+      'No search points fall inside the terrain area. Reload terrain or choose a smaller radius.',
     bestStatusScoringStart:
-      'Scoring {count} candidates in a Web Worker…',
-    bestStatusScoring: 'Scoring {processed} / {total} candidates…',
-    bestStatusCancelled: 'Best-spot search cancelled.',
+      'Checking {count} possible spots…',
+    bestStatusScoring: 'Checked {processed} of {total} spots…',
+    bestStatusCancelled: 'Clear-spot search cancelled.',
     bestStatusCompletePrefix: 'Search complete: ',
     bestStatusCompleteClear:
-      '{percent}% clear (pessimistic) at {lat}°, {lon}°',
-    bestStatusCompleteNoClear: 'no clear candidates',
+      '{percent}% clear (cautious estimate) at {lat}°, {lon}°',
+    bestStatusCompleteNoClear: 'no clear spots',
     bestStatusCompleteSuffix:
-      ' · {count} candidates in {seconds} s.',
-    bestHostStatus: 'Best spot: {summary}',
+      ' · {count} spots in {seconds} s.',
+    bestHostStatus: 'Clear-spot search: {summary}',
     bestHostTop:
-      'Terrain best-spot search found {count} top candidates.',
+      'The clear-spot search found {count} good spots.',
     bestStatusFailed: 'Search failed: {message}',
-    bestStatusHostFailed: 'Best-spot search failed: {message}',
+    bestStatusHostFailed: 'Clear-spot search failed: {message}',
     bestWorkerError: 'worker error',
     bestStatusCancelledShort: 'Search cancelled.',
     bestSummary:
-      '{count} candidates · {radius} radius · {spacing} m spacing · {margin}° margin · {pathSamples} path samples · {seconds} s. Ranked by the pessimistic score (default building heights ×1.5); range shows ×0.7 to ×1.5. Score = fraction of the physical Phase 1 visibility window above the local horizon + margin.',
+      'Checked {count} spots in {seconds} s. Each score is the share of the pass above the local skyline. The ranking is cautious about building heights; the range shows the cautious-to-optimistic spread.',
     bestWarningIncomplete:
-      'Warning: the Overpass query did not cover the full search area, so some buildings may be missing. Treat open-looking spots as provisional.',
+      'Building data did not cover the whole search area, so some spots may look clearer than they are. Treat them as provisional.',
     bestDetailEmpty:
-      'No scored candidates. Check the DEM coverage.',
+      'No results. Try reloading terrain or choosing a smaller area.',
     bestDetailHint:
-      'Tap a result to move the local 3D camera and map. “Rank ±N” means the spot moves N places between optimistic and pessimistic default heights. The app-wide observer and the shared Phase 1 path are unchanged.',
+      'Tap a spot to look from there. “Rank ±N” means it moves N places when building heights are uncertain.',
     bestViewpoint:
-      '<strong>Local viewpoint #{rank}</strong> at {lat}°, {lon}° · ground {ground} · pessimistic score {score}% (optimistic {optimistic}%) · rank {rankPessimistic} (optimistic rank {rankOptimistic}, spread {spread}) · min clearance {clearance}°. {reason}',
-    bestMakeObserver: 'Make this the observer',
+      '<strong>Spot #{rank}</strong> at {lat}°, {lon}° · ground {ground} · cautious score {score}% (optimistic {optimistic}%) · rank {rankPessimistic} (optimistic rank {rankOptimistic}, spread {spread}) · lowest clearance {clearance}°. {reason}',
+    bestMakeObserver: 'Use this spot',
     bestSummaryNone: 'No current search result.',
     bestSummaryInitial: 'No search yet.',
     footerBuildInfoInitial:
       'Terrain workstream · cached DEM tiles: — · cached Overpass queries: —',
-    blockersDefault: '{count} default-height',
-    blockersReal: '{count} real-height',
+    blockersDefault: '{count} with estimated height',
+    blockersReal: '{count} with mapped height',
     blockersTerrain: 'terrain',
     blockersNone: 'none',
     openNoBuildings: 'no mapped buildings',
-    openInside: 'inside a building footprint',
-    openNearest: '{distance} m to nearest building',
+    openInside: 'inside a building outline',
+    openNearest: '{distance} m to the nearest building',
     rankFlag: 'rank ±{spread}',
-    rankFlagTitle: 'Rank changes with the height assumption',
+    rankFlagTitle: 'Rank changes when building heights are uncertain',
     rank: '#{rank}',
     scoreRange:
-      '{optimistic}–{pessimistic}% across height assumptions',
+      '{optimistic}–{pessimistic}% depending on building heights',
     blockers: 'Blockers: {blockers} · {openSpace}',
     offlinePreparedStatus:
-      'Offline area ready · {bytes} · prepared {date}.',
-    offlineStatusPreparing: 'Preparing offline area…',
-    offlineStatusCancelled: 'Offline preparation cancelled.',
-    offlineStatusFailed: 'Offline preparation failed: {message}',
+      'Area saved for offline use · {bytes} · {date}.',
+    offlineStatusPreparing: 'Saving this area for offline use…',
+    offlineStatusCancelled: 'Saving cancelled.',
+    offlineStatusFailed: 'Could not save the area: {message}',
     offlineErrorNoObserver:
-      'Set an observer before preparing an offline area.',
+      'Choose a location before saving an offline area.',
     offlineErrorOffline:
-      'Cannot prepare offline data while offline. Reconnect, then press Prepare for offline.',
-    offlinePreparedHost: 'Offline area prepared for this location.',
-    offlineCleared: 'Offline data cleared.',
+      'You are offline. Reconnect, then save the area.',
+    offlinePreparedHost: 'Offline area saved for this location.',
+    offlineCleared: 'Saved offline data deleted.',
     offlineClearConfirm:
-      'Clear the prepared offline area, cached DEM tiles and cached building data? The app shell itself stays installed.',
+      'Delete the saved area, cached terrain and building data? The app itself stays installed.',
     offlineStatusOfflineNoSnapshot:
-      'Offline mode, but no prepared snapshot was found. Reconnect and prepare an area.',
-    offlineRunning: ' · running offline from this snapshot',
-    offlineStatusPrepared: 'Prepared {date} · {bytes}{active}.',
+      'You are offline and no saved area was found. Reconnect and save an area.',
+    offlineRunning: ' · using this saved area',
+    offlineStatusPrepared: 'Saved {date} · {bytes}{active}.',
     offlineContentsEphemeris:
-      '<li><strong>Ephemeris:</strong> {provider} · solution {solution} · retrieved {retrieved} · {bytes}</li>',
+      '<li><strong>Sky data:</strong> {provider} · solution {solution} · retrieved {retrieved} · {bytes}</li>',
     offlineContentsStars:
       '<li><strong>Stars:</strong> {stars}</li>',
     offlineContentsTerrain:
-      '<li><strong>Terrain:</strong> {tiles} DEM tiles at z{zoom} · {bytes} · {attribution}</li>',
+      '<li><strong>Terrain:</strong> {tiles} terrain tiles · {bytes} · {attribution}</li>',
     offlineContentsBuildings:
       '<li><strong>Buildings:</strong> {buildings}</li>',
     offlineContentsBaseMap:
-      '<li><strong>Base map:</strong> locally rendered hillshade from cached DEM + building footprints; OSM raster tiles are not stored.</li>',
+      '<li><strong>Map:</strong> a shaded terrain map with building outlines. OpenStreetMap street tiles are not saved.</li>',
     offlineNotStored: 'not stored',
     offlineBuildingsValue:
-      '{count} OSM ways · {defaultCount} default height · {bytes} · {source}{sourceLabel}',
+      '{count} buildings · {defaultCount} with estimated height · {bytes} · {source}{sourceLabel}',
     offlineBuildingsMissing:
-      'not stored; best-spot scores will be marked incomplete',
+      'not stored; clear-spot scores will be incomplete',
     offlineMismatchWarning:
-      'This observer is outside the prepared area. Sky and AR still work; terrain maps and best-spot searches for this location do not.',
+      'This location is outside the saved area. Sky and AR still work; terrain maps and clear-spot searches do not.',
     offlineBuildingsNotPrepared:
-      'Buildings: not prepared for this offline location.',
+      'Buildings: not saved for this offline location.',
     offlineDemNotPrepared:
-      'DEM: not prepared for this offline location.',
+      'Terrain: not saved for this offline location.',
     offlineBuildingsBadgeNotPrepared: 'Buildings: not prepared',
     offlineIncomplete: 'Offline data is incomplete.',
     offlineStorage:
@@ -662,52 +664,52 @@ export const en = {
     offlineLoadedFromSnapshot:
       'Loaded {count} buildings from the offline snapshot (retrieved {retrieved}).',
     buildingsProgressCheckingBundled:
-      'Checking for a bundled building area…',
+      'Checking for saved building data…',
     buildingsProgressNoBundledCoverage:
-      'No bundled area covers this view; querying Overpass…',
+      'No saved building data covers this view; loading from OpenStreetMap…',
     buildingsProgressLoadingBundled:
-      'Loading bundled area "{area}" for buildings within {radius} km…',
+      'Loading saved buildings from "{area}" within {radius} km…',
     buildingsProgressLoadedBundled:
-      'Loaded {count} buildings from the bundled area "{area}".',
+      'Loaded {count} buildings from "{area}".',
     buildingsProgressBundledUnavailable:
-      'Bundled building area unavailable; querying Overpass…',
-    buildingsProgressCheckingCache: 'Checking the local building cache…',
+      'Saved building data unavailable; loading from OpenStreetMap…',
+    buildingsProgressCheckingCache: 'Checking saved buildings…',
     buildingsProgressCacheHit:
-      'Loaded {count} buildings from cache ({source}).',
+      'Loaded {count} buildings from saved data ({source}).',
     buildingsProgressRetry:
-      '{action} {endpoint} in {seconds} s…',
+      'Trying again in {seconds} s…',
     buildingsProgressRetryAction: 'Retrying',
-    buildingsProgressFallbackAction: 'Trying the fallback endpoint',
+    buildingsProgressFallbackAction: 'Trying another map service',
     buildingsProgressQuerying:
-      'Querying {endpoint} for buildings within {radius} km…',
+      'Loading buildings within {radius} km from OpenStreetMap…',
     buildingsProgressLoaded:
-      'Loaded {count} buildings; {defaultCount} use the {defaultHeight} m default.',
+      'Loaded {count} buildings; {defaultCount} use an estimated {defaultHeight} m height.',
     buildingsProgressUnreachable:
-      '{endpoint} could not be reached; trying the fallback endpoint once.',
+      'The map service could not be reached; trying another one.',
     buildingsProgressHttp406:
-      '{endpoint} blocked the request (HTTP 406); switching endpoints without retrying it.',
+      'The map service blocked the request; switching to another service.',
     buildingsRateLimit:
-      'Overpass rate limit reached (HTTP 429). Wait {seconds} s before trying again.',
+      'The map service asked us to wait. Try again in {seconds} s.',
     buildingsEndpointError:
-      'Overpass endpoint {endpoint} responded HTTP {status}{body}',
-    buildingsResponseError: 'Overpass responded HTTP {status}{body}',
+      'The map service returned HTTP {status}{body}',
+    buildingsResponseError: 'The map service returned HTTP {status}{body}',
     buildingsInvalidJson:
-      'Overpass returned a response that is not valid JSON.',
-    buildingsRemark: 'Overpass: {remark}',
-    buildingsTimeout: 'Overpass did not answer within {seconds} s.',
+      'The map service returned data we could not read.',
+    buildingsRemark: 'Map service: {remark}',
+    buildingsTimeout: 'The map service did not answer within {seconds} s.',
     buildingsAllFailed:
-      'All Overpass endpoints failed. No building data was written or cached.',
+      'No building data could be downloaded. Try again later.',
     buildingsHttpBody: ': {body}',
-    buildingsSourceBundled: 'Bundled area: {name}',
+    buildingsSourceBundled: 'Saved area: {name}',
     importedAreaSource: 'Imported area: {name}',
-    buildingsTimeoutDefault: 'Overpass request timed out',
-    buildingsNoElements: 'Overpass response has no elements array',
-    gridProgressLoading: 'Loading {count} DEM tiles at z{zoom}…',
+    buildingsTimeoutDefault: 'Map service request timed out',
+    buildingsNoElements: 'The map service returned no building data.',
+    gridProgressLoading: 'Loading terrain ({count} tiles)…',
     gridProgressTiles:
-      'Loading DEM tiles: {loaded}/{total} ({cached} cached)',
-    gridProgressStitching: 'Stitching {count} tiles…',
+      'Loading terrain: {loaded}/{total} ({cached} already saved)',
+    gridProgressStitching: 'Preparing terrain…',
     gridProgressReady:
-      'DEM ready: z{zoom}, {spacing} m/px',
+      'Terrain ready: {spacing} m per pixel',
     importNotJson: 'Imported building data is not valid JSON.',
     importNoFeatures:
       'GeoJSON FeatureCollection has no features array.',
@@ -728,7 +730,7 @@ export const en = {
       'Offline hillshade: Terrain Tiles by Mapzen / AWS Open Data · &copy; OpenStreetMap contributors (ODbL)',
     markerObserverTitle: 'Observer — drag or click the map to move',
     viewpointTooltip: 'Local 3D viewpoint',
-    resultTooltip: '#{rank} · {percent}% clear (pessimistic)',
+    resultTooltip: '#{rank} · {percent}% clear (cautious)',
   },
 
   scene3d: {
@@ -744,33 +746,33 @@ export const en = {
   },
 
   horizonChart: {
-    empty: 'Load a DEM to compute the local horizon.',
-    legendHorizon: 'horizon: terrain + buildings',
-    legendPath: 'Apophis path (red = below horizon/margin)',
+    empty: 'Load terrain data to see the local horizon.',
+    legendHorizon: 'skyline: terrain + buildings',
+    legendPath: 'Apophis path (red = below the horizon or your height limit)',
   },
 
   bestSpot: {
     insideBuilding:
-      'Inside OSM building {id}; not a ground-level observing spot. Choose a rooftop eye height or another point.',
-    noWindow: 'No physical Phase 1 visibility window at this location.',
+      'You are inside a mapped building ({id}); this is not a ground-level spot. Choose Roof or another point.',
+    noWindow: 'Apophis is not visible from this location during the pass.',
     clearWhole:
-      'Clear for the whole visible window (minimum clearance {clearance}°).',
+      'Clear for the whole visible pass (lowest clearance {clearance}°).',
     clearPercent:
-      '{percent}% of the visible window is clear.',
+      '{percent}% of the visible pass is clear.',
     marginLimited:
-      '{source}{direction} {verb} less than the {margin}° margin from Apophis at {when}; {percent}% of the visible window is clear.',
+      'The view is limited by {source}{direction} from {when}; it is less than the {margin}° margin above the skyline. {percent}% of the visible pass is clear.',
     blocked:
-      'Blocked by {source}{direction} from {when}; {percent}% of the visible window is clear (minimum clearance {clearance}°).',
+      'Blocked by {source}{direction} from {when}; {percent}% of the visible pass is clear (lowest clearance {clearance}°).',
     sourceBuildings: 'buildings',
     sourceTerrain: 'terrain',
-    sourceHorizon: 'the horizon',
+    sourceHorizon: 'the skyline',
     verbBuildings: 'leave',
     verbOther: 'leaves',
     direction: ' to the {direction}',
     whenLocal: '{time} UTC ({local} local)',
     whenUtc: '{time} UTC',
-    parallaxWorst: 'worst case along the visible path',
-    parallaxGeocentric: 'at geocentric closest approach',
+    parallaxWorst: 'at worst along the visible pass',
+    parallaxGeocentric: 'at closest approach to Earth',
   },
 
   path: {
@@ -1027,38 +1029,38 @@ export const en = {
 
   location: {
     offlineUnavailable:
-      'No offline area is prepared. Connect to the internet, open Local 3D and use “Prepare for offline”, then try again.',
+      'No offline area has been saved. Connect to the internet, open Local 3D and use “Save this area offline”, then try again.',
     browserOffline:
       'Browser location is not used offline. Set coordinates manually or reconnect.',
     requesting: 'Requesting browser location…',
     ephemerisFetchFailed: 'Ephemeris fetch failed: HTTP {status}',
-    fromUrl: 'Observer set from URL parameters.',
+    fromUrl: 'Location set by this link.',
     previewStatus:
-      'Brasov preview. Choose your observing location to see the local sky.',
+      'Showing Brasov for now. Choose your location so the sky matches where you are.',
     restoredStatus:
-      'Restored your last location. Choose a preset or enter coordinates to change it.',
+      'Using your saved location. Change it with the location button.',
     locatingPreview:
       'Locating you… showing Brasov preview. You can set a location manually.',
-    offlineNoPreparedArea: 'Offline mode: no prepared area.',
+    offlineNoPreparedArea: 'Offline: no saved area.',
     offlineNotPrepared:
-      'Offline: this location is not prepared. Terrain, buildings and the offline base map are only available near {area}. Sky and AR still work for the selected coordinates.',
+      'Offline: terrain and buildings are only saved near {area}. Sky and AR still work for these coordinates.',
     offlineUsingPrepared:
-      'Offline: using the prepared area {area}{urlSuffix}. Prepared {preparedAt}.',
-    offlineUrlSuffix: ' (URL coordinates)',
+      'Offline: using the saved area {area}{urlSuffix}. Saved {preparedAt}.',
+    offlineUrlSuffix: ' (from this link)',
     offlineMismatch:
-      'Offline: terrain and buildings are only prepared for {area}. Sky and AR still work here.',
+      'Offline: terrain and buildings are only saved for {area}. Sky and AR still work here.',
     offlineAllAvailable:
-      'Offline: all sky/AR data and the prepared terrain area are available. Prepared {preparedAt}.',
+      'Offline: sky/AR data and the saved terrain area are available. Saved {preparedAt}.',
     offlineOneArea: 'one area',
     geolocationUnavailable:
-      'Geolocation is unavailable. Keeping the current location; set coordinates or choose a preset.',
+      'This browser cannot provide your location. Choose a preset or enter coordinates.',
     usingBrowser:
-      'Using browser location. GPS altitude ignored; eye height 1.7 m above unknown ground (no terrain data).',
+      'Using your current location. Phone GPS height is ignored; eye height is added above the terrain ground.',
     denied:
-      'Location permission denied or unavailable. Keeping the current location; set coordinates or choose a preset.',
+      'Location permission was denied. Choose a preset or enter coordinates.',
     dialogTitle: 'Where are you observing from?',
     dialogIntro:
-      'Apophis passes on 13 April 2029. Your location sets the sky, event times and local horizon; it is stored only in this browser.',
+      'Apophis passes on 13 April 2029. Choose where you will watch from so the times and sky match your spot. This stays on your device.',
     dialogUseLocation: 'Use my location',
     dialogCoordinates: 'Enter coordinates',
     dialogPresetLabel: 'Or choose a preset',
@@ -1069,7 +1071,7 @@ export const en = {
     dialogForgotten:
       'Saved location forgotten. This session keeps its current location.',
     presetStatus:
-      '{preset} preset. Ground elevation {elevation} m + eye height; no terrain data.',
+      '{preset}. Ground height {elevation} m; eye height is added above it.',
     validationLat: 'Latitude must be between -90 and 90 degrees.',
     validationLon: 'Longitude must be between -180 and 180 degrees.',
     validationEyeHeight: 'Eye height must be between 0 and 100 m.',
@@ -1078,19 +1080,19 @@ export const en = {
     validationGround:
       'Ground elevation must be between -500 and 9000 m.',
     manualStatus:
-      'Manual location. Ground elevation {ground} + {eye} m eye height; no terrain data.',
-    groundUnknownAssumed: 'unknown (0 m assumed)',
+      'Your coordinates. Ground height {ground}; eye height {eye} m.',
+    groundUnknownAssumed: 'not known (0 m assumed)',
     groundValue: '{elevation} m',
     timeOutsideWindow:
-      'Requested time is outside the committed ±24 h data window; clamped.',
-    endOfWindow: 'Reached the end of the data window.',
-    fromTerrain: 'Observer moved from the terrain/map panel.',
+      'That time is outside the available range; it has been moved to the nearest available time.',
+    endOfWindow: 'Reached the end of the available time range.',
+    fromTerrain: 'Location changed from the map.',
     groundFromDem:
-      'Ground elevation {elevation} m from the terrain DEM; eye height {eye} m.',
+      'Ground height {elevation} m from terrain data; eye height {eye} m.',
     eyeHeightStatus:
-      'Eye height {eye} m above ground; no terrain occlusion in the shared sky readout.',
+      'Eye height {eye} m above the ground. The sky view does not check terrain or buildings.',
     noJump:
-      'No {target} available for this observer in the data window.',
+      'There is no {target} for this location in the available time range.',
     noObserver: 'No observer set',
     observerSummary:
       '{lat}°, {lon}°, {elevation} m effective',
@@ -1101,48 +1103,48 @@ export const en = {
     requestStorage: 'Requesting persistent storage…',
     storageWarning:
       'Persistent storage was not granted. The browser may evict offline data; on iOS, add the app to the Home Screen and open it at least once a week.',
-    downloadingEphemeris: 'Downloading the committed ephemeris…',
-    ephemerisLabel: 'Ephemeris',
-    invalidEphemeris: 'The downloaded ephemeris is invalid.',
+    downloadingEphemeris: 'Downloading sky data…',
+    ephemerisLabel: 'Sky data',
+    invalidEphemeris: 'The downloaded sky data is invalid.',
     missingMetadata:
-      'The ephemeris is missing its target/solution metadata.',
-    downloadingStars: 'Downloading the star catalogue…',
-    starsLabel: 'Star catalogue',
+      'The sky data is missing its source information.',
+    downloadingStars: 'Downloading the star map…',
+    starsLabel: 'Star map',
     starsUnavailable:
-      'Star catalogue unavailable: {message}. The sky still works without labels.',
-    downloadingTerrain: 'Downloading and caching DEM tiles…',
-    terrainFailed: 'Terrain preparation failed: {message}',
+      'Star map unavailable: {message}. The sky still works without labels.',
+    downloadingTerrain: 'Saving terrain tiles…',
+    terrainFailed: 'Could not prepare terrain: {message}',
     missingTiles:
-      '{count} DEM tiles could not be stored in IndexedDB. The browser storage may be full or blocked. Free space and try again.',
+      'Some terrain tiles could not be saved. Browser storage may be full or blocked. Free some space and try again.',
     failedTiles:
-      '{count} DEM tiles failed to download; offline terrain has gaps there. Re-prepare when the network is stable.',
-    cachedTiles: 'Cached {count} DEM tiles at z{zoom}.',
-    fetchingBuildings: 'Fetching OSM building footprints…',
+      'Some terrain tiles could not be downloaded, so offline terrain will have gaps. Try again on a stable connection.',
+    cachedTiles: 'Saved {count} terrain tiles.',
+    fetchingBuildings: 'Downloading building outlines from OpenStreetMap…',
     buildingsUnavailable:
-      'Building data unavailable: {message}. Best-spot scores will be marked incomplete.',
-    writingSnapshot: 'Writing the offline snapshot metadata…',
+      'Building data unavailable: {message}. Clear-spot scores will be incomplete.',
+    writingSnapshot: 'Finishing the offline save…',
     snapshotFailed:
-      'The offline snapshot could not be saved. Browser storage is full or unavailable. Clear the prepared area or free storage and try again.',
+      'The offline area could not be saved. Browser storage is full or unavailable. Delete the saved area or free space and try again.',
     storageNearlyFull:
-      'Storage is over 90% full. Further updates may fail; consider a smaller search radius or clearing browser data.',
+      'Browser storage is over 90% full. Saving may fail; try a smaller search area or free some space.',
     persistentGranted:
-      'Persistent storage is now granted for this origin.',
+      'The browser has granted persistent storage.',
     done: 'Offline area ready.',
     downloadFailed:
       '{label} could not be downloaded: {error}',
     downloadHttp: '{label} download failed: HTTP {status}',
-    invalidJson: '{label} is not valid JSON',
+    invalidJson: '{label} could not be read.',
     baseMapNote:
-      'Offline base map is rendered locally from cached DEM tiles plus OSM building footprints. OSM raster tiles are not stored because tile.openstreetmap.org forbids bulk/offline use.',
+      'The offline map is a shaded terrain map with building outlines. OpenStreetMap street tiles are not saved because their service does not allow bulk downloads.',
     verifyMissingTiles:
-      '{missing} of {total} DEM tiles are missing. The browser may have evicted site data; re-prepare the area.',
+      'Some terrain tiles are missing. The browser may have deleted site data; save the area again.',
     verifyEphemeris:
-      'The stored ephemeris is missing or truncated. Re-prepare the area.',
+      'The stored sky data is missing or incomplete. Save the area again.',
   },
 
   startup: {
     title: 'Apophis Watch could not start',
     offlineHint:
-      'If you are offline, prepare an area while online first: open <strong>Local 3D</strong> → <strong>Prepare for offline</strong>. Then reload.',
+      'If you are offline, save an area while online first: open <strong>Local 3D</strong> → <strong>Save this area offline</strong>. Then reload.',
   },
 } as const;

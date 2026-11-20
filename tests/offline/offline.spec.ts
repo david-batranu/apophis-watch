@@ -22,11 +22,11 @@ test('prepare, go offline, and use sky/local/best-spot/AR from the snapshot', as
   await page.locator('[data-ref="building-radius"]').fill('1000');
   await page.locator('[data-action="prepare-offline"]').click();
   await expect(page.locator('[data-ref="offline-status"]')).toContainText(
-    /Prepared .*·.*MB/i,
+    /Saved .*·.*MB/i,
     { timeout: 180_000 },
   );
   await expect(page.locator('[data-ref="offline-contents"]')).toContainText(
-    /Ephemeris/i,
+    /Sky data/i,
   );
   await expect(page.locator('[data-ref="offline-contents"]')).toContainText(
     /Terrain/i,
@@ -46,7 +46,7 @@ test('prepare, go offline, and use sky/local/best-spot/AR from the snapshot', as
     /Offline: ready/i,
   );
 
-  // Sky readout still works from the prepared ephemeris.
+  // Sky readout still works from the saved sky data.
   await page.locator('[data-view="sky"]').click();
   await expect(page.locator('[data-ref="metric-az"]')).not.toHaveText('—');
   await expect(page.locator('[data-ref="metric-el"]')).not.toHaveText('—');
@@ -68,10 +68,10 @@ test('prepare, go offline, and use sky/local/best-spot/AR from the snapshot', as
   await expect(page.locator('[data-ref="building-info"]')).toContainText(
     /buildings|ways/i,
   );
-  // The prepared snapshot covers search radius + building radius (2.0 km);
+  // The saved snapshot covers search radius + building radius (2.0 km);
   // it must not be replaced by a narrower stale cache entry.
   await expect(page.locator('[data-ref="building-info"]')).toContainText(
-    /query 2\.0 km/i,
+    /within 2\.0 km/i,
   );
 
   // Best-spot search must run entirely from cached terrain/buildings/path.
@@ -107,13 +107,13 @@ test('prepare, go offline, and use sky/local/best-spot/AR from the snapshot', as
     { waitUntil: 'domcontentloaded' },
   );
   await expect(page.locator('[data-ref="offline-line"]')).toContainText(
-    /only prepared for|not prepared/i,
+    /only saved for|not saved/i,
   );
   await expect(page.locator('[data-ref="dem-badge"]')).toContainText(
-    /not prepared/i,
+    /not saved/i,
   );
   await expect(page.locator('[data-ref="building-info"]')).toContainText(
-    /not prepared/i,
+    /not saved/i,
   );
   await expect(page.locator('[data-ref="building-info"]')).not.toContainText(
     '9979',

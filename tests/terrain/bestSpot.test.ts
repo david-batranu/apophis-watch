@@ -168,7 +168,7 @@ describe('best-spot scoring', () => {
     expect(summary.noVisibilityWindow).toBe(true);
     expect(summary.top.every((result) => result.score === 0)).toBe(true);
     expect(describeBestSpot(summary.candidates[0])).toContain(
-      'No physical Phase 1 visibility window',
+      'Apophis is not visible from this location during the pass',
     );
   });
 
@@ -219,7 +219,7 @@ describe('best-spot scoring', () => {
     expect(reason).toContain('Blocked by buildings to the south-west');
     expect(reason).toContain('22:10 UTC');
     expect(reason).toContain('78%');
-    expect(reason).toContain('minimum clearance -1.2°');
+    expect(reason).toContain('lowest clearance -1.2°');
   });
 
   it('uses a margin-specific reason when the path is above the horizon', () => {

@@ -13,11 +13,11 @@ that service forbids prefetch/offline use. See [Deployment](DEPLOYMENT.md),
 [Event-day guide](EVENT-DAY.md) and
 [Real-phone checklist](REAL-PHONE-CHECKLIST.md).
 
-Production build: initial JS **805.06 kB** (218.03 kB gzip), terrain
-**287.76 kB** (81.77 kB gzip), AR **79.99 kB** (23.35 kB gzip) and a
+Production build: initial JS **801.52 kB** (216.97 kB gzip), terrain
+**290.05 kB** (82.28 kB gzip), AR **79.99 kB** (23.33 kB gzip) and a
 best-spot worker **13.63 kB**. Terrain and AR remain separate lazy chunks; the
 service worker precaches them for offline use without executing them.
-Precache: 22 entries, 1,268.90 KiB.
+Precache: 22 entries, 1,268.15 KiB.
 
 ## Run
 
@@ -48,12 +48,18 @@ Useful URL parameters (also convenient for testing and sharing):
 ```
 
 Without `lat`/`lon` a first visit opens a location card offering **Use my
-location**, a preset, or exact coordinates. Geolocation is only requested after
-that tap, never on page load. The chosen place, night mode, display toggles and
-last view are remembered in this browser (AR is deliberately not restored on
-launch, so the camera is not prompted automatically). GPS altitude is ignored.
-The shared sky/AR observer uses the preset/manual ground elevation or 0 m + eye
-height until the Local 3D tab resolves ground elevation from the DEM.
+location**, a saved place, or exact coordinates. If this site already has
+location permission, the app starts at the browser location instead and does
+not show the card. It never triggers a permission prompt on page load. The
+chosen place, night mode, display toggles and last view are remembered in this
+browser (AR is deliberately not restored on launch, so the camera is not
+prompted automatically). GPS altitude is ignored.
+
+The full observer controls — quick places, **Use my location**, map picking,
+coordinates and eye height — live in **Local 3D → Your location & map**. The
+header location pill opens the same quick choices from any view. Eye height is
+added above the ground height read from terrain data; the phone's GPS height is
+never used.
 
 The **Share** button copies (or opens the system share sheet with) the current
 deep link, including observer, time and view, so a plan can be reopened exactly.
