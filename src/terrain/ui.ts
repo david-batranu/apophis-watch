@@ -1746,10 +1746,12 @@ export class TerrainUi implements TerrainWorkstream {
     this.setProgress('best-progress', 0.02);
     this.ref('best-status').textContent = t('terrain.bestStatusPreparing');
 
-    const requiredBuildingRadius = clampNumber(
-      this.searchRadiusM + this.buildingRadiusM,
+    // Do not clamp the *required* radius: the live query is capped at 5 km,
+    // and a larger search must be marked incomplete rather than silently
+    // scored with missing buildings.
+    const requiredBuildingRadius = Math.max(
       50,
-      5_000,
+      this.searchRadiusM + this.buildingRadiusM,
     );
     let buildingsIncomplete = false;
     if (
@@ -1774,6 +1776,13 @@ export class TerrainUi implements TerrainWorkstream {
         quiet: true,
       });
       if (!result) {
+        buildingsIncomplete = true;
+        this.setStatus(
+          t('terrain.bestWarningBuildingsIncomplete'),
+          'warn',
+          true,
+        );
+      } else if (result.queryRadiusM < requiredBuildingRadius - 10) {
         buildingsIncomplete = true;
         this.setStatus(
           t('terrain.bestWarningBuildingsIncomplete'),
