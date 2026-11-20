@@ -27,7 +27,7 @@ import type {
   HeightSource,
 } from './types';
 
-export const DEFAULT_AREAS_BASE_URL = '/';
+export const DEFAULT_AREAS_BASE_URL = './';
 export const AREAS_DIRECTORY = 'data/areas/';
 export const AREAS_MANIFEST_FILE = 'index.json';
 export const OSM_LICENSE = 'ODbL';

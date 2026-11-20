@@ -269,7 +269,7 @@ export interface FetchBuildingsOptions {
   longitudeDeg: number;
   radiusM: number;
   useCache?: boolean;
-  /** App base URL for `data/areas/index.json`; defaults to `/`. */
+  /** App base URL for `data/areas/index.json`; defaults to the document base. */
   baseUrl?: string;
   /** Try a fully-covering bundled area after a cache miss. Default true. */
   allowBundled?: boolean;

@@ -160,17 +160,36 @@ sub-path hosting.
 
 ## Performance
 
-Pending final run (`npm run measure:perf`), which measures:
+Measured with `npm run measure:perf` on headless Chromium at 390×844 with
+**4× CPU throttling**, 12 s per view (playback at 60×), main-thread time from
+`performance.measure` around the frame callback (not just the rAF interval):
 
-- per-frame main-thread time via `performance.measure` around the render loop
-  (p50/p95/max), not just requestAnimationFrame interval;
-- Sky, Local 3D and AR at 390×844 with 4× CPU throttling;
-- a 10-minute mixed session sampling JS heap and per-frame stats;
-- WebGL renderer string (SwiftShader indicates headless software rendering).
+| View | Frames / 12 s | Mean | p50 | p95 | Max | >20 ms |
+|---|---:|---:|---:|---:|---:|---:|
+| Sky | 716 | 4.44 ms | 4.1 ms | **5.6 ms** | 25.0 ms | 4 |
+| Local 3D | 364 | 3.86 ms | 3.4 ms | **5.5 ms** | 17.2 ms | 0 |
+| AR | 719 | 2.32 ms | 2.0 ms | **3.4 ms** | 19.3 ms | 0 |
 
-Headless GPU cost is not a phone measurement. The final report will state
-whether the run used software rendering and will not claim phone GPU
-performance.
+- The renderer was **SwiftShader** (`ANGLE (Google, Vulkan 1.3.0 (SwiftShader
+  Device ...), SwiftShader driver)`), i.e. software rendering. Local 3D is
+  GPU-bound in this environment at ~30 fps; disabling antialiasing and using a
+  256² terrain mesh raised it from ~10 fps to ~30 fps. On a phone GPU the
+  cost is different and is **not measured here**.
+- Sky and AR are above 30 fps and have main-thread p95 below 6 ms. Local 3D's
+  main-thread p95 is 5.5 ms, but its headless frame count is limited by
+  SwiftShader.
+- A 10-minute mixed session (sky/local/AR cycled while paused) sampled JS heap
+  and listener counts every ~62 s. The first local load creates transient
+  geometry (137 MiB at 62 s), after which the session settled around
+  **20–22 MiB** with listeners ~140–180; the final verifier should compare the
+  start/end samples. This is Chromium heap, not a phone memory measurement.
+- Best-spot search: 317 candidates × 3 height scenarios in **~2.0 s** on this
+  desktop after sharing one terrain horizon and using a building spatial index;
+  the default 2,821-candidate search is projected at ~18 s and remains a
+  cancellable worker operation, not a frame-loop cost.
+
+These are headless numbers. Thermal throttling, real GPU cost and real battery
+drain are on the real-phone checklist.
 
 ## Build (final)
 
