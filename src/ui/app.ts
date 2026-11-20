@@ -1080,6 +1080,9 @@ export class AppUi {
       const manifest = (await response.json()) as {
         areas?: Array<{
           name?: string;
+          center?: { latitudeDeg?: number; longitudeDeg?: number };
+          centerLatDeg?: number;
+          centerLonDeg?: number;
           latitudeDeg?: number;
           longitudeDeg?: number;
           radiusM?: number;
@@ -1101,8 +1104,18 @@ export class AppUi {
           (area) =>
             t('shell.aboutAreaItem', {
               name: esc(area.name ?? t('shell.aboutAreaFallback')),
-              lat: Number(area.latitudeDeg ?? 0).toFixed(4),
-              lon: Number(area.longitudeDeg ?? 0).toFixed(4),
+              lat: Number(
+                area.latitudeDeg ??
+                  area.centerLatDeg ??
+                  area.center?.latitudeDeg ??
+                  0,
+              ).toFixed(4),
+              lon: Number(
+                area.longitudeDeg ??
+                  area.centerLonDeg ??
+                  area.center?.longitudeDeg ??
+                  0,
+              ).toFixed(4),
               radius: Math.round(area.radiusM ?? 0),
               count: area.buildingCount ?? '?',
               retrieved: esc(area.retrievedAt ?? '—'),

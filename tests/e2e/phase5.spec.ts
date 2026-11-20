@@ -72,6 +72,16 @@ test('night contrast and labels are usable', async ({ page }) => {
       .map((element) => element.outerHTML.slice(0, 100)),
   );
   expect(unnamed).toEqual([]);
+
+  await expect(page.locator('[data-ref="about-areas"]')).toContainText(
+    '45.6427',
+  );
+  await expect(page.locator('[data-ref="about-areas"]')).toContainText(
+    'endpoint',
+  );
+  await expect(page.locator('[data-ref="about-areas"]')).toContainText(
+    'query',
+  );
 });
 
 test.describe('reduced motion', () => {
