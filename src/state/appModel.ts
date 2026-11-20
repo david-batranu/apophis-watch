@@ -362,6 +362,17 @@ export class AppModel {
     );
   }
 
+  setEyeHeightM(eyeHeightM: number): void {
+    const current = this.store.getState().observer;
+    if (!current || !Number.isFinite(eyeHeightM)) return;
+    const clamped = Math.min(100, Math.max(0, eyeHeightM));
+    this.applyObserver(
+      { ...current, eyeHeightM: clamped },
+      this.store.getState().locationSource,
+      `Eye height ${clamped.toFixed(1)} m above ground; no terrain occlusion in the shared sky readout.`,
+    );
+  }
+
   setStatus(message: string | null): void {
     this.store.update({ auxStatus: message });
   }

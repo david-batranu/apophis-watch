@@ -1,12 +1,13 @@
 import { test, expect } from '@playwright/test';
 
 const BASE =
-  '/?lat=45.6427&lon=25.5887&elev=600&eye=0&utc=2029-04-13T20:45:00Z&debug=1&view=ar';
+  '/?lat=45.6427&lon=25.5887&elev=600&eye=0&utc=2029-04-13T20:45:00Z&debug=1';
 
 test('AR tab mounts on black when camera is unavailable and unmounts on leave', async ({
   page,
 }) => {
   await page.goto(BASE);
+  await page.getByRole('button', { name: 'AR', exact: true }).click();
   await expect(page.locator('.ar-root')).toBeVisible();
   await expect(page.locator('.ar-debug')).toBeVisible();
   await expect(page.locator('.ar-debug')).toContainText('AR DEBUG');

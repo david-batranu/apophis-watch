@@ -221,7 +221,7 @@ export class TerrainUi implements TerrainWorkstream {
           </div>
           <p class="tw-note" data-ref="eye-note">Eye height 1.7 m above DEM ground. Floor N uses (N−1)×3 m + 1.7 m; rooftop uses the tallest OSM building at the point + 1.7 m.</p>
           <p class="tw-note tw-ground-note" data-ref="ground-note">Ground elevation: waiting for DEM.</p>
-          <p class="tw-note">Ground elevation is taken from the DEM. Browser GPS altitude is only a cross-check and is never used. The shared store is not edited; this tab calls <code>setObserver</code> / <code>setGroundElevationM</code>.</p>
+          <p class="tw-note">Ground elevation is taken from the DEM. Browser GPS altitude is only a cross-check and is never used. Eye height is added above the DEM ground for the shared sky/AR observer.</p>
         </section>
 
         <section class="tw-card">

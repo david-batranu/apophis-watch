@@ -1,9 +1,9 @@
 # Apophis Watch
 
 A static, mobile-first simulator for the **13 April 2029** close approach of
-(99942) Apophis. Phase 1 (ephemeris + accuracy) and Phase 2 (time controls,
-sky dome, space view, size honesty, night mode) are implemented. Terrain,
-best-spot search and AR are not part of this phase.
+(99942) Apophis. Phases 1–4 are implemented: ephemeris validation, sky/space
+views, local terrain/buildings/best-spot search, and camera AR. Phase 5
+(offline PWA packaging) is not part of this build.
 
 ## Run
 
@@ -12,8 +12,9 @@ npm install
 npm run dev                 # Vite dev server (HTTP)
 npm run dev:https           # HTTPS for phone camera/orientation testing
 npm run build               # typecheck + production build
-npm test                    # 58 Vitest tests
-npm run test:e2e            # 10 Playwright smoke tests (needs Chromium)
+npm test                    # 153 Vitest tests
+npm run test:e2e            # 12 merged Playwright smoke tests (needs Chromium)
+npx playwright test -c tests/ar/playwright.ar.config.ts  # AR mock suite
 npm run typecheck
 npm run fetch:ephemeris     # refresh the committed JPL Horizons data
 npm run fetch:stars         # rebuild HYG + ConstellationLines JSON
@@ -25,13 +26,13 @@ Useful URL parameters (also convenient for testing and sharing):
 ```text
 ?lat=45.6427&lon=25.5887&elev=600&eye=0
 &utc=2029-04-13T21:35:42Z
-&view=sky|space&refraction=0|1&night=1
+&view=sky|space|local|ar&refraction=0|1&night=1
 &constellations=0|1&enlarged=1&minEl=10&debug=1
 ```
 
 Without `lat`/`lon` the app requests browser geolocation. GPS altitude is
-ignored; the UI says that ground elevation is unknown until the Phase 3 DEM/map
-picker exists.
+ignored. The shared sky/AR observer uses the preset/manual ground elevation or
+0 m + eye height until the Local 3D tab resolves ground elevation from the DEM.
 
 ## Architecture
 
@@ -47,6 +48,11 @@ picker exists.
 - `src/sky/` — stereographic projection, HYG catalogue loader,
   constellation lines, Sun/Moon/planets, canvas sky renderer, Three.js space
   view, size-comparison maths.
+- `src/terrain/` — Leaflet picker, Terrarium DEM, Overpass buildings, horizon
+  profile, Web-Worker best-spot scoring, local Three.js scene.
+- `src/workers/` — best-spot scoring worker.
+- `src/ar/` — camera AR, orientation/quaternion pipeline, WMM declination,
+  calibration, rehearsal and fallbacks.
 - `src/ui/` — panel shell, controls, readout, elevation/magnitude plot,
   debug overlay, time formatting.
 - `src/core/` — vector and time-scale utilities.
@@ -93,6 +99,24 @@ picker exists.
   `sky-topoca.png`, `sky-near-setting.png`, plus debug-panel versions, night
   sky/space and space presets.
 
+## Local 3D and best spot (Phase 3)
+
+Open `?view=local` or the **Local 3D** tab. It shows a Leaflet OSM picker, an
+AWS Terrarium DEM (z14, 6.7 m/px at Brasov; 81 tiles for the default search),
+Overpass buildings, a 1° horizon profile, a Web-Worker best-spot grid, and a
+Three.js eye-height scene with live occlusion.
+
+At Brasov the Phase 1 visible pass covers **az 124.3° → 320.1°**, elevation
+**0 → 42.29°**; the topocentric CA is 21:35:42 UTC. The 5 km parallax is
+**27.13″** at geocentric CA and **29.81″** at topocentric CA, far below the 1°
+horizon bin. A real 1 km Brasov building query returned 2,828 ways and 97%
+using the 8 m default height, so building heights are clearly incomplete. A
+2,821-candidate best-spot run took **4.4 s** in the worker on desktop.
+
+Terrain: **Terrain Tiles by Mapzen / AWS Open Data**; buildings and map:
+**© OpenStreetMap contributors, ODbL** via Overpass/Leaflet. Light pollution,
+weather and trees are not modelled. See `src/terrain/README.md`.
+
 ## AR mode (Phase 4)
 
 Open `?view=ar` or the **AR** tab. The camera and motion sensors require a
@@ -125,9 +149,15 @@ extrapolated/unsupported declination rather than silently trusting it.
   5-minute tick list is in the “5-min trail ticks” strip under the readout.
 - The Moon is near new during the flyby (~0.2% illuminated), so its phase icon
   is a very thin crescent.
-- Frame timing was measured in headless Chromium with CPU throttling, not on a
-  real mid-range phone. WebGL space-view performance on a phone is not yet
-  measured.
+- Frame timing was measured in headless Chromium with 4× CPU throttling, not on
+  a real mid-range phone.
+- OSM building heights are incomplete (97% default in the Brasov sample);
+  footprints may be missing. The horizon is limited by the DEM patch; distant
+  ridges beyond it are not modelled. Light pollution/weather/trees are not
+  modelled.
+- The AR compass is a finder, not a measuring instrument: typical 5–15°
+  accuracy (2026 iPhone field report ±14–16°). Camera FOV, absolute heading
+  sign, screen-rotation timing and permission behaviour can only be confirmed
+  on real hardware.
 - Pinch gestures are implemented but only wheel/drag/reset are automated.
-- No terrain, DEM, buildings, best-spot search, AR, PWA or offline pre-cache
-  yet; those are Phases 3–5.
+- Phase 5 (offline pre-cache, PWA install, deployment docs) is not started.

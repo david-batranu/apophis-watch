@@ -1,5 +1,6 @@
 import { jdTdbFromDate } from '../core/time';
 import type { ArWorkstream } from '../ar/host';
+import type { TerrainWorkstream } from '../terrain/host';
 import type { SkyPosition } from '../ephemeris/types';
 import type { AppModel } from '../state/appModel';
 import type { SimulationSession } from '../state/session';
@@ -80,6 +81,8 @@ export class AppUi {
   private lastObserverKey = '';
   private ar: ArWorkstream | null = null;
   private arLoading = false;
+  private terrain: TerrainWorkstream | null = null;
+  private terrainLoading = false;
 
   constructor(
     private readonly root: HTMLElement,
@@ -130,6 +133,7 @@ export class AppUi {
             <div class="tabs" role="tablist" aria-label="View">
               <button class="tab" data-view="sky" aria-pressed="true" type="button">Sky view</button>
               <button class="tab" data-view="space" aria-pressed="false" type="button">Space view</button>
+              <button class="tab" data-view="local" aria-pressed="false" type="button">Local 3D</button>
               <button class="tab" data-view="ar" aria-pressed="false" type="button">AR</button>
             </div>
             <div class="chip" data-ref="window-chip">Data window: —</div>
@@ -159,6 +163,9 @@ export class AppUi {
                   1 scene unit = 1,000 km · Earth radius 6,378 km · GEO ring 42,164 km · Moon orbit 384,400 km<br />
                   Apophis is a true-scale point; its 340 m disc is invisible at this scale.
                 </div>
+              </div>
+              <div class="terrain-view-stage hidden" data-ref="local-panel">
+                <div data-ref="terrain-host"></div>
               </div>
               <div class="ar-view-stage hidden" data-ref="ar-panel">
                 <div class="ar-host" data-ref="ar-host"></div>
@@ -290,7 +297,12 @@ export class AppUi {
       const target = (event.target as HTMLElement).closest<HTMLElement>('button');
       if (!target) return;
       if (target.dataset.jump) this.app.jumpTo(target.dataset.jump as never);
-      if (target.dataset.view === 'sky' || target.dataset.view === 'space') {
+      if (
+        target.dataset.view === 'sky' ||
+        target.dataset.view === 'space' ||
+        target.dataset.view === 'local' ||
+        target.dataset.view === 'ar'
+      ) {
         this.app.setViewMode(target.dataset.view);
       }
       if (target.dataset.camera) {
@@ -442,7 +454,7 @@ export class AppUi {
       const preset = this.presetIdFor(state.observer);
       (this.ref('preset-select') as HTMLSelectElement).value = preset;
     }
-    for (const view of ['sky', 'space', 'ar'] as const) {
+    for (const view of ['sky', 'space', 'local', 'ar'] as const) {
       const active = state.viewMode === view;
       this.root
         .querySelector<HTMLElement>(`[data-view="${view}"]`)
@@ -450,7 +462,14 @@ export class AppUi {
     }
     this.ref('sky-panel').classList.toggle('hidden', state.viewMode !== 'sky');
     this.ref('space-panel').classList.toggle('hidden', state.viewMode !== 'space');
+    this.ref('local-panel').classList.toggle('hidden', state.viewMode !== 'local');
     this.ref('ar-panel').classList.toggle('hidden', state.viewMode !== 'ar');
+    if (state.viewMode === 'local') {
+      void this.ensureTerrain(state);
+      this.terrain?.update(state);
+      // Leaflet needs a nudge after the panel returns from display:none.
+      requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+    }
     if (state.viewMode === 'ar') {
       void this.ensureAr(state);
     } else if (this.ar) {
@@ -496,6 +515,41 @@ export class AppUi {
       (this.ref('play-button') as HTMLButtonElement).disabled = true;
     } else {
       (this.ref('play-button') as HTMLButtonElement).disabled = false;
+    }
+  }
+
+  private async ensureTerrain(state: UiState): Promise<void> {
+    if (this.terrain) {
+      this.terrain.update(state);
+      return;
+    }
+    if (this.terrainLoading) return;
+    this.terrainLoading = true;
+    try {
+      const module = await import('../terrain');
+      if (this.app.getState().viewMode !== 'local') return;
+      const workstream = module.createTerrainWorkstream(this.ref('terrain-host'), {
+        getState: () => this.app.getState(),
+        subscribe: (listener) => this.app.onState(listener),
+        getSession: () => this.app.getSession(),
+        getEphemeris: () => this.app.getEphemeris(),
+        getCatalogue: () => this.app.getCatalogue(),
+        setObserver: (lat, lon, groundElevationM) => {
+          const error = this.app.setObserverFromExternal(lat, lon, groundElevationM);
+          if (error) this.app.setStatus(error);
+        },
+        setGroundElevationM: (m) => this.app.setGroundElevationM(m),
+        setTimeUtcMs: (ms) => this.app.setUtc(ms),
+        setStatus: (message) => this.app.setStatus(message),
+        setEyeHeightM: (m) => this.app.setEyeHeightM(m),
+      });
+      workstream.mount();
+      workstream.update(this.app.getState());
+      this.terrain = workstream;
+    } catch (error) {
+      this.app.setStatus(`Terrain failed to load: ${String(error)}`);
+    } finally {
+      this.terrainLoading = false;
     }
   }
 
@@ -700,8 +754,10 @@ export class AppUi {
       ${starCredit}${constellationCredit}
       <br /><strong>Star data licence:</strong> HYG Database v4.4, David Nash / Astronomy Nexus, <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>; the derived <code>stars.json</code> remains CC BY-SA 4.0. HYG is partly Hipparcos-derived; ESA’s Hipparcos data is CC BY-NC 3.0 IGO — review before any commercial use.
       <br /><strong>Line data licence:</strong> Marc van der Sluys, ConstellationLines v1.4, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a> · <a href="https://doi.org/10.5281/zenodo.23210182">DOI 10.5281/zenodo.23210182</a>.
-      <br /><strong>Full notices:</strong> <a href="./data/README.md">public/data/README.md</a> and THIRD_PARTY_NOTICES.md.
+      <br /><strong>Full notices:</strong> <a href="./data/README.md">star catalogue</a>, <a href="./data/TERRAIN.md">terrain/buildings</a> and THIRD_PARTY_NOTICES.md.
       <br /><strong>AR compass:</strong> WMM2025 from NOAA/NCEI and BGS, via geomagnetism (Apache-2.0). Extrapolated/unsupported dates are labelled in AR.
+      <br /><strong>Terrain:</strong> Terrain Tiles by Mapzen / AWS Open Data (includes Copernicus EU-DEM, USGS 3DEP/SRTM/GMTED2010, NOAA ETOPO1 and other national sources; see <a href="./data/TERRAIN.md">terrain attribution</a>).
+      <br /><strong>Buildings &amp; map:</strong> © OpenStreetMap contributors, ODbL; Overpass API; Leaflet (BSD-2-Clause). Light pollution, weather and trees are not modelled.
       <br /><strong>Size figures:</strong> Moon 3,474.8 km (NASA Moon Fact Sheet); ISS 109 m array span (NASA); football pitch 105 m (FIFA/IFAB); Eiffel Tower 330 m (official Eiffel Tower figures); Apophis 340 m (Horizons 2 × 0.170 km).
       <br /><strong>Accuracy:</strong> Phase 1 topocentric az/el max error 0.050 arcmin (3.01″) against Horizons; see PHASE1-VALIDATION.md. This view is a planning simulation, not a live feed.
       <br /><strong>Refraction:</strong> Bennett display-only correction; the validation path is airless.

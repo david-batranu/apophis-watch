@@ -394,7 +394,9 @@ test('measured sky frame time at 4x CPU throttle', async ({ page }) => {
   await client.send('Emulation.setCPUThrottlingRate', { rate: 4 });
   await page.locator('[data-ref="speed-select"]').selectOption('600');
   await page.locator('[data-ref="play-button"]').click();
-  await page.waitForTimeout(300);
+  // Let startup/compilation and the first simulated minute settle before
+  // measuring steady-state frame pacing.
+  await page.waitForTimeout(1_200);
   const stats = await page.evaluate(
     () =>
       new Promise<{ mean: number; p95: number; max: number; frames: number }>((resolve) => {
@@ -403,16 +405,17 @@ test('measured sky frame time at 4x CPU throttle', async ({ page }) => {
         const tick = (now: number) => {
           intervals.push(now - last);
           last = now;
-          if (intervals.length < 150) {
+          if (intervals.length < 210) {
             requestAnimationFrame(tick);
           } else {
-            const sorted = [...intervals].sort((a, b) => a - b);
-            const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+            const steady = intervals.slice(30);
+            const sorted = [...steady].sort((a, b) => a - b);
+            const mean = steady.reduce((a, b) => a + b, 0) / steady.length;
             resolve({
               mean,
               p95: sorted[Math.floor(sorted.length * 0.95)],
               max: sorted[sorted.length - 1],
-              frames: intervals.length,
+              frames: steady.length,
             });
           }
         };

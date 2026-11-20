@@ -493,7 +493,18 @@
 }
 
 .tw-night .leaflet-tile-pane {
-  filter: brightness(0.55) saturate(0.45) sepia(0.15);
+  /* Desaturate the map; the red multiply overlay below supplies the tint. */
+  filter: grayscale(1) brightness(0.55) contrast(1.1);
+}
+
+.tw-night .tw-map::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 400;
+  pointer-events: none;
+  background: rgba(190, 18, 8, 0.38);
+  mix-blend-mode: multiply;
 }
 
 .tw-night .leaflet-container {
@@ -505,6 +516,10 @@
   background: rgba(8, 0, 0, 0.82);
   color: #ff8a7a;
   border-color: #4a0d08;
+}
+
+.tw-night .leaflet-control-attribution a {
+  color: #ff8a7a;
 }
 
 .tw-night .leaflet-bar a {

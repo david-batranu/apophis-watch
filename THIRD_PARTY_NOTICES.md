@@ -34,6 +34,19 @@ time, precession/nutation and rise/set helpers.
   reformatted as JSON. Nine of 840 vertices are absent from HYG; polylines are
   split there rather than bridged.
 
+## Terrain, buildings and maps
+
+- **Terrain Tiles by Mapzen / AWS Open Data**:
+  <https://registry.opendata.aws/terrain-tiles> and
+  <https://github.com/tilezen/joerd/blob/master/docs/attribution.md>.
+  Required sources include Copernicus EU-DEM, USGS 3DEP/SRTM/GMTED2010,
+  NOAA ETOPO1, and national datasets listed at the attribution link.
+- **Buildings and map tiles:** © OpenStreetMap contributors, ODbL 1.0
+  (<https://www.openstreetmap.org/copyright>), queried through the Overpass API
+  (<https://overpass-api.de/>). No bulk scraping; one building query per settled
+  view, cached in IndexedDB.
+- **Leaflet:** BSD-2-Clause, <https://leafletjs.com/>.
+
 ## World Magnetic Model
 
 WMM2025 coefficients via `geomagnetism@0.2.0`, Apache-2.0. WMM2025 is produced

@@ -599,6 +599,13 @@ input[type="range"] {
   background: #05070d;
 }
 
+.terrain-view-stage {
+  position: relative;
+  width: 100%;
+  padding: 12px;
+  background: var(--panel);
+}
+
 .ar-view-stage {
   position: relative;
   width: 100%;
