@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Apophis Watch AR test harness</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #000;
+        overflow: hidden;
+      }
+      #ar {
+        position: fixed;
+        inset: 0;
+      }
+      #loading {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        color: #9fe3ff;
+        font: 13px ui-monospace, monospace;
+        z-index: 20;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="ar"></div>
+    <div id="loading">Loading AR harness…</div>
+    <script type="module">
+      import { createArWorkstream } from '/src/ar/index.ts';
+      import { TableEphemeris } from '/src/ephemeris/hermite.ts';
+      import { SimulationSession } from '/src/state/session.ts';
+      import { loadStarCatalogue } from '/src/sky/catalog.ts';
+
+      const OBSERVER = { latitudeDeg: 45.6427, longitudeDeg: 25.5887, elevationM: 600 };
+      const CA_MS = Date.parse('2029-04-13T21:35:42.000Z');
+
+      const data = await fetch('/data/apophis-2029.json').then((r) => r.json());
+      const ephem = new TableEphemeris(data);
+      const session = new SimulationSession(ephem, OBSERVER);
+      const catalogue = await loadStarCatalogue('/');
+
+      let state = {
+        utcMs: CA_MS,
+        playing: false,
+        speed: 60,
+        observer: {
+          latitudeDeg: OBSERVER.latitudeDeg,
+          longitudeDeg: OBSERVER.longitudeDeg,
+          groundElevationM: OBSERVER.elevationM,
+          eyeHeightM: 0,
+        },
+        locationSource: 'manual',
+        locationStatus: 'Playwright AR harness observer (Brasov, 600 m).',
+        viewMode: 'sky',
+        toggles: {
+          constellations: true,
+          refraction: false,
+          enlargedMarker: false,
+          nightMode: false,
+        },
+        minGoodElevationDeg: 10,
+        timeZone: 'Europe/Bucharest',
+        dataWindowStartMs: session.windowStartMs,
+        dataWindowEndMs: session.windowEndMs,
+        ready: true,
+        error: null,
+      };
+
+      const listeners = new Set();
+      const emit = () => {
+        for (const listener of listeners) listener(state);
+      };
+
+      const api = {
+        getState: () => state,
+        subscribe(listener) {
+          listeners.add(listener);
+          listener(state);
+          return () => listeners.delete(listener);
+        },
+        getSession: () => session,
+        getEphemeris: () => ephem,
+        getCatalogue: () => catalogue,
+        setTimeUtcMs(ms) {
+          const clamped = Math.max(session.windowStartMs, Math.min(session.windowEndMs, ms));
+          state = { ...state, utcMs: clamped };
+          emit();
+        },
+        setPlaying(playing) {
+          state = { ...state, playing: Boolean(playing) };
+          emit();
+        },
+        setStatus(message) {
+          window.__arStatus = message;
+        },
+      };
+
+      const root = document.getElementById('ar');
+      const workstream = createArWorkstream(root, api);
+      workstream.mount();
+
+      function dispatchOrientation(options = {}) {
+        const {
+          alpha = 0,
+          beta = 90,
+          gamma = 0,
+          absolute = true,
+          compassHeading = null,
+          compassAccuracy = null,
+          type = absolute ? 'deviceorientationabsolute' : 'deviceorientation',
+        } = options;
+        const event = new Event(type);
+        Object.assign(event, { alpha, beta, gamma, absolute });
+        if (compassHeading !== null) event.webkitCompassHeading = compassHeading;
+        if (compassAccuracy !== null) event.webkitCompassAccuracy = compassAccuracy;
+        window.dispatchEvent(event);
+      }
+
+      // Start looking west and 30° up. The raw absolute alpha is magnetic
+      // north; WMM2025 declination at Brasov (~+6.715°) makes true heading
+      // 269°, where Apophis is at closest approach (az 268.9°, el 30.3°).
+      dispatchOrientation({ alpha: 97.86, beta: 120, gamma: 0, absolute: true });
+
+      window.__arHarness = {
+        ready: true,
+        api,
+        workstream,
+        session,
+        catalogue,
+        ephem,
+        getState: () => state,
+        setState(patch) {
+          state = {
+            ...state,
+            ...patch,
+            toggles: patch.toggles ? { ...state.toggles, ...patch.toggles } : state.toggles,
+          };
+          emit();
+        },
+        setTime(ms) {
+          api.setTimeUtcMs(ms);
+        },
+        setNight(nightMode) {
+          window.__arHarness.setState({ toggles: { nightMode } });
+        },
+        setScreenAngle(angle) {
+          window.__mockScreenAngle = angle;
+          window.dispatchEvent(new Event('resize'));
+        },
+        dispatchOrientation,
+        getDebug() {
+          const el = document.querySelector('[data-role="debug"]');
+          return { text: el?.textContent ?? '', dataset: { ...(el?.dataset ?? {}) } };
+        },
+        getAlignOptions() {
+          return Array.from(document.querySelectorAll('[data-role="align-select"] option')).map(
+            (option) => ({ value: option.value, text: option.textContent }),
+          );
+        },
+        getAlignTargets() {
+          return workstream.getAlignTargets();
+        },
+      };
+
+      document.getElementById('loading')?.remove();
+    </script>
+  </body>
+</html>
