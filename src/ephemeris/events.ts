@@ -392,11 +392,33 @@ export function findAltitudeEvents(
     }
     prev = cur;
   }
+  // Refine the transit between the 60 s samples; the grid value can be a
+  // second or two early, which matters for a "jump to max elevation" button.
+  let transitRefined = transit;
+  if (transit !== null) {
+    transitRefined = goldenMin(
+      (jd) => -altitudeAt(ephem, location, jd),
+      transit - step,
+      transit + step,
+    );
+    maxEl = altitudeAt(ephem, location, transitRefined);
+  }
   // The event pass containing the transit: last rise before it, first set
   // after it. A ±12 h window can include an adjacent pass; do not confuse them.
-  const rise = transit === null ? null : (rises.filter((x) => x < transit).at(-1) ?? null);
-  const set = transit === null ? null : (sets.find((x) => x > transit) ?? null);
-  return { riseJdTdb: rise, setJdTdb: set, transitJdTdb: transit, maxElevationDeg: maxEl };
+  const rise =
+    transitRefined === null
+      ? null
+      : (rises.filter((x) => x < transitRefined).at(-1) ?? null);
+  const set =
+    transitRefined === null
+      ? null
+      : (sets.find((x) => x > transitRefined) ?? null);
+  return {
+    riseJdTdb: rise,
+    setJdTdb: set,
+    transitJdTdb: transitRefined,
+    maxElevationDeg: maxEl,
+  };
 }
 
 function refineAltitudeCrossing(

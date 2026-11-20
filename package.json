@@ -11,7 +11,9 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "report:phase1": "tsx scripts/report-phase1.ts",
-    "eval:site": "tsx scripts/eval-site.ts"
+    "eval:site": "tsx scripts/eval-site.ts",
+    "test:e2e": "playwright test",
+    "fetch:stars": "tsx scripts/fetch-stars.ts"
   },
   "keywords": [],
   "author": "",
@@ -26,6 +28,7 @@
     "three": "^0.187.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "@types/leaflet": "^1.9.22",
     "@types/node": "^26.6.6",
     "@types/three": "^0.187.0",

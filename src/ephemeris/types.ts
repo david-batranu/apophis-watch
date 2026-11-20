@@ -17,7 +17,10 @@ export interface ObserverLocation {
   elevationM: number;
 }
 
-/** Computed topocentric sky position of Apophis. */
+/**
+ * Computed topocentric sky position of Apophis.
+ * FROZEN after Phase 2: view modules consume this shape; extend with care.
+ */
 export interface SkyPosition {
   /** UTC instant this position refers to. */
   utc: Date;
@@ -43,7 +46,10 @@ export interface SkyPosition {
   phaseAngleDeg: number;
 }
 
-/** Observer state used by the UI and AR layers. */
+/**
+ * Observer state used by the UI and AR layers.
+ * FROZEN after Phase 2 (shape guarded by tests/interfaces.test.ts).
+ */
 export interface ObserverState {
   location: ObserverLocation;
   jdTdb: number;
@@ -53,7 +59,10 @@ export interface ObserverState {
   eciKm: Vec3;
 }
 
-/** Ephemeris provider contract; frozen after Phase 2. */
+/**
+ * Ephemeris provider contract.
+ * FROZEN after Phase 2: TableEphemeris is the only implementation the views use.
+ */
 export interface EphemerisProvider {
   readonly startJdTdb: number;
   readonly endJdTdb: number;

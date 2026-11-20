@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { UiStore, initialUiState } from '../src/ui/store';
+import { UiStore, initialUiState } from '../src/state/store';
 
 describe('typed UI store', () => {
   it('updates immutably and notifies subscribers', () => {
     const store = new UiStore(initialUiState);
-    const seen: number[] = [];
+    const seen: (number | null)[] = [];
     const unsubscribe = store.subscribe((state) => {
-      if (state.timeUtcMs !== null) seen.push(state.timeUtcMs);
+      seen.push(state.utcMs);
     });
-    store.update({ timeUtcMs: 1 });
-    store.update({ timeUtcMs: 2, nightMode: true });
+    store.update({ utcMs: 1 });
+    store.update({ utcMs: 2, toggles: { ...store.getState().toggles, nightMode: true } });
     unsubscribe();
-    store.update({ timeUtcMs: 3 });
-    expect(seen).toEqual([1, 2]);
-    expect(store.getState().nightMode).toBe(true);
+    store.update({ utcMs: 3 });
+    expect(seen).toEqual([null, 1, 2]);
+    expect(store.getState().toggles.nightMode).toBe(true);
     expect(store.getState()).not.toBe(initialUiState);
   });
 });
