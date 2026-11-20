@@ -6,6 +6,7 @@
  * curvature drop is applied only when building geometry or horizon angles.
  */
 
+import { t } from '../i18n';
 import {
   getCachedTile,
   putCachedTile,
@@ -63,6 +64,7 @@ export interface LoadTerrainOptions {
 }
 
 function abortError(): Error {
+  // Internal abort payload; the UI discards aborted loads instead of showing it.
   const error = new Error('Terrain load cancelled');
   error.name = 'AbortError';
   return error;
@@ -125,7 +127,12 @@ export async function loadTerrainGrid(
       message,
     });
   };
-  report(`Loading ${total} DEM tiles at z${zoomChoice.zoom}…`);
+  report(
+    t('terrain.gridProgressLoading', {
+      count: total,
+      zoom: zoomChoice.zoom,
+    }),
+  );
 
   const bytes = new Map<string, Float32Array>();
   let cursor = 0;
@@ -139,7 +146,13 @@ export async function loadTerrainGrid(
         bytes.set(key, hit.elevations);
         cached++;
         loaded++;
-        report(`Loading DEM tiles: ${loaded}/${total} (${cached} cached)`);
+        report(
+          t('terrain.gridProgressTiles', {
+            loaded,
+            total,
+            cached,
+          }),
+        );
         return;
       }
     }
@@ -151,12 +164,12 @@ export async function loadTerrainGrid(
         cache: 'default',
       });
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        throw new Error(`HTTP ${response.status}`); // technical provider payload
       }
       const blob = await response.blob();
       const elevations = await decodeTerrariumPng(blob);
       if (elevations.length !== TERRARIUM_TILE_SIZE * TERRARIUM_TILE_SIZE) {
-        throw new Error(`unexpected tile size ${elevations.length}`);
+        throw new Error(`unexpected tile size ${elevations.length}`); // technical payload
       }
       bytes.set(key, elevations);
       network++;
@@ -171,7 +184,13 @@ export async function loadTerrainGrid(
     } finally {
       if (!signal?.aborted) {
         loaded++;
-        report(`Loading DEM tiles: ${loaded}/${total} (${cached} cached)`);
+        report(
+          t('terrain.gridProgressTiles', {
+            loaded,
+            total,
+            cached,
+          }),
+        );
       }
     }
   };
@@ -195,7 +214,7 @@ export async function loadTerrainGrid(
     cached,
     network,
     failed,
-    message: `Stitching ${total} tiles…`,
+    message: t('terrain.gridProgressStitching', { count: total }),
   });
 
   const width = (xMax - xMin + 1) * TILE_SIZE;
@@ -277,7 +296,10 @@ export async function loadTerrainGrid(
     cached,
     network,
     failed,
-    message: `DEM ready: z${grid.zoom}, ${grid.spacingM.toFixed(1)} m/px`,
+    message: t('terrain.gridProgressReady', {
+      zoom: grid.zoom,
+      spacing: grid.spacingM.toFixed(1),
+    }),
   });
 
   return grid;

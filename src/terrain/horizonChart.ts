@@ -5,6 +5,7 @@
 
 import { horizonElevationAtAzimuth } from './horizon';
 import { compass8, normalizeAzimuth } from './geo';
+import { t } from '../i18n';
 import type { ApophisPathInfo, HorizonProfile } from './types';
 
 export interface HorizonChartState {
@@ -111,7 +112,7 @@ export function drawHorizonChart(
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.font = '12px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillText('Load a DEM to compute the local horizon.', width / 2, height / 2);
+    ctx.fillText(t('horizonChart.empty'), width / 2, height / 2);
     return;
   }
 
@@ -199,9 +200,9 @@ export function drawHorizonChart(
   ctx.fillStyle = horizonColour;
   ctx.fillRect(margin.left, height - 11, 12, 3);
   ctx.fillStyle = text;
-  ctx.fillText('horizon: terrain + buildings', margin.left + 16, height - 8);
+  ctx.fillText(t('horizonChart.legendHorizon'), margin.left + 16, height - 8);
   ctx.fillStyle = pathColour;
   ctx.fillRect(margin.left + 190, height - 11, 12, 3);
   ctx.fillStyle = text;
-  ctx.fillText('Apophis path (red = below horizon/margin)', margin.left + 206, height - 8);
+  ctx.fillText(t('horizonChart.legendPath'), margin.left + 206, height - 8);
 }

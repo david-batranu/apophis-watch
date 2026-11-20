@@ -12,6 +12,7 @@ import { jdTdbFromDate } from '../core/time';
 import { apparentHorizontalAtJd } from '../ephemeris/topocentric';
 import type { ObserverLocation } from '../ephemeris/types';
 import type { SimulationSession } from '../state/session';
+import { t } from '../i18n';
 import { parallaxArcsec } from './geo';
 import type {
   ApophisPathInfo,
@@ -140,7 +141,7 @@ function buildPathInfo(
     rangeKm: worst.rangeKm,
     arcsec: parallaxArcsec(baselineKm, worst.rangeKm),
     utcMs: worst.utcMs,
-    label: 'worst case along the visible path',
+    label: t('bestSpot.parallaxWorst'),
   };
   const caRange = session.geocentricCa.geocentricDistanceKm;
   const parallaxAtGeocentricCa: ParallaxReport = {
@@ -148,7 +149,7 @@ function buildPathInfo(
     rangeKm: caRange,
     arcsec: parallaxArcsec(baselineKm, caRange),
     utcMs: session.geocentricCa.utc.getTime(),
-    label: 'at geocentric closest approach',
+    label: t('bestSpot.parallaxGeocentric'),
   };
   return {
     samples,
@@ -197,11 +198,16 @@ export function interpolatePathAt(
 
 /** Human-readable azimuth sector, e.g. "123.4° → 317.6° (SW→NW)". */
 export function formatSector(sector: PathSector): string {
-  if (sector.spanDeg === 0) return 'no above-horizon sector';
-  const direction = sector.wrapsNorth ? 'crosses north' : 'clockwise';
-  return `${sector.minAzimuthDeg.toFixed(1)}° → ${sector.maxAzimuthDeg.toFixed(
-    1,
-  )}° (${direction}, ${sector.spanDeg.toFixed(1)}°)`;
+  if (sector.spanDeg === 0) return t('path.noSector');
+  const direction = sector.wrapsNorth
+    ? t('path.crossesNorth')
+    : t('path.clockwise');
+  return t('path.sector', {
+    min: sector.minAzimuthDeg.toFixed(1),
+    max: sector.maxAzimuthDeg.toFixed(1),
+    direction,
+    span: sector.spanDeg.toFixed(1),
+  });
 }
 
 /** UTC HH:MM label used in result reasons. */

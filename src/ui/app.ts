@@ -1,4 +1,5 @@
 import { jdTdbFromDate } from '../core/time';
+import { t } from '../i18n';
 import type { ArWorkstream } from '../ar/host';
 import type { TerrainWorkstream } from '../terrain/host';
 import type { SkyPosition } from '../ephemeris/types';
@@ -34,16 +35,24 @@ type JumpButton = {
 };
 
 const JUMPS: JumpButton[] = [
-  { kind: 'topocentricCa', label: 'Topocentric CA' },
-  { kind: 'geocentricCa', label: 'Geocentric CA' },
-  { kind: 'rise', label: 'Rise' },
-  { kind: 'set', label: 'Set' },
-  { kind: 'maxElevation', label: 'Max elevation' },
-  { kind: 'visibilityStart', label: 'Visibility start' },
-  { kind: 'visibilityEnd', label: 'Visibility end' },
+  { kind: 'topocentricCa', label: t('jump.topocentricCa') },
+  { kind: 'geocentricCa', label: t('jump.geocentricCa') },
+  { kind: 'rise', label: t('jump.rise') },
+  { kind: 'set', label: t('jump.set') },
+  { kind: 'maxElevation', label: t('jump.maxElevation') },
+  { kind: 'visibilityStart', label: t('jump.visibilityStart') },
+  { kind: 'visibilityEnd', label: t('jump.visibilityEnd') },
 ];
 
 const SPEEDS = [1, 5, 10, 30, 60, 300, 600];
+
+const SIZE_OBJECT_LABELS = {
+  moon: 'shell.sizeObjectMoon',
+  apophis: 'shell.sizeObjectApophis',
+  eiffel: 'shell.sizeObjectEiffel',
+  football: 'shell.sizeObjectFootball',
+  iss: 'shell.sizeObjectIss',
+} as const;
 
 function fmtDeg(value: number, digits = 2): string {
   return `${value.toFixed(digits)}°`;
@@ -95,7 +104,7 @@ export class AppUi {
   private pwa: PwaController | null = null;
   private pwaBannerKind: 'update' | 'offline' | null = null;
   private lastAboutKey = '';
-  private aboutStorageText = 'Storage status not checked yet.';
+  private aboutStorageText = t('shell.storageNotChecked');
   private offlineSnapshot: OfflineSnapshot | null = null;
 
   constructor(
@@ -127,17 +136,19 @@ export class AppUi {
       onNeedRefresh: () => {
         this.showPwaBanner(
           'update',
-          'A new version is ready. Reload when convenient; the prepared offline area is kept.',
+          t('shell.pwaUpdateReady'),
         );
       },
       onOfflineReady: () => {
         this.showPwaBanner(
           'offline',
-          'App shell cached for offline use. Open Local 3D and press “Prepare for offline” to store terrain and buildings.',
+          t('shell.pwaOfflineReady'),
         );
       },
       onError: (error) => {
-        this.setError(`Service worker: ${String(error)}`);
+        this.setError(
+          t('shell.pwaServiceWorkerError', { error: String(error) }),
+        );
       },
     });
     this.ref('pwa-primary').addEventListener('click', () => {
@@ -150,12 +161,12 @@ export class AppUi {
     this.ref('pwa-dismiss').addEventListener('click', () => this.hidePwaBanner());
     this.ref('check-updates').addEventListener('click', () => {
       const status = this.ref('update-status');
-      status.textContent = 'Checking for a new build…';
+      status.textContent = t('shell.pwaChecking');
       void this.pwa?.check().then(() => {
         window.setTimeout(() => {
           status.textContent = this.pwa?.hasWaitingUpdate()
-            ? 'A new build is ready; use Reload in the banner.'
-            : 'No update found (or the browser is offline).';
+            ? t('shell.pwaNewBuildReady')
+            : t('shell.pwaNoUpdate');
         }, 1_500);
       });
     });
@@ -164,7 +175,8 @@ export class AppUi {
   private showPwaBanner(kind: 'update' | 'offline', text: string): void {
     this.pwaBannerKind = kind;
     this.ref('pwa-banner-text').textContent = text;
-    this.ref('pwa-primary').textContent = kind === 'update' ? 'Reload' : 'Got it';
+    this.ref('pwa-primary').textContent =
+      kind === 'update' ? t('shell.pwaReload') : t('shell.pwaGotIt');
     this.ref('pwa-banner').classList.remove('hidden');
     this.ref('pwa-banner').classList.toggle('update', kind === 'update');
   }
@@ -190,57 +202,57 @@ export class AppUi {
     ).join('');
     return `
       <div class="app-shell">
-        <a class="skip-link" href="#main-content">Skip to main content</a>
+        <a class="skip-link" href="#main-content">${t('shell.skipToContent')}</a>
         <header class="topbar">
-          <div class="brand">APOPHIS WATCH <span>(99942) Apophis · 13 April 2029</span></div>
+          <div class="brand">${t('shell.brandName')} <span>${t('shell.brandSubtitle')}</span></div>
           <div class="top-actions">
-            <span class="chip" data-ref="location-chip">Location</span>
-            <button class="chip chip-button" data-ref="offline-chip" type="button" aria-label="Offline status and preparation">Offline: checking…</button>
-            <button class="btn" data-ref="night-button" type="button" aria-pressed="false">Night mode</button>
+            <span class="chip" data-ref="location-chip">${t('shell.locationFallback')}</span>
+            <button class="chip chip-button" data-ref="offline-chip" type="button" aria-label="${t('shell.offlineChipAria')}">${t('shell.offlineChecking')}</button>
+            <button class="btn" data-ref="night-button" type="button" aria-pressed="false">${t('shell.nightModeButton')}</button>
           </div>
         </header>
         <div class="app-banner hidden" data-ref="pwa-banner" role="status" aria-live="polite">
           <span data-ref="pwa-banner-text"></span>
           <span class="app-banner-actions">
-            <button class="btn small primary" data-ref="pwa-primary" type="button">Reload</button>
-            <button class="btn small ghost" data-ref="pwa-dismiss" type="button">Later</button>
+            <button class="btn small primary" data-ref="pwa-primary" type="button">${t('shell.pwaReload')}</button>
+            <button class="btn small ghost" data-ref="pwa-dismiss" type="button">${t('shell.pwaLater')}</button>
           </span>
         </div>
         <main class="main" id="main-content" tabindex="-1">
           <div class="bar bar-between">
-            <div class="tabs" role="tablist" aria-label="View">
-              <button class="tab" id="tab-sky" role="tab" aria-controls="panel-sky" aria-selected="true" tabindex="0" data-view="sky" type="button">Sky view</button>
-              <button class="tab" id="tab-space" role="tab" aria-controls="panel-space" aria-selected="false" tabindex="-1" data-view="space" type="button">Space view</button>
-              <button class="tab" id="tab-local" role="tab" aria-controls="panel-local" aria-selected="false" tabindex="-1" data-view="local" type="button">Local 3D</button>
-              <button class="tab" id="tab-ar" role="tab" aria-controls="panel-ar" aria-selected="false" tabindex="-1" data-view="ar" type="button">AR</button>
+            <div class="tabs" role="tablist" aria-label="${t('shell.tabsAria')}">
+              <button class="tab" id="tab-sky" role="tab" aria-controls="panel-sky" aria-selected="true" tabindex="0" data-view="sky" type="button">${t('shell.tabSky')}</button>
+              <button class="tab" id="tab-space" role="tab" aria-controls="panel-space" aria-selected="false" tabindex="-1" data-view="space" type="button">${t('shell.tabSpace')}</button>
+              <button class="tab" id="tab-local" role="tab" aria-controls="panel-local" aria-selected="false" tabindex="-1" data-view="local" type="button">${t('shell.tabLocal')}</button>
+              <button class="tab" id="tab-ar" role="tab" aria-controls="panel-ar" aria-selected="false" tabindex="-1" data-view="ar" type="button">${t('shell.tabAr')}</button>
             </div>
-            <div class="chip" data-ref="window-chip">Data window: —</div>
+            <div class="chip" data-ref="window-chip">${t('shell.dataWindowPlaceholder')}</div>
           </div>
           <div class="status-line error hidden" data-ref="error-line" role="alert"></div>
           <div class="status-line hidden" data-ref="aux-status" role="status" aria-live="polite"></div>
           <div class="status-line offline-line hidden" data-ref="offline-line" role="status"></div>
           <section class="grid-main">
             <div class="stage-card">
-              <div class="sky-stage" id="panel-sky" role="tabpanel" aria-labelledby="tab-sky" data-ref="sky-panel" aria-label="Stereographic sky dome">
-                <canvas class="sky-canvas" data-ref="sky-canvas" tabindex="0" aria-label="Sky dome. Drag or use arrow keys to look; plus and minus zoom; zero resets."></canvas>
+              <div class="sky-stage" id="panel-sky" role="tabpanel" aria-labelledby="tab-sky" data-ref="sky-panel" aria-label="${t('shell.skyAria')}">
+                <canvas class="sky-canvas" data-ref="sky-canvas" tabindex="0" aria-label="${t('shell.skyCanvasAria')}"></canvas>
                 <div class="stage-topline">
-                  <span class="badge" data-ref="sky-refraction-badge">refracted</span>
+                  <span class="badge" data-ref="sky-refraction-badge">${t('shell.badgeRefracted')}</span>
                   <span class="badge" data-ref="sky-visibility-badge">—</span>
                 </div>
-                <div class="stage-hint">Drag to look · pinch/scroll to zoom · double-click reset</div>
+                <div class="stage-hint">${t('shell.skyHint')}</div>
               </div>
               <div class="space-stage hidden" id="panel-space" role="tabpanel" aria-labelledby="tab-space" data-ref="space-panel">
                 <div class="space-host" data-ref="space-host"></div>
                 <div class="space-overlay">
-                  <button class="btn small" data-camera="earth" type="button">Earth</button>
-                  <button class="btn small" data-camera="flyby" type="button">Flyby</button>
-                  <button class="btn small" data-camera="moon" type="button">Moon orbit</button>
-                  <button class="btn small" data-camera="top" type="button">Top-down</button>
-                  <button class="btn small" data-ref="space-reset" type="button">Reset cameras</button>
+                  <button class="btn small" data-camera="earth" type="button">${t('shell.spaceCameraEarth')}</button>
+                  <button class="btn small" data-camera="flyby" type="button">${t('shell.spaceCameraFlyby')}</button>
+                  <button class="btn small" data-camera="moon" type="button">${t('shell.spaceCameraMoon')}</button>
+                  <button class="btn small" data-camera="top" type="button">${t('shell.spaceCameraTop')}</button>
+                  <button class="btn small" data-ref="space-reset" type="button">${t('shell.spaceResetCameras')}</button>
                 </div>
                 <div class="space-legend">
-                  1 scene unit = 1,000 km · Earth radius 6,378 km · GEO ring 42,164 km · Moon orbit 384,400 km<br />
-                  Apophis is a true-scale point; its 340 m disc is invisible at this scale.
+                  ${t('shell.spaceLegendScale')}<br />
+                  ${t('shell.spaceLegendTrueScale')}
                 </div>
               </div>
               <div class="terrain-view-stage hidden" id="panel-local" role="tabpanel" aria-labelledby="tab-local" data-ref="local-panel">
@@ -252,36 +264,36 @@ export class AppUi {
             </div>
             <aside class="aside-stack">
               <section class="panel">
-                <h2>Live readout</h2>
+                <h2>${t('shell.readoutTitle')}</h2>
                 <div class="readout-grid">
-                  ${this.metric('az', 'Azimuth', '—')}
-                  ${this.metric('el', 'Elevation', '—')}
-                  ${this.metric('range', 'Range', '—')}
-                  ${this.metric('rate', 'Angular rate', '—')}
-                  ${this.metric('mag', 'V magnitude', '—')}
-                  ${this.metric('size', 'Angular size', '—')}
-                  ${this.metric('moon', 'Moon separation', '—')}
-                  ${this.metric('view', 'Visibility', '—')}
+                  ${this.metric('az', t('shell.metricAzimuth'), '—')}
+                  ${this.metric('el', t('shell.metricElevation'), '—')}
+                  ${this.metric('range', t('shell.metricRange'), '—')}
+                  ${this.metric('rate', t('shell.metricRate'), '—')}
+                  ${this.metric('mag', t('shell.metricMagnitude'), '—')}
+                  ${this.metric('size', t('shell.metricSize'), '—')}
+                  ${this.metric('moon', t('shell.metricMoonSeparation'), '—')}
+                  ${this.metric('view', t('shell.metricVisibility'), '—')}
                 </div>
                 <div class="status-line" data-ref="readout-note">—</div>
                 <div class="trail-strip" data-ref="trail-strip">—</div>
               </section>
               <section class="panel">
-                <h2>Time</h2>
+                <h2>${t('shell.timeTitle')}</h2>
                 <div class="clock-block">
                   <div class="clock-utc" data-ref="utc-clock">—</div>
                   <div class="clock-local" data-ref="local-clock">—</div>
                 </div>
                 <div class="time-controls" style="margin-top: 10px">
                   <div class="bar">
-                    <button class="btn primary" data-ref="play-button" type="button">▶ Play</button>
-                    <label class="toggle">Speed
+                    <button class="btn primary" data-ref="play-button" type="button">${t('shell.play')}</button>
+                    <label class="toggle">${t('shell.speed')}
                       <select class="field" data-ref="speed-select">${speedOptions}</select>
                     </label>
                   </div>
                   <div class="scrub">
                     <span class="scrub-label" data-ref="window-start">—</span>
-                    <input type="range" min="0" max="10000" step="1" value="5000" data-ref="scrub" aria-label="Time scrub" />
+                    <input type="range" min="0" max="10000" step="1" value="5000" data-ref="scrub" aria-label="${t('shell.scrubAria')}" />
                     <span class="scrub-label" data-ref="window-end">—</span>
                   </div>
                   <div class="jump-grid">${jumpButtons}</div>
@@ -291,80 +303,78 @@ export class AppUi {
           </section>
           <section class="analysis-grid">
             <section class="panel">
-              <h2>Elevation &amp; magnitude vs time</h2>
+              <h2>${t('shell.plotTitle')}</h2>
               <div class="plot-wrap" data-ref="plot-host"></div>
-              <div class="status-line">Elevation line is airless geometric elevation (the readout may be refracted) · magnitude line (lower is brighter) · shaded: Phase 1 visibility (Sun &lt; −6°) · dashed: good-viewing threshold.</div>
+              <div class="status-line">${t('shell.plotCaption')}</div>
             </section>
             <section class="panel">
-              <h2>Size honesty</h2>
+              <h2>${t('shell.sizeTitle')}</h2>
               <div data-ref="size-panel"></div>
             </section>
           </section>
           <section class="controls-grid">
             <section class="panel">
-              <h2>Observer</h2>
+              <h2>${t('shell.observerTitle')}</h2>
               <div class="field">
-                <label for="preset-select">Preset</label>
+                <label for="preset-select">${t('shell.observerPreset')}</label>
                 <select id="preset-select" data-ref="preset-select">
-                  <option value="">Custom / browser location</option>
+                  <option value="">${t('shell.observerCustom')}</option>
                 </select>
               </div>
               <div class="field-grid" style="margin-top: 8px">
-                <div class="field"><label for="lat">Latitude °</label><input id="lat" data-ref="lat" inputmode="decimal" placeholder="45.6427" /></div>
-                <div class="field"><label for="lon">Longitude °</label><input id="lon" data-ref="lon" inputmode="decimal" placeholder="25.5887" /></div>
-                <div class="field"><label for="elev">Ground elev. m (optional)</label><input id="elev" data-ref="elev" inputmode="decimal" placeholder="unknown" /></div>
-                <div class="field"><label for="eye">Eye height m</label><input id="eye" data-ref="eye" inputmode="decimal" value="1.7" /></div>
+                <div class="field"><label for="lat">${t('shell.observerLat')}</label><input id="lat" data-ref="lat" inputmode="decimal" placeholder="45.6427" /></div>
+                <div class="field"><label for="lon">${t('shell.observerLon')}</label><input id="lon" data-ref="lon" inputmode="decimal" placeholder="25.5887" /></div>
+                <div class="field"><label for="elev">${t('shell.observerGroundElevation')}</label><input id="elev" data-ref="elev" inputmode="decimal" placeholder="${t('shell.observerGroundPlaceholder')}" /></div>
+                <div class="field"><label for="eye">${t('shell.observerEyeHeight')}</label><input id="eye" data-ref="eye" inputmode="decimal" value="1.7" /></div>
               </div>
               <div class="bar" style="margin-top: 8px">
-                <button class="btn" data-ref="apply-observer" type="button">Apply coordinates</button>
-                <button class="btn ghost" data-ref="use-location" type="button">Use my location</button>
+                <button class="btn" data-ref="apply-observer" type="button">${t('shell.observerApply')}</button>
+                <button class="btn ghost" data-ref="use-location" type="button">${t('shell.observerUseLocation')}</button>
               </div>
               <p class="status-line" data-ref="location-status">—</p>
-              <p class="status-line">Height is eye height above ground: <strong>no terrain/DEM yet</strong>; GPS altitude is ignored. Phase 3 adds the map picker and terrain.</p>
+              <p class="status-line">${t('shell.observerNote')}</p>
             </section>
             <section class="panel">
-              <h2>Display</h2>
+              <h2>${t('shell.displayTitle')}</h2>
               <div class="toggle-grid">
-                <label class="toggle"><input type="checkbox" data-ref="toggle-refraction" /> Refraction (display only)</label>
-                <label class="toggle"><input type="checkbox" data-ref="toggle-constellations" /> Constellation lines</label>
-                <label class="toggle"><input type="checkbox" data-ref="toggle-enlarged" /> Enlarged marker <span class="badge warn">not to scale</span></label>
-                <label class="toggle"><input type="checkbox" data-ref="toggle-night" /> Night mode (red)</label>
+                <label class="toggle"><input type="checkbox" data-ref="toggle-refraction" /> ${t('shell.displayRefraction')}</label>
+                <label class="toggle"><input type="checkbox" data-ref="toggle-constellations" /> ${t('shell.displayConstellations')}</label>
+                <label class="toggle"><input type="checkbox" data-ref="toggle-enlarged" /> ${t('shell.displayEnlarged')} <span class="badge warn">${t('shell.displayEnlargedBadge')}</span></label>
+                <label class="toggle"><input type="checkbox" data-ref="toggle-night" /> ${t('shell.displayNightMode')}</label>
               </div>
               <div class="field" style="margin-top: 10px">
-                <label for="min-good">Good-viewing minimum elevation: <span data-ref="min-good-value">10°</span></label>
+                <label for="min-good">${t('shell.displayMinGoodLabel')}<span data-ref="min-good-value">10°</span></label>
                 <input id="min-good" type="range" min="0" max="60" step="1" value="10" data-ref="min-good" />
               </div>
-              <p class="status-line">The Phase 1 visibility window (above horizon + Sun &lt; −6°) is unchanged; this threshold only highlights the easier part of the path.</p>
+              <p class="status-line">${t('shell.displayMinGoodNote')}</p>
             </section>
           </section>
           <div data-ref="event-guide"></div>
           <details class="about-panel" open>
-            <summary>About, data, offline storage &amp; licences</summary>
+            <summary>${t('shell.aboutSummary')}</summary>
             <div class="about-grid">
               <section>
-                <h3>Build &amp; data source</h3>
+                <h3>${t('shell.aboutBuildTitle')}</h3>
                 <div class="about-block" data-ref="about-build">—</div>
                 <div class="bar" style="margin-top: 8px">
-                  <button class="btn small" data-ref="check-updates" type="button">Check for updates</button>
+                  <button class="btn small" data-ref="check-updates" type="button">${t('shell.checkUpdates')}</button>
                   <span class="status-line" data-ref="update-status"></span>
                 </div>
               </section>
               <section>
-                <h3>Prepared offline area</h3>
-                <div class="about-block" data-ref="about-offline">Not prepared.</div>
-                <div class="about-block" data-ref="about-storage">Storage status not checked yet.</div>
+                <h3>${t('shell.aboutOfflineTitle')}</h3>
+                <div class="about-block" data-ref="about-offline">${t('shell.aboutNotPrepared')}</div>
+                <div class="about-block" data-ref="about-storage">${t('shell.storageNotChecked')}</div>
               </section>
               <section>
-                <h3>Bundled building areas</h3>
-                <div class="about-block" data-ref="about-areas">Checking…</div>
+                <h3>${t('shell.aboutAreasTitle')}</h3>
+                <div class="about-block" data-ref="about-areas">${t('shell.checking')}</div>
               </section>
             </div>
             <div class="credits" data-ref="credits"></div>
           </details>
           <div class="footer-note">
-            Everything is computed from the committed JPL Horizons state vectors and astronomy-engine.
-            The view is a simulation for planning, not a live feed. Offline base maps are rendered
-            from cached terrain tiles; OpenStreetMap raster tiles are never bulk-downloaded.
+            ${t('shell.footerNote')}
           </div>
         </main>
         ${this.debug ? '<div class="debug-overlay" data-ref="debug-overlay"></div>' : ''}
@@ -379,12 +389,12 @@ export class AppUi {
   private populatePresets(): void {
     const select = this.ref('preset-select') as HTMLSelectElement;
     const options = [
-      ['', 'Custom / browser location'],
+      ['', t('shell.observerCustom')],
       ...Object.entries({
-        brasov: 'Brasov, Romania',
-        'cape-town': 'Cape Town, South Africa',
-        tenerife: 'Teide Observatory, Tenerife',
-        longyearbyen: 'Longyearbyen, Svalbard',
+        brasov: t('shell.presetBrasov'),
+        'cape-town': t('shell.presetCapeTown'),
+        tenerife: t('shell.presetTenerife'),
+        longyearbyen: t('shell.presetLongyearbyen'),
       }),
     ];
     select.innerHTML = options
@@ -502,7 +512,7 @@ export class AppUi {
     const latRaw = (this.ref('lat') as HTMLInputElement).value.trim();
     const lonRaw = (this.ref('lon') as HTMLInputElement).value.trim();
     if (latRaw === '' || lonRaw === '') {
-      this.setError('Enter both latitude and longitude, or choose a preset.');
+      this.setError(t('shell.enterCoordinates'));
       return;
     }
     const lat = Number(latRaw);
@@ -531,9 +541,15 @@ export class AppUi {
     if (state.utcMs !== null) {
       this.ref('utc-clock').textContent = formatUtc(state.utcMs);
       const local = formatLocal(state.utcMs, state.timeZone);
-      this.ref('local-clock').textContent = `${local.label} ${local.zone} (${state.timeZone})`;
+      this.ref('local-clock').textContent = t('shell.localClock', {
+        label: local.label,
+        zone: local.zone,
+        iana: state.timeZone,
+      });
     }
-    this.ref('play-button').textContent = state.playing ? '⏸ Pause' : '▶ Play';
+    this.ref('play-button').textContent = state.playing
+      ? t('shell.pause')
+      : t('shell.play');
     const speed = this.ref('speed-select') as HTMLSelectElement;
     if (Number(speed.value) !== state.speed) speed.value = String(state.speed);
     const scrub = this.ref('scrub') as HTMLInputElement;
@@ -548,11 +564,14 @@ export class AppUi {
       scrub.value = String(Math.round(Math.max(0, Math.min(1, fraction)) * 10000));
       this.ref('window-start').textContent = formatUtc(state.dataWindowStartMs).slice(5, 16);
       this.ref('window-end').textContent = formatUtc(state.dataWindowEndMs).slice(5, 16);
-      this.ref('window-chip').textContent = `${formatUtc(state.dataWindowStartMs).slice(0, 16)} → ${formatUtc(state.dataWindowEndMs).slice(0, 16)} UTC`;
+      this.ref('window-chip').textContent = t('shell.dataWindowValue', {
+        start: formatUtc(state.dataWindowStartMs).slice(0, 16),
+        end: formatUtc(state.dataWindowEndMs).slice(0, 16),
+      });
     }
     this.ref('night-button').textContent = state.toggles.nightMode
-      ? 'Night mode: on'
-      : 'Night mode: off';
+      ? t('shell.nightModeOn')
+      : t('shell.nightModeOff');
     this.ref('night-button').setAttribute('aria-pressed', String(state.toggles.nightMode));
     (this.ref('toggle-night') as HTMLInputElement).checked = state.toggles.nightMode;
     (this.ref('toggle-refraction') as HTMLInputElement).checked = state.toggles.refraction;
@@ -562,7 +581,7 @@ export class AppUi {
     (this.ref('min-good') as HTMLInputElement).value = String(state.minGoodElevationDeg);
     this.ref('location-chip').textContent = state.observer
       ? `${state.observer.latitudeDeg.toFixed(2)}°, ${state.observer.longitudeDeg.toFixed(2)}°`
-      : 'Location';
+      : t('shell.locationFallback');
     this.ref('location-chip').title = state.locationStatus;
     this.ref('location-status').textContent = state.locationStatus;
     if (state.observer) {
@@ -642,18 +661,18 @@ export class AppUi {
     const line = this.ref('offline-line');
     if (state.offline.active) {
       chip.textContent = state.offline.mismatch
-        ? 'Offline: area not prepared'
-        : 'Offline: ready';
+        ? t('shell.offlineAreaNotPrepared')
+        : t('shell.offlineReady');
       chip.classList.toggle('warn', state.offline.mismatch);
       chip.classList.toggle('good', !state.offline.mismatch);
-      line.textContent = state.offline.message ?? 'Offline mode.';
+      line.textContent = state.offline.message ?? t('shell.offlineMode');
       line.classList.remove('hidden');
       line.classList.toggle('warn', state.offline.mismatch);
       line.classList.toggle('good', !state.offline.mismatch);
     } else {
       chip.textContent = state.offline.preparedAt
-        ? 'Offline: prepared'
-        : 'Offline: not prepared';
+        ? t('shell.offlinePrepared')
+        : t('shell.offlineNotPrepared');
       chip.classList.toggle('good', state.offline.preparedAt !== null);
       chip.classList.toggle('warn', state.offline.preparedAt === null);
       line.textContent = '';
@@ -717,7 +736,9 @@ export class AppUi {
       workstream.update(this.app.getState());
       this.terrain = workstream;
     } catch (error) {
-      this.app.setStatus(`Terrain failed to load: ${String(error)}`);
+      this.app.setStatus(
+        t('shell.terrainLoadFailed', { error: String(error) }),
+      );
     } finally {
       this.terrainLoading = false;
     }
@@ -747,7 +768,7 @@ export class AppUi {
       workstream.update(this.app.getState());
       this.ar = workstream;
     } catch (error) {
-      this.app.setStatus(`AR failed to load: ${String(error)}`);
+      this.app.setStatus(t('shell.arLoadFailed', { error: String(error) }));
     } finally {
       this.arLoading = false;
     }
@@ -780,36 +801,44 @@ export class AppUi {
     const above = sky.elevationDeg > 0;
     this.ref('metric-az').textContent = fmtDeg(sky.azimuthDeg, 3);
     this.ref('metric-el').textContent = fmtDeg(sky.elevationDeg, 3);
-    this.ref('metric-el-sub').textContent = state.toggles.refraction ? 'refracted' : 'airless';
+    this.ref('metric-el-sub').textContent = state.toggles.refraction
+      ? t('shell.refractionSubRefracted')
+      : t('shell.refractionSubAirless');
     this.ref('metric-range').textContent = fmtKm(sky.rangeKm);
-    this.ref('metric-range-sub').textContent = `${(sky.rangeKm / 384_400).toFixed(3)} lunar distances`;
-    this.ref('metric-rate').textContent = `${sky.angularRateDegPerMin.toFixed(3)}°/min`;
-    this.ref('metric-mag').textContent = `${sky.magnitude.toFixed(2)} (est.)`;
+    this.ref('metric-range-sub').textContent = t('shell.rangeSub', {
+      ratio: (sky.rangeKm / 384_400).toFixed(3),
+    });
+    this.ref('metric-rate').textContent = t('shell.rateValue', {
+      rate: sky.angularRateDegPerMin.toFixed(3),
+    });
+    this.ref('metric-mag').textContent = t('shell.magnitudeValue', {
+      magnitude: sky.magnitude.toFixed(2),
+    });
     this.ref('metric-size').textContent = `${sky.angularDiameterArcsec.toFixed(3)}″`;
-    this.ref('metric-size-sub').textContent = 'true angular size';
+    this.ref('metric-size-sub').textContent = t('shell.sizeSub');
     this.ref('metric-moon').textContent = moonSep === null ? '—' : fmtDeg(moonSep, 2);
     this.ref('metric-view').textContent = !above
-      ? 'Below horizon'
+      ? t('shell.viewBelow')
       : inWindow
-        ? 'In visibility window'
-        : 'Above horizon, not dark';
+        ? t('shell.viewInWindow')
+        : t('shell.viewNotDark');
     this.ref('metric-view-sub').textContent = inWindow
-      ? 'Phase 1 (Sun < −6°)'
-      : 'Sun criterion not met';
+      ? t('shell.viewSubPhase1')
+      : t('shell.viewSubNotMet');
     this.ref('sky-refraction-badge').textContent = state.toggles.refraction
-      ? 'refracted (display)'
-      : 'airless';
+      ? t('shell.badgeDisplayRefracted')
+      : t('shell.badgeAirless');
     this.ref('sky-visibility-badge').textContent = !above
-      ? 'below horizon'
+      ? t('shell.badgeVisibilityBelow')
       : inWindow
-        ? 'visible · Sun < −6°'
-        : 'above horizon · not dark';
+        ? t('shell.badgeVisibilityVisible')
+        : t('shell.badgeVisibilityNotDark');
     this.ref('sky-visibility-badge').className = `badge ${
       above && inWindow ? 'good' : above ? 'warn' : ''
     }`;
-    this.ref('readout-note').textContent = `${
-      state.toggles.refraction ? 'Refracted azimuth/elevation' : 'Airless azimuth/elevation'
-    } · range/rate/size are geometric · magnitude is an H-G estimate · marker glow encodes magnitude, not the 1.7″ physical disc.`;
+    this.ref('readout-note').textContent = state.toggles.refraction
+      ? t('shell.readoutNoteRefracted')
+      : t('shell.readoutNoteAirless');
     const session = this.app.getSession();
     if (session) {
       const stripKey = `${Math.floor(state.utcMs / 60_000)}|${state.toggles.refraction}|${state.timeZone}`;
@@ -821,10 +850,10 @@ export class AppUi {
             s.elevationDeg >= 0 && new Date(s.utcMs).getUTCMinutes() % 5 === 0,
         );
         this.lastStripHtml = ticks.length
-          ? `<strong>5-min trail ticks (local, thinned on dome):</strong> ${ticks
+          ? `<strong>${t('shell.trailTicksTitle')}</strong> ${ticks
               .map((s) => localHhMm(s.utcMs, state.timeZone))
               .join(' · ')}`
-          : '5-min trail ticks: none above the horizon in this ±3 h window.';
+          : t('shell.trailTicksNone');
       }
       this.ref('trail-strip').innerHTML = this.lastStripHtml;
     }
@@ -849,17 +878,33 @@ export class AppUi {
     const maxArc = Math.max(...rows.map((r) => r.angularArcsec));
     const html = `
       <div class="bar bar-between" style="margin-bottom: 6px">
-        <span class="badge good">Apophis ${apophis.angularArcsec.toFixed(3)}″</span>
-        <span class="chip">at ${fmtKm(sky.rangeKm)}</span>
+        <span class="badge good">${t('shell.sizeBadge', {
+          arcsec: apophis.angularArcsec.toFixed(3),
+        })}</span>
+        <span class="chip">${t('shell.sizeAtRange', {
+          range: fmtKm(sky.rangeKm),
+        })}</span>
       </div>
       <table class="size-table">
-        <thead><tr><th>Object</th><th class="num">Angular</th><th class="num">vs Apophis</th></tr></thead>
+        <thead><tr><th>${t('shell.sizeTableObject')}</th><th class="num">${t(
+          'shell.sizeTableAngular',
+        )}</th><th class="num">${t('shell.sizeTableVsApophis')}</th></tr></thead>
         <tbody>
           ${rows
             .map((r) => {
               const width = Math.max(0.5, Math.min(100, (r.angularArcsec / maxArc) * 100));
               return `<tr title="${esc(r.source)}">
-                <td>${esc(r.name)}<div class="bar-track"><div class="bar-fill" style="width:${width.toFixed(2)}%"></div></div></td>
+                <td>${esc(
+                  SIZE_OBJECT_LABELS[
+                    r.id as keyof typeof SIZE_OBJECT_LABELS
+                  ]
+                    ? t(
+                        SIZE_OBJECT_LABELS[
+                          r.id as keyof typeof SIZE_OBJECT_LABELS
+                        ],
+                      )
+                    : r.name,
+                )}<div class="bar-track"><div class="bar-fill" style="width:${width.toFixed(2)}%"></div></div></td>
                 <td class="num">${fmtArcsec(r.angularArcsec)}</td>
                 <td class="num">${r.relativeToApophis >= 1000 ? `${Math.round(r.relativeToApophis).toLocaleString('en-US')}×` : `${r.relativeToApophis.toFixed(2)}×`}</td>
               </tr>`;
@@ -867,13 +912,16 @@ export class AppUi {
             .join('')}
         </tbody>
       </table>
-      <p class="size-note">Every angular figure is calculated as 2·atan(radius/distance) at the current Apophis range. The Moon is shown as if it were at that distance, not its real 384,400 km. Apophis’ real size is ${apophis.angularArcsec.toFixed(3)}″; the true-scale marker is a point, and the dashed marker is labelled “not to scale”.</p>
+      <p class="size-note">${t('shell.sizeNote', {
+        arcsec: apophis.angularArcsec.toFixed(3),
+      })}</p>
     `;
     this.ref('size-panel').innerHTML = html;
   }
 
   private updateDebug(sky: SkyPosition, state: UiState): void {
     if (!this.debug) return;
+    // Debug-only overlay (`?debug=1`); technical labels stay untranslated.
     const d: SkyDebugSnapshot = this.skyView.getDebugSnapshot();
     const local = state.utcMs === null ? '—' : formatLocal(state.utcMs, state.timeZone);
     const lines = [
@@ -929,65 +977,90 @@ export class AppUi {
     const sourceInfo: EphemerisSourceInfo | null = source;
     const buildDate = typeof __BUILD_TIME__ === 'string'
       ? formatPreparedDate(Date.parse(__BUILD_TIME__), state?.timeZone)
-      : 'development';
-    this.ref('about-build').innerHTML = `
-      <p><strong>App</strong> v${esc(__APP_VERSION__)} · built ${esc(buildDate)}</p>
-      <p><strong>Ephemeris</strong> ${esc(sourceInfo?.provider ?? '—')} · solution <strong>${esc(
-        sourceInfo?.solution ?? '—',
-      )}</strong> · retrieved <strong>${esc(sourceInfo?.retrievedAt ?? '—')}</strong></p>
-      <p><strong>This session is using</strong> ${esc(
+      : t('shell.aboutDevelopment');
+    this.ref('about-build').innerHTML = t('shell.aboutBuild', {
+      version: esc(__APP_VERSION__),
+      buildDate: esc(buildDate),
+      provider: esc(sourceInfo?.provider ?? '—'),
+      solution: esc(sourceInfo?.solution ?? '—'),
+      retrieved: esc(sourceInfo?.retrievedAt ?? '—'),
+      activeSource:
         sourceInfo?.activeSource === 'prepared'
-          ? 'the prepared offline snapshot'
-          : 'the built-in data file',
-      )}.${sourceInfo?.queryUrl ? ` <a href="${esc(sourceInfo.queryUrl)}">Exact Horizons query</a>.` : ''}</p>
-      <p><strong>Stars</strong> HYG Database v4.4 (CC BY-SA 4.0) · WMM2025 (NOAA/NCEI + BGS) · astronomy-engine (MIT).</p>
-    `;
+          ? t('shell.aboutActivePrepared')
+          : t('shell.aboutActiveBuiltIn'),
+      queryLink: sourceInfo?.queryUrl
+        ? t('shell.aboutQueryLink', { url: esc(sourceInfo.queryUrl) })
+        : '',
+    });
 
     if (!snapshot) {
-      this.ref('about-offline').innerHTML =
-        '<p>No offline area is prepared. Open <strong>Local 3D</strong> and press <strong>Prepare for offline</strong>.</p>';
+      this.ref('about-offline').innerHTML = t('shell.aboutOfflineNone');
     } else {
       const b = snapshot.buildings;
-      this.ref('about-offline').innerHTML = `
-        <p><strong>Prepared</strong> ${esc(
-          formatPreparedDate(snapshot.preparedAt, state?.timeZone),
-        )} · ${esc(formatBytes(snapshot.totalBytes))}</p>
-        <p><strong>Area</strong> ${esc(snapshot.area.label)} · search radius ${Math.round(
+      this.ref('about-offline').innerHTML = t('shell.aboutOfflinePresent', {
+        prepared: esc(formatPreparedDate(snapshot.preparedAt, state?.timeZone)),
+        bytes: esc(formatBytes(snapshot.totalBytes)),
+        area: esc(snapshot.area.label),
+        searchRadius: Math.round(
           snapshot.area.searchRadiusM,
-        ).toLocaleString('ro-RO')} m · buildings within ${Math.round(
+        ).toLocaleString('ro-RO'),
+        buildingRadius: Math.round(
           snapshot.area.buildingRadiusM,
-        ).toLocaleString('ro-RO')} m</p>
-        <p><strong>Ephemeris</strong> solution ${esc(
-          snapshot.ephemeris.solution,
-        )} · retrieved ${esc(snapshot.ephemeris.retrievedAt)} · ${esc(
-          formatBytes(snapshot.ephemeris.bytes),
-        )}</p>
-        <p><strong>Stars</strong> ${snapshot.stars ? `${esc(snapshot.stars.source)} · ${esc(formatBytes(snapshot.stars.bytes))}` : 'not stored'}</p>
-        <p><strong>Terrain</strong> ${snapshot.terrain.tileCount} DEM tiles (z${snapshot.area.terrainZoom}) · ${esc(
-          formatBytes(snapshot.terrain.bytes),
-        )} · ${esc(snapshot.terrain.attribution)}</p>
-        <p><strong>Buildings</strong> ${b ? `${b.count} OSM ways · ${b.defaultHeightCount} default height · ${esc(
-          formatBytes(b.bytes),
-        )} · ${esc(b.source)}${b.sourceLabel ? ` (${esc(b.sourceLabel)})` : ''} · retrieved ${esc(b.retrievedAt)}` : 'not stored (best-spot scores marked incomplete)'}</p>
-        <p><strong>Base map</strong> ${esc(snapshot.baseMap.note)}</p>
-        ${snapshot.warnings.length ? `<p class="status-line warn">${snapshot.warnings.map(esc).join('<br />')}</p>` : ''}
-        <p><strong>Data source</strong> ${esc(snapshot.ephemeris.provider)} · solution ${esc(
-          snapshot.ephemeris.solution,
-        )}.</p>
-      `;
+        ).toLocaleString('ro-RO'),
+        solution: esc(snapshot.ephemeris.solution),
+        retrieved: esc(snapshot.ephemeris.retrievedAt),
+        ephemerisBytes: esc(formatBytes(snapshot.ephemeris.bytes)),
+        stars: snapshot.stars
+          ? t('shell.aboutStarsValue', {
+              source: esc(snapshot.stars.source),
+              bytes: esc(formatBytes(snapshot.stars.bytes)),
+            })
+          : t('shell.aboutNotStored'),
+        tileCount: snapshot.terrain.tileCount,
+        zoom: snapshot.area.terrainZoom,
+        terrainBytes: esc(formatBytes(snapshot.terrain.bytes)),
+        attribution: esc(snapshot.terrain.attribution),
+        buildings: b
+          ? t('shell.aboutBuildingsValue', {
+              count: b.count,
+              defaultCount: b.defaultHeightCount,
+              bytes: esc(formatBytes(b.bytes)),
+              source: esc(b.source),
+              sourceLabel: b.sourceLabel
+                ? t('shell.aboutSourceLabel', {
+                    label: esc(b.sourceLabel),
+                  })
+                : '',
+              retrieved: esc(b.retrievedAt),
+            })
+          : t('shell.aboutBuildingsMissing'),
+        baseMapNote: esc(snapshot.baseMap.note),
+        warnings: snapshot.warnings.length
+          ? t('shell.aboutWarnings', {
+              warnings: snapshot.warnings.map(esc).join('<br />'),
+            })
+          : '',
+        provider: esc(snapshot.ephemeris.provider),
+      });
     }
 
     void storageInfo().then((info) => {
       if (!info.supported) {
-        this.aboutStorageText =
-          'Storage API is unavailable in this browser; offline data cannot be inspected.';
+        this.aboutStorageText = t('shell.aboutStorageUnsupported');
       } else {
-        const parts = [
-          info.persisted ? 'persistent storage granted' : 'best-effort storage (may be evicted)',
-          info.usageBytes !== null ? `used ${formatBytes(info.usageBytes)}` : 'usage unknown',
-          info.quotaBytes !== null ? `quota ${formatBytes(info.quotaBytes)}` : 'quota unknown',
-        ];
-        this.aboutStorageText = `${parts.join(' · ')}. On iOS, Add to Home Screen and open the app at least once a week to avoid the 7-day eviction rule.`;
+        this.aboutStorageText = t('shell.aboutStorageSupported', {
+          persistence: info.persisted
+            ? t('shell.aboutPersistentGranted')
+            : t('shell.aboutBestEffort'),
+          used:
+            info.usageBytes !== null
+              ? formatBytes(info.usageBytes)
+              : t('shell.aboutUsageUnknown'),
+          quota:
+            info.quotaBytes !== null
+              ? formatBytes(info.quotaBytes)
+              : t('shell.aboutQuotaUnknown'),
+        });
       }
       this.ref('about-storage').textContent = this.aboutStorageText;
     });
@@ -1017,49 +1090,51 @@ export class AppUi {
       };
       const areas = Array.isArray(manifest.areas) ? manifest.areas : [];
       if (areas.length === 0) {
-        node.innerHTML =
-          '<p>No bundled building areas. Use <code>npm run fetch:buildings</code> at build time, or import a GeoJSON/Overpass file in Local 3D.</p>';
+        node.innerHTML = t('shell.aboutAreasNone');
         return;
       }
       node.innerHTML = `<ul class="about-list">${areas
         .map(
           (area) =>
-            `<li><strong>${esc(area.name ?? 'Area')}</strong> · ${Number(
-              area.latitudeDeg ?? 0,
-            ).toFixed(4)}°, ${Number(area.longitudeDeg ?? 0).toFixed(4)}° · r=${Math.round(
-              area.radiusM ?? 0,
-            )} m · ${area.buildingCount ?? '?'} buildings · retrieved ${esc(
-              area.retrievedAt ?? '—',
-            )}${area.source ? ` · ${esc(area.source)}` : ''}</li>`,
+            t('shell.aboutAreaItem', {
+              name: esc(area.name ?? t('shell.aboutAreaFallback')),
+              lat: Number(area.latitudeDeg ?? 0).toFixed(4),
+              lon: Number(area.longitudeDeg ?? 0).toFixed(4),
+              radius: Math.round(area.radiusM ?? 0),
+              count: area.buildingCount ?? '?',
+              retrieved: esc(area.retrievedAt ?? '—'),
+              source: area.source
+                ? t('shell.aboutAreaSource', { source: esc(area.source) })
+                : '',
+            }),
         )
         .join('')}</ul>`;
     } catch {
-      node.innerHTML =
-        '<p>No bundled building manifest is available (offline or not built). Live Overpass and manual import remain available.</p>';
+      node.innerHTML = t('shell.aboutAreasError');
     }
   }
 
   private renderCredits(): void {
     const catalogue = this.app.getCatalogue();
     const starCredit = catalogue
-      ? `<br /><strong>Stars:</strong> ${esc(catalogue.metadata.source)} · ${esc(catalogue.metadata.license)} · ${esc(catalogue.metadata.attribution)}`
-      : '<br /><strong>Stars:</strong> catalogue unavailable; sky still works without it.';
+      ? t('shell.creditsStars', {
+          source: esc(catalogue.metadata.source),
+          license: esc(catalogue.metadata.license),
+          attribution: esc(catalogue.metadata.attribution),
+        })
+      : t('shell.creditsStarsUnavailable');
     const constellationCredit = catalogue?.metadata.constellationSource
-      ? `<br /><strong>Constellation lines:</strong> ${esc(catalogue.metadata.constellationSource)} · ${esc(catalogue.metadata.constellationLicense ?? 'see source')}`
+      ? t('shell.creditsConstellations', {
+          source: esc(catalogue.metadata.constellationSource),
+          license: esc(
+            catalogue.metadata.constellationLicense ??
+              t('shell.creditsSeeSource'),
+          ),
+        })
       : '';
-    this.ref('credits').innerHTML = `
-      <strong>Ephemeris:</strong> NASA/JPL Horizons, solution JPL#220, retrieved 2026-11-19. H=19.09, G=0.24, radius 0.170 km.
-      <br /><strong>Astronomy engine:</strong> astronomy-engine (MIT) for Sun/Moon/planets, sidereal time and precession/nutation.
-      ${starCredit}${constellationCredit}
-      <br /><strong>Star data licence:</strong> HYG Database v4.4, David Nash / Astronomy Nexus, <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>; the derived <code>stars.json</code> remains CC BY-SA 4.0. HYG is partly Hipparcos-derived; ESA’s Hipparcos data is CC BY-NC 3.0 IGO — review before any commercial use.
-      <br /><strong>Line data licence:</strong> Marc van der Sluys, ConstellationLines v1.4, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a> · <a href="https://doi.org/10.5281/zenodo.23210182">DOI 10.5281/zenodo.23210182</a>.
-      <br /><strong>Full notices:</strong> <a href="./data/README.md">star catalogue</a>, <a href="./data/TERRAIN.md">terrain/buildings</a> and THIRD_PARTY_NOTICES.md.
-      <br /><strong>AR compass:</strong> WMM2025 from NOAA/NCEI and BGS, via geomagnetism (Apache-2.0). Extrapolated/unsupported dates are labelled in AR.
-      <br /><strong>Terrain:</strong> Terrain Tiles by Mapzen / AWS Open Data (includes Copernicus EU-DEM, USGS 3DEP/SRTM/GMTED2010, NOAA ETOPO1 and other national sources; see <a href="./data/TERRAIN.md">terrain attribution</a>).
-      <br /><strong>Buildings &amp; map:</strong> © OpenStreetMap contributors, ODbL; Overpass API; Leaflet (BSD-2-Clause). Light pollution, weather and trees are not modelled.
-      <br /><strong>Size figures:</strong> Moon 3,474.8 km (NASA Moon Fact Sheet); ISS 109 m array span (NASA); football pitch 105 m (FIFA/IFAB); Eiffel Tower 330 m (official Eiffel Tower figures); Apophis 340 m (Horizons 2 × 0.170 km).
-      <br /><strong>Accuracy:</strong> Phase 1 topocentric az/el max error 0.050 arcmin (3.01″) against Horizons; see PHASE1-VALIDATION.md. This view is a planning simulation, not a live feed.
-      <br /><strong>Refraction:</strong> Bennett display-only correction; the validation path is airless.
-    `;
+    this.ref('credits').innerHTML = t('shell.creditsBlock', {
+      starCredit,
+      constellationCredit,
+    });
   }
 }

@@ -11,6 +11,7 @@
  * can run in the browser worker, in a node test, or as a main-thread fallback.
  */
 
+import { t } from '../i18n';
 import {
   compass8Long,
   distanceToBoxM,
@@ -37,6 +38,7 @@ import type {
  * explicit height/levels values are kept unchanged.
  */
 export const HEIGHT_SCENARIOS: HeightScenarios = {
+  // Internal scenario labels (data/test metadata); the UI shows its own summary.
   base: {
     id: 'base',
     label: 'Base (8 m default ×1.0)',
@@ -713,34 +715,40 @@ export function describeBestSpot(
   options: ReasonOptions = {},
 ): string {
   if (result.insideBuildingId !== null) {
-    return `Inside OSM building ${result.insideBuildingId}; not a ground-level observing spot. Choose a rooftop eye height or another point.`;
+    return t('bestSpot.insideBuilding', { id: result.insideBuildingId });
   }
   if (result.totalSamples === 0) {
-    return 'No physical Phase 1 visibility window at this location.';
+    return t('bestSpot.noWindow');
   }
   if (result.score >= 0.999_999) {
-    return `Clear for the whole visible window (minimum clearance ${result.minClearanceDeg.toFixed(
-      1,
-    )}°).`;
+    return t('bestSpot.clearWhole', {
+      clearance: result.minClearanceDeg.toFixed(1),
+    });
   }
   if (result.firstBlockedUtcMs === null) {
-    return `${Math.round(result.score * 100)}% of the visible window is clear.`;
+    return t('bestSpot.clearPercent', {
+      percent: Math.round(result.score * 100),
+    });
   }
   const time = formatUtcHhMm(result.firstBlockedUtcMs);
   const local = options.timeZone
     ? localHhMm(result.firstBlockedUtcMs, options.timeZone)
     : '';
-  const when = local ? `${time} UTC (${local} local)` : `${time} UTC`;
+  const when = local
+    ? t('bestSpot.whenLocal', { time, local })
+    : t('bestSpot.whenUtc', { time });
   const source =
     result.firstBlockedSource === 'building'
-      ? 'buildings'
+      ? t('bestSpot.sourceBuildings')
       : result.firstBlockedSource === 'terrain'
-        ? 'terrain'
-        : 'the horizon';
+        ? t('bestSpot.sourceTerrain')
+        : t('bestSpot.sourceHorizon');
   const direction =
     result.firstBlockedAzimuthDeg === null
       ? ''
-      : ` to the ${compass8Long(result.firstBlockedAzimuthDeg)}`;
+      : t('bestSpot.direction', {
+          direction: compass8Long(result.firstBlockedAzimuthDeg),
+        });
   const horizonDeg = result.firstBlockedHorizonDeg;
   const elevationDeg = result.firstBlockedElevationDeg;
   const marginLimited =
@@ -750,20 +758,26 @@ export function describeBestSpot(
   if (marginLimited) {
     const margin =
       options.marginDeg ?? Math.max(0, Math.abs(result.minClearanceDeg));
-    const verb = result.firstBlockedSource === 'building' ? 'leave' : 'leaves';
-    return `${source[0].toUpperCase()}${source.slice(
-      1,
-    )}${direction} ${verb} less than the ${margin.toFixed(
-      1,
-    )}° margin from Apophis at ${when}; ${formatClearPercent(
-      result.score,
-    )}% of the visible window is clear.`;
+    const verb =
+      result.firstBlockedSource === 'building'
+        ? t('bestSpot.verbBuildings')
+        : t('bestSpot.verbOther');
+    return t('bestSpot.marginLimited', {
+      source: `${source[0].toUpperCase()}${source.slice(1)}`,
+      direction,
+      verb,
+      margin: margin.toFixed(1),
+      when,
+      percent: formatClearPercent(result.score),
+    });
   }
-  return `Blocked by ${source}${direction} from ${when}; ${formatClearPercent(
-    result.score,
-  )}% of the visible window is clear (minimum clearance ${result.minClearanceDeg.toFixed(
-    1,
-  )}°).`;
+  return t('bestSpot.blocked', {
+    source,
+    direction,
+    when,
+    percent: formatClearPercent(result.score),
+    clearance: result.minClearanceDeg.toFixed(1),
+  });
 }
 
 /** Heatmap colour: red (blocked) → yellow → green (clear). */

@@ -5,6 +5,7 @@
  * hardcoded event-day numbers. The checklist is user state in localStorage.
  */
 
+import { t } from '../i18n';
 import type { AppModel } from '../state/appModel';
 import type { UiState } from '../state/store';
 import { formatLocalLocale, formatUtc } from './timeFormat';
@@ -20,43 +21,43 @@ interface ChecklistItem {
 const CHECKLIST: ChecklistItem[] = [
   {
     id: 'charge',
-    label: 'Charge the phone and bring a power bank',
-    detail: 'Cold batteries drain faster; AR and GPS are power-hungry.',
+    label: t('event.checklistItems.charge.label'),
+    detail: t('event.checklistItems.charge.detail'),
   },
   {
     id: 'update',
-    label: 'Update the app and open it once while online',
-    detail: 'A new build is offered as a reload prompt; do not update in the field.',
+    label: t('event.checklistItems.update.label'),
+    detail: t('event.checklistItems.update.detail'),
   },
   {
     id: 'install',
-    label: 'Install the PWA / Add to Home Screen',
-    detail: 'On iOS this is what keeps offline data from being evicted after 7 days without a tap.',
+    label: t('event.checklistItems.install.label'),
+    detail: t('event.checklistItems.install.detail'),
   },
   {
     id: 'prepare',
-    label: 'Prepare the offline area for the chosen spot',
-    detail: 'Local 3D → Prepare for offline. Wait for “Offline area ready”.',
+    label: t('event.checklistItems.prepare.label'),
+    detail: t('event.checklistItems.prepare.detail'),
   },
   {
     id: 'calibrate',
-    label: 'Calibrate AR on the Moon or a bright planet',
-    detail: 'Do this before it gets dark, while the object is easy to identify.',
+    label: t('event.checklistItems.calibrate.label'),
+    detail: t('event.checklistItems.calibrate.detail'),
   },
   {
     id: 'early',
-    label: 'Go outside at least 30–45 minutes early',
-    detail: 'Let your eyes adapt and confirm the horizon is clear.',
+    label: t('event.checklistItems.early.label'),
+    detail: t('event.checklistItems.early.detail'),
   },
   {
     id: 'direction',
-    label: 'Check the predicted direction and time below',
-    detail: 'Use the compass rose and the Local 3D horizon to find the sector.',
+    label: t('event.checklistItems.direction.label'),
+    detail: t('event.checklistItems.direction.detail'),
   },
   {
     id: 'expectation',
-    label: 'Expect a fast-moving point of light, not a disc',
-    detail: 'At flyby the angular size is only a few arcseconds; the trail is the giveaway.',
+    label: t('event.checklistItems.expectation.label'),
+    detail: t('event.checklistItems.expectation.detail'),
   },
 ];
 
@@ -120,22 +121,22 @@ export class EventGuide {
       <section class="panel event-day">
         <div class="event-head">
           <div>
-            <h2>Event day</h2>
-            <p class="status-line">A short plan generated from the current observer, ephemeris and visibility window.</p>
+            <h2>${t('event.title')}</h2>
+            <p class="status-line">${t('event.subtitle')}</p>
           </div>
-          <span class="badge good">13 April 2029</span>
+          <span class="badge good">${t('event.badge')}</span>
         </div>
         <div class="event-grid">
           <div>
-            <h3>Your plan</h3>
-            <div class="event-plan" data-ref="event-plan">Waiting for the simulation session.</div>
+            <h3>${t('event.yourPlan')}</h3>
+            <div class="event-plan" data-ref="event-plan">${t('event.waitingSession')}</div>
           </div>
           <div>
-            <h3>Checklist</h3>
+            <h3>${t('event.checklist')}</h3>
             <ul class="event-checklist" data-ref="event-checklist"></ul>
           </div>
         </div>
-        <p class="status-line">The object is a point of light. The app’s marker is enlarged only when you turn on “Enlarged marker”; the true angular size is shown in the readout.</p>
+        <p class="status-line">${t('event.footer')}</p>
       </section>
     `;
     this.planEl = this.root.querySelector<HTMLElement>('[data-ref="event-plan"]')!;
@@ -154,7 +155,7 @@ export class EventGuide {
   update(state: UiState): void {
     const session = this.app.getSession();
     if (!session || !state.observer) {
-      this.planEl.textContent = 'Waiting for the ephemeris and observer.';
+      this.planEl.textContent = t('event.waitingObserver');
       return;
     }
     const key = [
@@ -189,63 +190,63 @@ export class EventGuide {
 
     if (session.visibility.intervals.length === 0) {
       this.planEl.innerHTML = `<p class="status-line error">${esc(
-        session.visibility.reason ||
-          'No physical Phase 1 visibility window at this location.',
-      )}</p><p class="status-line">Choose another observer or check the Sun/Moon geometry.</p>`;
+        session.visibility.reason || t('event.noWindowFallback'),
+      )}</p><p class="status-line">${t('event.chooseAnother')}</p>`;
       return;
     }
 
-    const spotNote =
-      'Run the best-spot search in Local 3D, tap a result and press “Make this the observer” to make this plan spot-specific.';
+    const spotNote = t('event.spotNote');
     const direction =
       minAz !== null && maxAz !== null
         ? `${minAz.toFixed(1)}° (${compass16(minAz)}) → ${maxAz.toFixed(1)}° (${compass16(maxAz)})`
         : '—';
 
-    this.planEl.innerHTML = `
-      <dl class="event-plan-list">
-        <dt>Location</dt>
-        <dd>${state.observer.latitudeDeg.toFixed(5)}°, ${state.observer.longitudeDeg.toFixed(5)}° · ground ${
+    const elevationMin = Math.min(
+      ...visible.map((sample) => sample.elevationDeg),
+    );
+    const elevationMax = Math.max(
+      ...visible.map((sample) => sample.elevationDeg),
+    );
+
+    this.planEl.innerHTML = t('event.plan', {
+      location: t('event.locationLine', {
+        lat: state.observer.latitudeDeg.toFixed(5),
+        lon: state.observer.longitudeDeg.toFixed(5),
+        ground:
           state.observer.groundElevationM === null
-            ? 'unknown'
-            : `${state.observer.groundElevationM.toFixed(1)} m`
-        } · eye ${state.observer.eyeHeightM.toFixed(1)} m</dd>
-        <dt>Closest approach</dt>
-        <dd><strong>${formatUtc(caMs)}</strong> · ${localCa} · range ${Math.round(
-          ca.rangeKm,
-        ).toLocaleString('ro-RO')} km</dd>
-        <dt>Look at closest approach</dt>
-        <dd><strong>${ca.azimuthDeg.toFixed(1)}° (${compass16(
-          ca.azimuthDeg,
-        )})</strong>, elevation <strong>${ca.elevationDeg.toFixed(1)}°</strong></dd>
-        <dt>Visible window</dt>
-        <dd>${startMs === null ? '—' : `${formatUtc(startMs)} (${startLocal})`} → ${
-          endMs === null ? '—' : `${formatUtc(endMs)} (${endLocal})`
-        }</dd>
-        <dt>Highest</dt>
-        <dd>${
-          maxMs === null
-            ? '—'
-            : `${formatUtc(maxMs)} (${maxLocal}) at ${session.visibility.maxElevationDeg.toFixed(
-                1,
-              )}°`
-        }</dd>
-        <dt>Path direction</dt>
-        <dd>${direction} · elevation ${Math.min(
-          ...visible.map((sample) => sample.elevationDeg),
-        ).toFixed(1)}° → ${Math.max(
-          ...visible.map((sample) => sample.elevationDeg),
-        ).toFixed(1)}°</dd>
-        <dt>What you will see</dt>
-        <dd>A fast-moving point of light (V ≈ ${ca.magnitude.toFixed(
-          1,
-        )}, true size ${ca.angularDiameterArcsec.toFixed(
-          2,
-        )}″). It will not look like a disc or a movie asteroid. The trail and motion are the signature.</dd>
-        <dt>Spot</dt>
-        <dd>${spotNote}</dd>
-      </dl>
-    `;
+            ? t('event.groundUnknown')
+            : `${state.observer.groundElevationM.toFixed(1)} m`,
+        eye: state.observer.eyeHeightM.toFixed(1),
+      }),
+      caUtc: formatUtc(caMs),
+      caLocal: localCa,
+      range: Math.round(ca.rangeKm).toLocaleString('ro-RO'),
+      azimuth: ca.azimuthDeg.toFixed(1),
+      compass: compass16(ca.azimuthDeg),
+      elevation: ca.elevationDeg.toFixed(1),
+      window: t('event.visibleWindow', {
+        start: startMs === null ? '—' : `${formatUtc(startMs)} (${startLocal})`,
+        end: endMs === null ? '—' : `${formatUtc(endMs)} (${endLocal})`,
+      }),
+      highest:
+        maxMs === null
+          ? '—'
+          : t('event.highest', {
+              time: formatUtc(maxMs),
+              local: maxLocal ?? '',
+              elevation: session.visibility.maxElevationDeg.toFixed(1),
+            }),
+      direction: t('event.pathDirection', {
+        direction,
+        min: elevationMin.toFixed(1),
+        max: elevationMax.toFixed(1),
+      }),
+      what: t('event.whatYouSee', {
+        magnitude: ca.magnitude.toFixed(1),
+        size: ca.angularDiameterArcsec.toFixed(2),
+      }),
+      spot: spotNote,
+    });
   }
 
   private renderChecklist(): void {

@@ -8,6 +8,7 @@
  */
 
 import * as THREE from 'three';
+import { t } from '../i18n';
 import { curvatureDropM, normalizeAzimuth } from './geo';
 import { horizonElevationAtAzimuth } from './horizon';
 import { interpolatePathAt } from './path';
@@ -133,7 +134,7 @@ export class LocalScene3D {
       this.renderer.domElement.setAttribute('role', 'application');
       this.renderer.domElement.setAttribute(
         'aria-label',
-        'Local 3D terrain view. Arrow keys look around; plus and minus change the field of view; 0 resets the view.',
+        t('scene3d.canvasAria'),
       );
       container.appendChild(this.renderer.domElement);
       this.available = true;
@@ -143,8 +144,7 @@ export class LocalScene3D {
       this.available = false;
       const fallback = document.createElement('div');
       fallback.className = 'tw-scene-fallback';
-      fallback.textContent =
-        'WebGL is unavailable in this browser, so the local 3D view cannot be shown. The horizon chart and best-spot list still work.';
+      fallback.textContent = t('scene3d.webglUnavailable');
       container.appendChild(fallback);
     }
 
@@ -154,7 +154,7 @@ export class LocalScene3D {
     sun.position.set(-4000, 7000, 5000);
     this.scene.add(sun);
 
-    this.labelTexture = makeLabelTexture('Apophis', '#9fe7b0');
+    this.labelTexture = makeLabelTexture(t('scene3d.markerApophis'), '#9fe7b0');
 
     if (this.renderer) {
       this.bindPointer();
@@ -693,10 +693,10 @@ export class LocalScene3D {
     this.cardinalSprites = [];
     if (!this.renderer) return;
     const labels: Array<[string, number]> = [
-      ['N', 0],
-      ['E', 90],
-      ['S', 180],
-      ['W', 270],
+      [t('scene3d.cardinalN'), 0],
+      [t('scene3d.cardinalE'), 90],
+      [t('scene3d.cardinalS'), 180],
+      [t('scene3d.cardinalW'), 270],
     ];
     const centre = this.camera.position;
     for (const [text, azDeg] of labels) {

@@ -1,4 +1,5 @@
 import type { ObserverLocation } from '../ephemeris/types';
+import { t } from '../i18n';
 import type { StarCatalogue } from '../sky/catalog';
 import { toObserverLocation, type UiState } from '../state/store';
 import type { SimulationSession } from '../state/session';
@@ -64,6 +65,12 @@ type SensorState =
   | 'relative'
   | 'denied'
   | 'unavailable';
+
+const JUMP_LABELS = {
+  topocentricCa: 'ar.jumpTopocentricCa',
+  visibilityStart: 'ar.jumpVisibilityStart',
+  rise: 'ar.jumpRise',
+} as const;
 
 interface OrientationSample {
   alphaDeg: number;
@@ -241,10 +248,10 @@ export class ArView implements ArWorkstream {
   private retryCameraButton!: HTMLButtonElement;
 
   private cameraState: CameraState = 'idle';
-  private cameraMessage = 'Camera not started.';
+  private cameraMessage = t('ar.cameraNotStarted');
   private stream: MediaStream | null = null;
   private sensorState: SensorState = 'idle';
-  private sensorMessage = 'Sensors not started.';
+  private sensorMessage = t('ar.sensorNotStarted');
   private sensorUiSignature = '';
   private latestSample: OrientationSample | null = null;
   private lastAbsoluteAt = 0;
@@ -299,7 +306,7 @@ export class ArView implements ArWorkstream {
     if (this.mounted) return;
     this.mounted = true;
     this.cameraState = 'idle';
-    this.cameraMessage = 'Camera not started.';
+    this.cameraMessage = t('ar.cameraNotStarted');
     this.touchMode = false;
     this.displayQuat = null;
     this.snapNextFrame = true;
@@ -319,7 +326,7 @@ export class ArView implements ArWorkstream {
     this.updateScreenAngle();
     this.applyState();
     this.renderCalibrationUi();
-    this.setCameraState('idle', 'Requesting rear camera…');
+    this.setCameraState('idle', t('ar.cameraRequesting'));
     this.startCamera();
     this.startOrientationListeners();
     this.maybeShowPermissionUi();
@@ -356,7 +363,7 @@ export class ArView implements ArWorkstream {
     if (this.touchToggle) this.touchToggle.checked = false;
     this.root.classList.remove('ar-touch');
     this.cameraState = 'idle';
-    this.cameraMessage = 'Camera not started.';
+    this.cameraMessage = t('ar.cameraNotStarted');
     this.sensorUiSignature = '';
     this.displayQuat = null;
     this.snapNextFrame = true;
@@ -415,32 +422,32 @@ export class ArView implements ArWorkstream {
     return `
       <div class="ar-stage">
         <video class="ar-video" data-role="video" playsinline muted autoplay></video>
-        <canvas class="ar-canvas" data-role="canvas" tabindex="0" aria-label="Augmented reality sky overlay. Arrow keys pan the virtual view when touch mode is active."></canvas>
+        <canvas class="ar-canvas" data-role="canvas" tabindex="0" aria-label="${t('ar.canvasAria')}"></canvas>
         <div class="ar-vignette"></div>
         <div class="ar-top">
-          <span class="ar-chip" data-role="status-camera">Camera</span>
-          <span class="ar-chip" data-role="status-sensor">Sensors</span>
-          <span class="ar-chip" data-role="status-accuracy">±—°</span>
-          <span class="ar-chip" data-role="status-time">2029 rehearsal</span>
-          <button class="ar-chip ar-chip-btn" data-role="enable-sensors-top" type="button">Enable compass</button>
-          <button class="ar-chip ar-chip-btn" data-role="fullscreen" type="button">Full screen</button>
+          <span class="ar-chip" data-role="status-camera">${t('ar.statusCamera')}</span>
+          <span class="ar-chip" data-role="status-sensor">${t('ar.statusSensors')}</span>
+          <span class="ar-chip" data-role="status-accuracy">${t('ar.statusAccuracyPlaceholder')}</span>
+          <span class="ar-chip" data-role="status-time">${t('ar.statusRehearsal')}</span>
+          <button class="ar-chip ar-chip-btn" data-role="enable-sensors-top" type="button">${t('ar.enableCompass')}</button>
+          <button class="ar-chip ar-chip-btn" data-role="fullscreen" type="button">${t('ar.fullscreen')}</button>
         </div>
         <div class="ar-reticle" aria-hidden="true"></div>
-        <div class="ar-reading" data-role="reading">Waiting for the host clock…</div>
+        <div class="ar-reading" data-role="reading">${t('ar.waitingClock')}</div>
         <div class="ar-messages" data-role="messages"></div>
         <div class="ar-debug" data-role="debug" hidden></div>
         <div class="ar-tap-capture" data-role="tap-capture" hidden>
           <div class="ar-tap-prompt">
-            <span data-role="tap-prompt">Tap a target in the image</span>
-            <button type="button" data-role="tap-cancel">Cancel</button>
+            <span data-role="tap-prompt">${t('ar.tapPrompt')}</span>
+            <button type="button" data-role="tap-cancel">${t('ar.cancel')}</button>
           </div>
         </div>
         <div class="ar-bottom">
           <details class="ar-panel">
-            <summary>Calibration</summary>
+            <summary>${t('ar.calibrationTitle')}</summary>
             <div class="ar-grid">
               <label class="ar-field">
-                <span>Heading offset <output data-role="offset-value">+0.0°</output></span>
+                <span>${t('ar.headingOffset')} <output data-role="offset-value">+0.0°</output></span>
                 <input type="range" data-role="offset" min="-180" max="180" step="0.5" value="0" />
               </label>
               <div class="ar-row ar-nudges">
@@ -450,57 +457,57 @@ export class ArView implements ArWorkstream {
                 <button type="button" data-nudge="1">+1°</button>
               </div>
               <label class="ar-field">
-                <span>Horizontal FOV <output data-role="fov-value">60.0°</output></span>
+                <span>${t('ar.horizontalFov')} <output data-role="fov-value">60.0°</output></span>
                 <input type="range" data-role="fov" min="30" max="100" step="0.5" value="60" />
               </label>
               <div class="ar-row">
-                <select data-role="fov-target-a" aria-label="FOV target A"></select>
-                <button type="button" data-role="fov-tap-a">Tap A</button>
+                <select data-role="fov-target-a" aria-label="${t('ar.fovTargetAAria')}"></select>
+                <button type="button" data-role="fov-tap-a">${t('ar.tapA')}</button>
               </div>
               <div class="ar-row">
-                <select data-role="fov-target-b" aria-label="FOV target B"></select>
-                <button type="button" data-role="fov-tap-b">Tap B</button>
+                <select data-role="fov-target-b" aria-label="${t('ar.fovTargetBAria')}"></select>
+                <button type="button" data-role="fov-tap-b">${t('ar.tapB')}</button>
               </div>
-              <p class="ar-note" data-role="fov-status">FOV from two taps: choose two objects at least 5° apart, then tap each in the camera image.</p>
+              <p class="ar-note" data-role="fov-status">${t('ar.fovInstructions')}</p>
               <div class="ar-row">
-                <select data-role="align-select" aria-label="Calibration target"></select>
-                <button class="ar-primary" type="button" data-role="align">Align on target</button>
+                <select data-role="align-select" aria-label="${t('ar.calibrationTargetAria')}"></select>
+                <button class="ar-primary" type="button" data-role="align">${t('ar.align')}</button>
               </div>
               <div class="ar-row">
-                <button type="button" data-role="two-point">Two-point heading: mark A</button>
-                <button type="button" data-role="reset-cal">Reset</button>
+                <button type="button" data-role="two-point">${t('ar.twoPointMarkA')}</button>
+                <button type="button" data-role="reset-cal">${t('ar.reset')}</button>
               </div>
-              <p class="ar-note" data-role="error-estimate">±—° estimated pointing error.</p>
-              <p class="ar-note">One tap centres the overlay on a known object. Two-point heading averages two heading marks and reports their disagreement. FOV from two taps is separate: it solves the lens FOV from the pixel spacing of two known objects and does not claim to fix heading.</p>
+              <p class="ar-note" data-role="error-estimate">${t('ar.errorPlaceholder')}</p>
+              <p class="ar-note">${t('ar.calibrationExplainer')}</p>
             </div>
           </details>
           <details class="ar-panel">
-            <summary>Rehearsal &amp; fallback</summary>
+            <summary>${t('ar.rehearsalTitle')}</summary>
             <div class="ar-grid">
               <div class="ar-row ar-mode-row">
-                <button type="button" data-mode="rehearsal" aria-pressed="true">2029 rehearsal</button>
-                <button type="button" data-mode="tonight" aria-pressed="false">Tonight practice</button>
+                <button type="button" data-mode="rehearsal" aria-pressed="true">${t('ar.modeRehearsal')}</button>
+                <button type="button" data-mode="tonight" aria-pressed="false">${t('ar.modeTonight')}</button>
               </div>
               <label class="ar-field">
-                <span>Rehearsal time (UTC)</span>
+                <span>${t('ar.timeLabel')}</span>
                 <input type="datetime-local" step="1" data-role="time-input" />
               </label>
               <div class="ar-row">
-                <button class="ar-primary" type="button" data-role="time-go">Go</button>
-                <button type="button" data-jump="topocentricCa">Closest approach</button>
-                <button type="button" data-jump="visibilityStart">Visible start</button>
-                <button type="button" data-jump="rise">Rise</button>
+                <button class="ar-primary" type="button" data-role="time-go">${t('ar.go')}</button>
+                <button type="button" data-jump="topocentricCa">${t('ar.jumpTopocentricCa')}</button>
+                <button type="button" data-jump="visibilityStart">${t('ar.jumpVisibilityStart')}</button>
+                <button type="button" data-jump="rise">${t('ar.jumpRise')}</button>
               </div>
               <label class="ar-toggle">
                 <input type="checkbox" data-role="touch-toggle" />
-                Touch-drag virtual AR (no sensors)
+                ${t('ar.touchToggle')}
               </label>
               <div class="ar-row">
-                <button class="ar-primary" type="button" data-role="enable-sensors">Enable compass / motion</button>
-                <button type="button" data-role="retry-camera">Retry camera</button>
+                <button class="ar-primary" type="button" data-role="enable-sensors">${t('ar.enableSensors')}</button>
+                <button type="button" data-role="retry-camera">${t('ar.retryCamera')}</button>
               </div>
-              <p class="ar-note" data-role="sensor-note">Absolute compass is requested only from a user gesture on iOS. Android Chrome may grant it automatically.</p>
-              <p class="ar-note">Tonight practice uses the real clock for Sun, Moon, planets and stars. Apophis is hidden there because the committed ephemeris covers only 13–14 April 2029 (UTC ±24 h).</p>
+              <p class="ar-note" data-role="sensor-note">${t('ar.sensorNote')}</p>
+              <p class="ar-note">${t('ar.tonightNote')}</p>
             </div>
           </details>
         </div>
@@ -510,7 +517,7 @@ export class ArView implements ArWorkstream {
 
   private ref<T extends HTMLElement = HTMLElement>(role: string): T {
     const node = this.root.querySelector<T>(`[data-role="${role}"]`);
-    if (!node) throw new Error(`AR control missing: ${role}`);
+    if (!node) throw new Error(`AR control missing: ${role}`); // developer error
     return node;
   }
 
@@ -715,7 +722,7 @@ export class ArView implements ArWorkstream {
       button.setAttribute('aria-pressed', String(button.dataset.mode === this.timeMode));
     }
     this.statusTime.textContent =
-      this.timeMode === 'tonight' ? 'Tonight · real clock' : '2029 rehearsal · host clock';
+      this.timeMode === 'tonight' ? t('ar.timeTonight') : t('ar.timeRehearsal');
     this.updateSensorStatus();
     this.updateCameraStatus();
     this.declinationForCurrentTime();
@@ -755,17 +762,14 @@ export class ArView implements ArWorkstream {
   private async startCamera(): Promise<void> {
     if (this.cameraState === 'starting' || this.cameraState === 'live') return;
     if (!window.isSecureContext) {
-      this.setCameraState(
-        'insecure',
-        'Camera needs HTTPS (or localhost). The AR overlay will run on black.',
-      );
+      this.setCameraState('insecure', t('ar.cameraInsecure'));
       return;
     }
     if (!navigator.mediaDevices?.getUserMedia) {
-      this.setCameraState('unavailable', 'This browser has no camera API. AR overlay runs on black.');
+      this.setCameraState('unavailable', t('ar.cameraUnavailable'));
       return;
     }
-    this.setCameraState('starting', 'Requesting rear camera…');
+    this.setCameraState('starting', t('ar.cameraRequesting'));
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
@@ -787,7 +791,7 @@ export class ArView implements ArWorkstream {
       } catch {
         // Autoplay can be blocked; the muted+playsinline attributes normally suffice.
       }
-      this.setCameraState('live', 'Rear camera live.');
+      this.setCameraState('live', t('ar.cameraLive'));
     } catch (error) {
       if (!this.mounted) return;
       const name = error instanceof DOMException ? error.name : '';
@@ -795,8 +799,10 @@ export class ArView implements ArWorkstream {
       this.setCameraState(
         denied ? 'denied' : 'unavailable',
         denied
-          ? 'Camera permission denied. The AR overlay is shown on black; sensors still drive it. Use Touch-drag in Rehearsal & fallback if sensors are unavailable.'
-          : `Camera unavailable (${name || 'error'}). The AR overlay is shown on black; sensors still drive it. Use Touch-drag in Rehearsal & fallback if sensors are unavailable.`,
+          ? t('ar.cameraDenied')
+          : t('ar.cameraUnavailableDetail', {
+              name: name || t('ar.cameraErrorNameFallback'),
+            }),
       );
     }
   }
@@ -825,12 +831,12 @@ export class ArView implements ArWorkstream {
   private updateCameraStatus(): void {
     if (!this.statusCamera) return;
     const labels: Record<CameraState, string> = {
-      idle: 'Camera idle',
-      starting: 'Camera starting…',
-      live: 'Camera live',
-      denied: 'Camera denied',
-      unavailable: 'No camera',
-      insecure: 'HTTPS needed',
+      idle: t('ar.cameraStatusIdle'),
+      starting: t('ar.cameraStatusStarting'),
+      live: t('ar.cameraStatusLive'),
+      denied: t('ar.cameraStatusDenied'),
+      unavailable: t('ar.cameraStatusUnavailable'),
+      insecure: t('ar.cameraStatusInsecure'),
     };
     this.statusCamera.textContent = labels[this.cameraState];
     this.statusCamera.dataset.state = this.cameraState;
@@ -919,33 +925,31 @@ export class ArView implements ArWorkstream {
     const previousMessage = this.sensorMessage;
     if (!this.latestSample) {
       if (this.sensorState === 'idle' || this.sensorState === 'requesting') {
-        this.sensorMessage = 'Waiting for motion sensors…';
+        this.sensorMessage = t('ar.sensorWaiting');
       }
     } else if (this.touchMode) {
       if (this.sensorState !== 'denied' && this.sensorState !== 'unavailable') {
-        this.sensorMessage =
-          'Touch-drag virtual AR. Sensor data is ignored while touch look is on.';
+        this.sensorMessage = t('ar.sensorTouchIgnored');
       }
     } else {
       const sample = this.latestSample;
       if (sample.compassAccuracyDeg !== null && sample.compassAccuracyDeg < 0) {
         this.sensorState = sample.absolute ? 'absolute' : 'relative';
-        this.sensorMessage =
-          'Compass accuracy is reported as unusable (negative). Absolute tilt may still work; align manually or use touch-drag.';
+        this.sensorMessage = t('ar.sensorAccuracyUnusable');
       } else if (sample.source === 'compass') {
         this.sensorState = 'compass';
         this.sensorMessage =
           sample.compassAccuracyDeg === null || sample.compassAccuracyDeg === 0
-            ? 'Compass heading (accuracy not reported; 5–15° is typical).'
-            : `Compass heading, device reports ±${sample.compassAccuracyDeg.toFixed(1)}°.`;
+            ? t('ar.sensorCompassNoAccuracy')
+            : t('ar.sensorCompassAccuracy', {
+                accuracy: sample.compassAccuracyDeg.toFixed(1),
+              });
       } else if (sample.source === 'absolute') {
         this.sensorState = 'absolute';
-        this.sensorMessage =
-          'Absolute orientation (magnetic north assumed). Declination is applied from WMM2025.';
+        this.sensorMessage = t('ar.sensorAbsolute');
       } else {
         this.sensorState = 'relative';
-        this.sensorMessage =
-          'Relative orientation only: alpha has an arbitrary zero. Align on a known object to set north, or use touch-drag.';
+        this.sensorMessage = t('ar.sensorRelative');
       }
     }
     const accuracyBucket =
@@ -974,20 +978,20 @@ export class ArView implements ArWorkstream {
   private updateSensorStatus(): void {
     if (!this.statusSensor) return;
     const labels: Record<SensorState, string> = {
-      idle: 'Sensors idle',
-      requesting: 'Sensors…',
-      compass: 'Compass',
-      absolute: 'Absolute',
-      relative: 'Relative only',
-      denied: 'Sensors denied',
-      unavailable: 'No sensors',
+      idle: t('ar.sensorStatusIdle'),
+      requesting: t('ar.sensorStatusRequesting'),
+      compass: t('ar.sensorStatusCompass'),
+      absolute: t('ar.sensorStatusAbsolute'),
+      relative: t('ar.sensorStatusRelative'),
+      denied: t('ar.sensorStatusDenied'),
+      unavailable: t('ar.sensorStatusUnavailable'),
     };
     this.statusSensor.textContent = this.touchMode
       ? this.sensorState === 'denied'
-        ? 'Sensors denied · touch'
+        ? t('ar.sensorDeniedTouch')
         : this.sensorState === 'unavailable'
-          ? 'No sensors · touch'
-          : 'Touch look'
+          ? t('ar.sensorUnavailableTouch')
+          : t('ar.sensorTouch')
       : labels[this.sensorState];
     this.statusSensor.dataset.state =
       this.touchMode && this.sensorState !== 'denied' && this.sensorState !== 'unavailable'
@@ -1022,8 +1026,7 @@ export class ArView implements ArWorkstream {
     if (this.sensorPermissionDenied) {
       this.sensorState = 'denied';
       this.sensorMessage =
-        this.sensorDenialMessage ??
-        'Sensor permission denied. Use touch-drag virtual AR, or allow Motion & Orientation in settings and reload.';
+        this.sensorDenialMessage ?? t('ar.sensorDeniedSettings');
       this.touchMode = true;
       this.touchToggle.checked = true;
       this.root.classList.add('ar-touch');
@@ -1033,8 +1036,7 @@ export class ArView implements ArWorkstream {
       return;
     }
     this.sensorState = 'idle';
-    this.sensorMessage =
-      'iOS requires a tap to allow compass/motion. Tap “Enable compass / motion”.';
+    this.sensorMessage = t('ar.sensorIosGesture');
     this.updateSensorStatus();
     this.renderMessages();
   }
@@ -1056,7 +1058,7 @@ export class ArView implements ArWorkstream {
     }
     this.permissionRequested = true;
     this.sensorState = 'requesting';
-    this.sensorMessage = 'Requesting motion sensor permission…';
+    this.sensorMessage = t('ar.sensorRequesting');
     this.updateSensorStatus();
     this.renderMessages();
     const ctor = (
@@ -1069,7 +1071,7 @@ export class ArView implements ArWorkstream {
     const request = ctor?.requestPermission;
     if (typeof request !== 'function') {
       this.startOrientationListeners();
-      this.sensorMessage = 'Motion sensor permission is not required on this browser.';
+      this.sensorMessage = t('ar.sensorNotRequired');
       this.updateSensorStatus();
       this.renderMessages();
       return;
@@ -1087,13 +1089,11 @@ export class ArView implements ArWorkstream {
         this.sensorPermissionDenied = false;
         this.sensorDenialMessage = null;
         this.startOrientationListeners();
-        this.sensorMessage =
-          'Sensor permission granted. Move the phone in a figure-eight if the compass drifts.';
+        this.sensorMessage = t('ar.sensorGranted');
         window.setTimeout(() => this.checkSensorWatchdog(), 2200);
       } else {
         this.sensorState = 'denied';
-        this.sensorMessage =
-          'Sensor permission denied. Use touch-drag virtual AR, or allow Motion & Orientation in Safari settings and reload.';
+        this.sensorMessage = t('ar.sensorDeniedSafari');
         this.sensorPermissionDenied = true;
         this.sensorDenialMessage = this.sensorMessage;
         this.touchMode = true;
@@ -1102,9 +1102,9 @@ export class ArView implements ArWorkstream {
       }
     } catch (error) {
       this.sensorState = 'denied';
-      this.sensorMessage = `Sensor permission failed: ${
-        error instanceof Error ? error.message : String(error)
-      }. Use touch-drag virtual AR.`;
+      this.sensorMessage = t('ar.sensorFailed', {
+        message: error instanceof Error ? error.message : String(error),
+      });
       this.sensorPermissionDenied = true;
       this.sensorDenialMessage = this.sensorMessage;
       this.touchMode = true;
@@ -1147,15 +1147,13 @@ export class ArView implements ArWorkstream {
       // iOS: do not switch to touch mode before the user has had a chance to
       // grant motion access from a gesture.
       this.sensorState = 'idle';
-      this.sensorMessage =
-        'Tap “Enable compass / motion” to allow iOS motion access, or use touch-drag virtual AR.';
+      this.sensorMessage = t('ar.sensorIosAccess');
       this.updateSensorStatus();
       this.renderMessages();
       return;
     }
     this.sensorState = 'unavailable';
-    this.sensorMessage =
-      'No motion sensor data arrived. Touch-drag virtual AR is enabled; the overlay still shows the sky at the host time.';
+    this.sensorMessage = t('ar.sensorNoData');
     this.touchMode = true;
     this.touchToggle.checked = true;
     this.root.classList.add('ar-touch');
@@ -1346,24 +1344,32 @@ export class ArView implements ArWorkstream {
     this.offsetInput.value = String(
       Math.max(-180, Math.min(180, this.calibration.headingOffsetDeg)),
     );
-    this.offsetValue.textContent = `${this.calibration.headingOffsetDeg >= 0 ? '+' : ''}${this.calibration.headingOffsetDeg.toFixed(1)}°`;
+    this.offsetValue.textContent = t('ar.offsetValue', {
+      sign: this.calibration.headingOffsetDeg >= 0 ? '+' : '',
+      offset: this.calibration.headingOffsetDeg.toFixed(1),
+    });
     this.fovInput.value = String(this.calibration.horizontalFovDeg);
-    this.fovValue.textContent = `${this.calibration.horizontalFovDeg.toFixed(1)}°`;
+    this.fovValue.textContent = t('ar.fovValue', {
+      fov: this.calibration.horizontalFovDeg.toFixed(1),
+    });
     const estimate = estimatePointingError(
       this.calibration,
       this.latestSample?.compassAccuracyDeg ?? null,
     );
-    this.errorEl.textContent = `${estimate.label}. ${estimate.detail}`;
+    this.errorEl.textContent = t('ar.errorEstimate', {
+      label: estimate.label,
+      detail: estimate.detail,
+    });
     this.statusAccuracy.textContent =
-      this.latestSample?.source === 'compass'
-        ? `±${estimate.totalDeg.toFixed(estimate.totalDeg < 10 ? 1 : 0)}° est.`
-        : this.touchMode
-          ? 'Touch alignment'
-          : `±${estimate.totalDeg.toFixed(estimate.totalDeg < 10 ? 1 : 0)}° est.`;
+      this.latestSample?.source === 'compass' || !this.touchMode
+        ? t('ar.estimatedAccuracy', {
+            value: estimate.totalDeg.toFixed(estimate.totalDeg < 10 ? 1 : 0),
+          })
+        : t('ar.touchAlignment');
     this.statusAccuracy.title = estimate.detail;
     this.twoPointButton.textContent = this.twoPointFirst
-      ? 'Two-point heading: mark B & apply'
-      : 'Two-point heading: mark A';
+      ? t('ar.twoPointMarkB')
+      : t('ar.twoPointMarkA');
     this.updateFovStatus();
   }
 
@@ -1405,11 +1411,16 @@ export class ArView implements ArWorkstream {
     return targets.length
       ? targets
           .map(
-            (t) =>
-              `<option value="${escapeHtml(t.id)}"${t.id === selectedId ? ' selected' : ''}>${escapeHtml(t.name)} · ${t.elevationDeg.toFixed(0)}°</option>`,
+            (tgt) =>
+              `<option value="${escapeHtml(tgt.id)}"${tgt.id === selectedId ? ' selected' : ''}>${escapeHtml(
+                t('ar.targetOption', {
+                  name: tgt.name,
+                  elevation: tgt.elevationDeg.toFixed(0),
+                }),
+              )}</option>`,
           )
           .join('')
-      : '<option value="">No named target above the horizon</option>';
+      : `<option value="">${t('ar.noTargets')}</option>`;
   }
 
   private selectedTarget(): SkyTarget | null {
@@ -1426,11 +1437,11 @@ export class ArView implements ArWorkstream {
   private armFovTap(slot: 'A' | 'B'): void {
     const target = this.selectedFovTarget(slot);
     if (!target) {
-      this.setLocalMessage('Choose a named target above the horizon first.');
+      this.setLocalMessage(t('ar.fovErrorNoTarget'));
       return;
     }
     if (!this.displayQuat) {
-      this.setLocalMessage('No orientation yet. Enable the compass or use touch look first.');
+      this.setLocalMessage(t('ar.fovErrorNoOrientation'));
       return;
     }
     const projected = projectAzEl(
@@ -1443,8 +1454,8 @@ export class ArView implements ArWorkstream {
     if (!projected.inFront || !projected.visible) {
       this.setLocalMessage(
         projected.inFront
-          ? `${target.name} is outside the current camera view. Point the phone towards it before tapping.`
-          : `${target.name} is behind the camera. Point the phone towards it before tapping.`,
+          ? t('ar.fovErrorOutsideView', { name: target.name })
+          : t('ar.fovErrorBehindCamera', { name: target.name }),
       );
       return;
     }
@@ -1453,7 +1464,7 @@ export class ArView implements ArWorkstream {
     for (const detail of this.root.querySelectorAll<HTMLDetailsElement>('details')) {
       detail.open = false;
     }
-    this.tapPrompt.textContent = `Tap ${target.name} in the camera image`;
+    this.tapPrompt.textContent = t('ar.fovTapNamed', { name: target.name });
     this.tapCapture.hidden = false;
     this.updateFovStatus();
   }
@@ -1478,7 +1489,7 @@ export class ArView implements ArWorkstream {
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
     if (x < 0 || y < 0 || x > rect.width || y > rect.height) {
-      this.setLocalMessage('Tap inside the camera image.');
+      this.setLocalMessage(t('ar.fovErrorTapOutside'));
       return;
     }
     const mark: FovTapMark = {
@@ -1512,23 +1523,42 @@ export class ArView implements ArWorkstream {
   private updateFovStatus(): void {
     if (!this.fovStatusEl) return;
     if (this.fovTapArmed && this.fovArmedTarget) {
-      this.fovStatusEl.textContent = `Tap ${this.fovArmedTarget.name} in the image (${this.fovTapArmed}).`;
-      this.fovTapAButton.textContent = this.fovTapArmed === 'A' ? 'Tap A on image…' : 'Tap A';
-      this.fovTapBButton.textContent = this.fovTapArmed === 'B' ? 'Tap B on image…' : 'Tap B';
+      this.fovStatusEl.textContent = t('ar.fovStatusArmed', {
+        name: this.fovArmedTarget.name,
+        slot: this.fovTapArmed,
+      });
+      this.fovTapAButton.textContent =
+        this.fovTapArmed === 'A' ? t('ar.fovButtonTapAOnImage') : t('ar.tapA');
+      this.fovTapBButton.textContent =
+        this.fovTapArmed === 'B' ? t('ar.fovButtonTapBOnImage') : t('ar.tapB');
       return;
     }
-    this.fovTapAButton.textContent = this.fovTapA ? 'Tap A again' : 'Tap A';
-    this.fovTapBButton.textContent = this.fovTapB ? 'Tap B again' : 'Tap B';
+    this.fovTapAButton.textContent = this.fovTapA
+      ? t('ar.fovButtonTapAAgain')
+      : t('ar.tapA');
+    this.fovTapBButton.textContent = this.fovTapB
+      ? t('ar.fovButtonTapBAgain')
+      : t('ar.tapB');
     if (this.calibration.twoPointFov) {
       const f = this.calibration.twoPointFov;
-      this.fovStatusEl.textContent = `Solved FOV ${f.horizontalFovDeg.toFixed(1)}° from ${f.targetAName}–${f.targetBName} (${f.separationDeg.toFixed(1)}° apart), tap residual ${f.residualPx.toFixed(1)} px / ${f.residualDeg.toFixed(1)}°.`;
+      this.fovStatusEl.textContent = t('ar.fovStatusSolved', {
+        fov: f.horizontalFovDeg.toFixed(1),
+        a: f.targetAName,
+        b: f.targetBName,
+        separation: f.separationDeg.toFixed(1),
+        px: f.residualPx.toFixed(1),
+        deg: f.residualDeg.toFixed(1),
+      });
     } else if (this.fovTapA && !this.fovTapB) {
-      this.fovStatusEl.textContent = `${this.fovTapA.targetName} marked. Choose target B and tap it in the image.`;
+      this.fovStatusEl.textContent = t('ar.fovStatusMarkedA', {
+        name: this.fovTapA.targetName,
+      });
     } else if (!this.fovTapA && this.fovTapB) {
-      this.fovStatusEl.textContent = `${this.fovTapB.targetName} marked. Choose target A and tap it in the image.`;
+      this.fovStatusEl.textContent = t('ar.fovStatusMarkedB', {
+        name: this.fovTapB.targetName,
+      });
     } else {
-      this.fovStatusEl.textContent =
-        'FOV from two taps: choose two objects at least 5° apart, then tap each in the camera image.';
+      this.fovStatusEl.textContent = t('ar.fovInstructions');
     }
   }
 
@@ -1537,7 +1567,7 @@ export class ArView implements ArWorkstream {
     const b = this.fovTapB;
     if (!a || !b) return;
     if (a.targetId === b.targetId) {
-      this.setLocalMessage('Choose two different targets for FOV calibration.');
+      this.setLocalMessage(t('ar.fovErrorSameTarget'));
       this.resetFovTaps();
       this.updateFovStatus();
       return;
@@ -1556,7 +1586,9 @@ export class ArView implements ArWorkstream {
       separationDeg,
     );
     if (!solution.ok) {
-      this.setLocalMessage(`FOV calibration failed: ${solution.error}`);
+      this.setLocalMessage(
+        t('ar.fovErrorFailed', { error: solution.error }),
+      );
       this.resetFovTaps();
       this.updateFovStatus();
       return;
@@ -1601,19 +1633,25 @@ export class ArView implements ArWorkstream {
     this.renderCalibrationUi();
     this.updateFovStatus();
     this.setLocalMessage(
-      `FOV calibrated to ${result.horizontalFovDeg.toFixed(1)}° from ${result.targetAName}–${result.targetBName}; tap residual ${result.residualPx.toFixed(1)} px (${result.residualDeg.toFixed(1)}°).`,
+      t('ar.fovSuccess', {
+        fov: result.horizontalFovDeg.toFixed(1),
+        a: result.targetAName,
+        b: result.targetBName,
+        px: result.residualPx.toFixed(1),
+        deg: result.residualDeg.toFixed(1),
+      }),
     );
   }
 
   private alignOnSelectedTarget(): void {
     const target = this.selectedTarget();
     if (!target) {
-      this.setLocalMessage('No calibration target above the horizon right now.');
+      this.setLocalMessage(t('ar.calibrationErrorNoTarget'));
       return;
     }
     const measured = this.measuredHeadingDeg;
     if (measured === null) {
-      this.setLocalMessage('No orientation yet. Enable the compass or switch to touch look.');
+      this.setLocalMessage(t('ar.calibrationErrorNoOrientation'));
       return;
     }
     this.calibration = recordAlignment(this.calibration, {
@@ -1627,7 +1665,10 @@ export class ArView implements ArWorkstream {
     this.persistCalibration();
     this.renderCalibrationUi();
     this.setLocalMessage(
-      `Aligned on ${target.name}: heading offset ${this.calibration.headingOffsetDeg >= 0 ? '+' : ''}${this.calibration.headingOffsetDeg.toFixed(1)}°.`,
+      t('ar.calibrationAligned', {
+        name: target.name,
+        offset: `${this.calibration.headingOffsetDeg >= 0 ? '+' : ''}${this.calibration.headingOffsetDeg.toFixed(1)}`,
+      }),
     );
   }
 
@@ -1635,7 +1676,7 @@ export class ArView implements ArWorkstream {
     const target = this.selectedTarget();
     const measured = this.measuredHeadingDeg;
     if (!target || measured === null) {
-      this.setLocalMessage('Choose a target above the horizon and get an orientation first.');
+      this.setLocalMessage(t('ar.calibrationErrorNeedTarget'));
       return;
     }
     const input: CalibrationInput = {
@@ -1649,12 +1690,12 @@ export class ArView implements ArWorkstream {
       this.twoPointFirst = input;
       this.renderCalibrationUi();
       this.setLocalMessage(
-        `Two-point: ${target.name} marked. Now point at a second known object, choose it, and tap again.`,
+        t('ar.calibrationTwoPointFirst', { name: target.name }),
       );
       return;
     }
     if (this.twoPointFirst.targetId === input.targetId) {
-      this.setLocalMessage('Choose a different second target for two-point calibration.');
+      this.setLocalMessage(t('ar.calibrationErrorSameSecond'));
       return;
     }
     this.calibration = recordTwoPointAlignment(this.calibration, this.twoPointFirst, input);
@@ -1663,7 +1704,10 @@ export class ArView implements ArWorkstream {
     this.renderCalibrationUi();
     const residual = this.calibration.twoPointResidualDeg ?? 0;
     this.setLocalMessage(
-      `Two-point heading calibration applied: offset ${this.calibration.headingOffsetDeg.toFixed(1)}°, disagreement ±${residual.toFixed(1)}°.`,
+      t('ar.calibrationTwoPointApplied', {
+        offset: this.calibration.headingOffsetDeg.toFixed(1),
+        residual: residual.toFixed(1),
+      }),
     );
   }
 
@@ -1677,7 +1721,7 @@ export class ArView implements ArWorkstream {
       // ignore blocked storage
     }
     this.renderCalibrationUi();
-    this.setLocalMessage('Calibration reset: offset 0°, FOV 60°.');
+    this.setLocalMessage(t('ar.calibrationResetDone'));
   }
 
   private changeOffset(delta: number): void {
@@ -1688,7 +1732,7 @@ export class ArView implements ArWorkstream {
 
   private persistCalibration(): void {
     const ok = saveCalibration(this.calibration);
-    if (!ok) this.setLocalMessage('Calibration could not be saved (storage blocked).');
+    if (!ok) this.setLocalMessage(t('ar.calibrationStorageFailed'));
   }
 
   // ---------------------------------------------------------------------
@@ -1706,7 +1750,7 @@ export class ArView implements ArWorkstream {
       button.setAttribute('aria-pressed', String(button.dataset.mode === mode));
     }
     this.statusTime.textContent =
-      mode === 'tonight' ? 'Tonight · real clock' : '2029 rehearsal · host clock';
+      mode === 'tonight' ? t('ar.timeTonight') : t('ar.timeRehearsal');
     if (mode === 'rehearsal' && this.state.utcMs !== null) {
       this.timeInput.value = datetimeUtcValue(this.state.utcMs);
     }
@@ -1716,12 +1760,12 @@ export class ArView implements ArWorkstream {
   private applyTimeInput(): void {
     const raw = this.timeInput.value.trim();
     if (!raw) {
-      this.setLocalMessage('Enter a UTC date and time first.');
+      this.setLocalMessage(t('ar.timeErrorEmpty'));
       return;
     }
     const ms = Date.parse(`${raw}Z`);
     if (!Number.isFinite(ms)) {
-      this.setLocalMessage('Invalid UTC date/time.');
+      this.setLocalMessage(t('ar.timeErrorInvalid'));
       return;
     }
     this.timeMode = 'rehearsal';
@@ -1730,7 +1774,7 @@ export class ArView implements ArWorkstream {
     for (const button of this.modeButtons) {
       button.setAttribute('aria-pressed', String(button.dataset.mode === 'rehearsal'));
     }
-    this.statusTime.textContent = '2029 rehearsal · host clock';
+    this.statusTime.textContent = t('ar.timeRehearsal');
     this.api.setTimeUtcMs(ms);
     this.snapshotKey = '';
     this.trailCache.key = '';
@@ -1739,12 +1783,14 @@ export class ArView implements ArWorkstream {
   private jumpTo(kind: 'topocentricCa' | 'visibilityStart' | 'rise'): void {
     const session = this.api.getSession();
     if (!session) {
-      this.setLocalMessage('No simulation session yet.');
+      this.setLocalMessage(t('ar.timeErrorNoSession'));
       return;
     }
     const ms = session.jumpTarget(kind);
     if (ms === null) {
-      this.setLocalMessage(`No ${kind} available for this observer.`);
+      this.setLocalMessage(
+        t('ar.timeErrorNoJump', { kind: t(JUMP_LABELS[kind]) }),
+      );
       return;
     }
     this.timeMode = 'rehearsal';
@@ -1753,7 +1799,7 @@ export class ArView implements ArWorkstream {
     for (const button of this.modeButtons) {
       button.setAttribute('aria-pressed', String(button.dataset.mode === 'rehearsal'));
     }
-    this.statusTime.textContent = '2029 rehearsal · host clock';
+    this.statusTime.textContent = t('ar.timeRehearsal');
     this.api.setTimeUtcMs(ms);
     this.snapshotKey = '';
     this.trailCache.key = '';
@@ -1764,7 +1810,7 @@ export class ArView implements ArWorkstream {
       if (!document.fullscreenElement) await this.root.requestFullscreen();
       else await document.exitFullscreen();
     } catch {
-      this.setLocalMessage('Fullscreen is unavailable in this browser.');
+      this.setLocalMessage(t('ar.fullscreenUnavailable'));
     }
   }
 
@@ -1784,7 +1830,7 @@ export class ArView implements ArWorkstream {
     const messages: { text: string; tone: 'warn' | 'bad' | 'info' }[] = [];
     if (!window.isSecureContext) {
       messages.push({
-        text: 'Camera and motion sensors need HTTPS. Use localhost or a trusted LAN certificate.',
+        text: t('ar.messageHttps'),
         tone: 'bad',
       });
     }
@@ -1800,10 +1846,10 @@ export class ArView implements ArWorkstream {
       messages.push({ text: this.declination.warning, tone: 'warn' });
     }
     if (!this.currentObserver()) {
-      messages.push({ text: 'Waiting for the host to supply an observer location.', tone: 'info' });
+      messages.push({ text: t('ar.messageWaitingObserver'), tone: 'info' });
     }
     if (this.state.utcMs === null && this.timeMode === 'rehearsal') {
-      messages.push({ text: 'Waiting for the host clock.', tone: 'info' });
+      messages.push({ text: t('ar.messageWaitingClock'), tone: 'info' });
     }
     if (this.localMessage) messages.push({ text: this.localMessage, tone: 'info' });
     this.messagesEl.innerHTML = messages
@@ -1815,8 +1861,11 @@ export class ArView implements ArWorkstream {
     if (!this.mounted) return;
     const status =
       this.cameraState === 'live'
-        ? `${this.sensorMessage}`
-        : `${this.cameraMessage} ${this.sensorMessage}`;
+        ? this.sensorMessage
+        : t('ar.statusHostSummary', {
+            camera: this.cameraMessage,
+            sensor: this.sensorMessage,
+          });
     if (status === this.lastStatus) return;
     this.lastStatus = status;
     this.api.setStatus(status);
@@ -1881,7 +1930,9 @@ export class ArView implements ArWorkstream {
     ctx.font = '600 14px ui-sans-serif, system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(
-      this.currentObserver() ? 'Waiting for orientation…' : 'Waiting for observer location…',
+      this.currentObserver()
+        ? t('ar.canvasWaitingOrientation')
+        : t('ar.canvasWaitingObserver'),
       width / 2,
       height / 2 + 32,
     );
@@ -2090,7 +2141,7 @@ export class ArView implements ArWorkstream {
         ctx.arc(p.x, p.y, 2.6, 0, Math.PI * 2);
         ctx.fill();
         this.drawLabel(
-          `Apophis · ${fmtDeg(target.elevationDeg)}`,
+          t('ar.chartApophis', { elevation: fmtDeg(target.elevationDeg) }),
           p.x + 18,
           p.y - 12,
           pal.apophis,
@@ -2113,7 +2164,7 @@ export class ArView implements ArWorkstream {
           ctx.lineTo(p.x + Math.cos(a) * 18, p.y + Math.sin(a) * 18);
           ctx.stroke();
         }
-        this.drawLabel('Sun', p.x + 18, p.y - 10, pal.sun, pal, 'left', 11.5, true);
+        this.drawLabel(t('ar.chartSun'), p.x + 18, p.y - 10, pal.sun, pal, 'left', 11.5, true);
       } else if (target.kind === 'moon') {
         ctx.beginPath();
         ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
@@ -2127,7 +2178,7 @@ export class ArView implements ArWorkstream {
         ctx.beginPath();
         ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
         ctx.stroke();
-        this.drawLabel('Moon', p.x + 18, p.y - 10, pal.moon, pal, 'left', 11.5, true);
+        this.drawLabel(t('ar.chartMoon'), p.x + 18, p.y - 10, pal.moon, pal, 'left', 11.5, true);
       } else {
         ctx.beginPath();
         ctx.arc(p.x, p.y, Math.max(3, target.radiusPx * 0.8), 0, Math.PI * 2);
@@ -2214,26 +2265,43 @@ export class ArView implements ArWorkstream {
   private updateReading(snapshot: ArSkySnapshot | null): void {
     if (!this.readingEl) return;
     if (!snapshot) {
-      this.readingEl.textContent = 'Waiting for observer and clock…';
+      this.readingEl.textContent = t('ar.readingWaiting');
       return;
     }
     const heading = this.displayHeadingDeg;
     const pitch = this.displayPitchDeg;
     const cameraText =
       heading === null || pitch === null
-        ? 'Camera —'
-        : `Camera ${fmtDeg(heading)} / ${pitch >= 0 ? '+' : ''}${fmtDeg(pitch)}`;
+        ? t('ar.readingCameraNone')
+        : t('ar.readingCamera', {
+            az: fmtDeg(heading),
+            pitch: `${pitch >= 0 ? '+' : ''}${fmtDeg(pitch)}`,
+          });
     if (this.timeMode === 'tonight') {
-      this.readingEl.textContent = `Tonight practice · ${cameraText} · Apophis hidden (2029 ephemeris only)`;
+      this.readingEl.textContent = t('ar.readingTonight', {
+        camera: cameraText,
+      });
       return;
     }
     if (!snapshot.apophis) {
-      this.readingEl.textContent = `${cameraText} · no Apophis data`;
+      this.readingEl.textContent = t('ar.readingNoApophis', {
+        camera: cameraText,
+      });
       return;
     }
     const a = snapshot.apophis;
     const above = a.elevationDeg > 0;
-    this.readingEl.textContent = `${cameraText} · Apophis ${fmtDeg(a.azimuthDeg)} / ${above ? '+' : ''}${fmtDeg(a.elevationDeg)} · ${fmtKm(a.rangeKm)} · ${above ? '' : 'below horizon'}${this.declination?.status === 'extrapolated' ? ' · extrapolated WMM' : ''}`;
+    this.readingEl.textContent = t('ar.readingApophis', {
+      camera: cameraText,
+      az: fmtDeg(a.azimuthDeg),
+      el: `${above ? '+' : ''}${fmtDeg(a.elevationDeg)}`,
+      range: fmtKm(a.rangeKm),
+      below: above ? '' : t('ar.readingBelow'),
+      extrapolated:
+        this.declination?.status === 'extrapolated'
+          ? t('ar.readingExtrapolated')
+          : '',
+    });
     this.readingEl.classList.toggle('ar-below', !above);
   }
 
@@ -2269,6 +2337,7 @@ export class ArView implements ArWorkstream {
         )
       : null;
     const lines = [
+      // Debug-only overlay (`?debug=1`); technical labels stay untranslated.
       'AR DEBUG',
       `mode        ${this.timeMode} · UTC ${snapshot ? new Date(snapshot.utcMs).toISOString() : '—'}`,
       `raw         α ${sample ? sample.alphaDeg.toFixed(3) : '—'} · β ${sample ? sample.betaDeg.toFixed(3) : '—'} · γ ${sample ? sample.gammaDeg.toFixed(3) : '—'} · absolute ${sample ? sample.absolute : '—'}`,

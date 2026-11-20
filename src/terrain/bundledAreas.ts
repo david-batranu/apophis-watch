@@ -12,6 +12,7 @@
  * Overpass parser.
  */
 
+import { t } from '../i18n';
 import {
   buildingHeightFromTags,
   parseHeightMeters,
@@ -212,9 +213,7 @@ export function normaliseBundledAreaManifest(
     };
   }
   if (!isRecord(value) || !Array.isArray(value.areas)) {
-    throw new BundledAreaError(
-      'Bundled area manifest must contain an "areas" array.',
-    );
+    throw new BundledAreaError(t('terrain.manifestNotArray'));
   }
   return {
     schemaVersion: finiteNumber(value.schemaVersion) ?? undefined,
@@ -247,14 +246,14 @@ export async function loadBundledAreaManifest(
   }
   if (!response.ok) {
     throw new BundledAreaError(
-      `Bundled area manifest responded HTTP ${response.status}.`,
+      t('terrain.manifestHttp', { status: response.status }),
     );
   }
   let value: unknown;
   try {
     value = await response.json();
   } catch {
-    throw new BundledAreaError('Bundled area manifest is not valid JSON.');
+    throw new BundledAreaError(t('terrain.manifestNotJson'));
   }
   return normaliseBundledAreaManifest(value);
 }
@@ -341,7 +340,7 @@ function readTopLevelMetadata(value: unknown): TopLevelMetadata {
       sourceString.length > 0
         ? sourceString
         : name
-          ? `Imported area: ${name}`
+          ? t('terrain.importedAreaSource', { name })
           : undefined,
     sourceUrl:
       stringOrUndefined(value.sourceEndpoint) ??
@@ -607,17 +606,13 @@ export function parseGeoJsonBuildings(
     features = geojson;
   } else if (isRecord(geojson) && geojson.type === 'FeatureCollection') {
     if (!Array.isArray(geojson.features)) {
-      throw new BundledAreaError(
-        'GeoJSON FeatureCollection has no features array.',
-      );
+      throw new BundledAreaError(t('terrain.importNoFeatures'));
     }
     features = geojson.features;
   } else if (isRecord(geojson) && geojson.type === 'Feature') {
     features = [geojson];
   } else {
-    throw new BundledAreaError(
-      'Imported building data is not a GeoJSON FeatureCollection.',
-    );
+    throw new BundledAreaError(t('terrain.importNotGeoJson'));
   }
 
   const top = readTopLevelMetadata(geojson);
@@ -699,7 +694,7 @@ export function parseImportedBuildings(
   try {
     value = JSON.parse(text);
   } catch {
-    throw new BundledAreaError('Imported building data is not valid JSON.');
+    throw new BundledAreaError(t('terrain.importNotJson'));
   }
   if (isRecord(value) && Array.isArray(value.elements)) {
     const response = value as unknown as OverpassResponse;
@@ -782,7 +777,10 @@ export async function loadBundledBuildings(
   });
   if (!response.ok) {
     throw new BundledAreaError(
-      `Bundled area "${area.name}" responded HTTP ${response.status}.`,
+      t('terrain.bundledHttp', {
+        name: area.name,
+        status: response.status,
+      }),
     );
   }
   let text: string;
@@ -790,13 +788,16 @@ export async function loadBundledBuildings(
     text = await response.text();
   } catch (error) {
     if (options.signal?.aborted) {
+      // Internal abort payload; the caller discards aborted requests.
       const aborted = new Error('Building query cancelled');
       aborted.name = 'AbortError';
       throw aborted;
     }
     throw error instanceof Error
       ? error
-      : new BundledAreaError(`Could not read bundled area "${area.name}".`);
+      : new BundledAreaError(
+          t('terrain.bundledReadFailed', { name: area.name }),
+        );
   }
 
   const result = parseImportedBuildings(
@@ -806,7 +807,7 @@ export async function loadBundledBuildings(
     area.radiusM,
     {
       source: 'bundled',
-      sourceLabel: `Bundled area: ${area.name}`,
+      sourceLabel: t('terrain.buildingsSourceBundled', { name: area.name }),
       sourceUrl: area.sourceEndpoint,
       sourceQuery: area.sourceQuery,
       retrievedAt: area.retrievedAt,
@@ -831,6 +832,7 @@ export async function loadBundledBuildings(
       }
     } catch (error) {
       if (options.signal?.aborted) {
+        // Internal abort payload; the caller discards aborted requests.
         const aborted = new Error('Building query cancelled');
         aborted.name = 'AbortError';
         throw aborted;
@@ -843,7 +845,9 @@ export async function loadBundledBuildings(
   return {
     ...result,
     source: 'bundled',
-    sourceLabel: `Bundled area: ${sidecar.name ?? area.name}`,
+    sourceLabel: t('terrain.buildingsSourceBundled', {
+      name: sidecar.name ?? area.name,
+    }),
     sourceUrl: sidecar.sourceEndpoint ?? area.sourceEndpoint ?? url,
     sourceQuery: sidecar.sourceQuery ?? area.sourceQuery ?? result.sourceQuery,
     retrievedAt: sidecar.retrievedAt ?? area.retrievedAt ?? result.retrievedAt,

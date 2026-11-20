@@ -2,6 +2,7 @@ import * as Astronomy from 'astronomy-engine';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { jdTdbFromDate } from '../core/time';
+import { t } from '../i18n';
 import type { SkyPosition } from '../ephemeris/types';
 import type { SimulationSession } from '../state/session';
 import type { UiState } from '../state/store';
@@ -118,12 +119,12 @@ export class SpaceView {
   private readonly earthMesh: THREE.Mesh;
   private readonly earthWire: THREE.LineSegments;
   private readonly moonMesh: THREE.Mesh;
-  private readonly moonLabel = labelSprite('Moon', '#c9d6e8');
-  private readonly earthLabel = labelSprite('Earth', '#c9d6e8');
-  private readonly geoLabel = labelSprite('GEO ring 42,164 km', '#c9d6e8');
-  private readonly moonOrbitLabel = labelSprite('Moon orbit 384,400 km', '#c9d6e8');
-  private readonly markerLabel = labelSprite('Apophis — true-scale point', '#ff8a7a');
-  private readonly enlargedLabel = labelSprite('ENLARGED — NOT TO SCALE', '#ffb347');
+  private readonly moonLabel = labelSprite(t('space.moon'), '#c9d6e8');
+  private readonly earthLabel = labelSprite(t('space.earth'), '#c9d6e8');
+  private readonly geoLabel = labelSprite(t('space.geoRing'), '#c9d6e8');
+  private readonly moonOrbitLabel = labelSprite(t('space.moonOrbit'), '#c9d6e8');
+  private readonly markerLabel = labelSprite(t('space.apophis'), '#ff8a7a');
+  private readonly enlargedLabel = labelSprite(t('space.enlarged'), '#ffb347');
   private readonly markerPoint: THREE.Points;
   private readonly enlargedRing: THREE.Sprite;
   private readonly sunLight: THREE.DirectionalLight;
@@ -263,7 +264,10 @@ export class SpaceView {
           new THREE.LineBasicMaterial({ color: this.paletteRef.ruler }),
         ),
       );
-      const label = labelSprite(`${km},000 km`, this.paletteRef.label);
+      const label = labelSprite(
+        t('space.rulerTick', { thousands: km }),
+        this.paletteRef.label,
+      );
       label.position.set(x, 5, 0);
       label.scale.set(14, 2.6, 1);
       this.rulerGroup.add(label);

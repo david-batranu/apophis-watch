@@ -87,6 +87,7 @@ function bodyTarget(body: BodyPosition): SkyTarget {
   const isMoon = body.body === 'Moon';
   return {
     id: `body:${body.body}`,
+    // Solar-system names are catalogue data (proper nouns), not UI copy.
     name: body.body,
     kind: isSun ? 'sun' : isMoon ? 'moon' : 'planet',
     azimuthDeg: body.azimuthDeg,
@@ -237,6 +238,7 @@ export function buildSkySnapshot(input: BuildSnapshotInput): ArSkySnapshot {
   if (apophis) {
     targets.unshift({
       id: 'apophis',
+      // Proper noun/data identity; it is not translated in this build.
       name: 'Apophis',
       kind: 'apophis',
       azimuthDeg: apophis.azimuthDeg,
