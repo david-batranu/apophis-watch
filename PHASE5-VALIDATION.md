@@ -1,7 +1,7 @@
 # Phase 5 validation — offline PWA, robustness, accessibility
 
-Status: implementation complete. A fresh read-only verifier found four defects;
-all are fixed at commit `29c79bf` and the re-check is in progress. This file
+Status: **PASS**. A fresh read-only verifier found four defects plus one low-
+severity residual; all are fixed at commit `a9faf2a` and re-verified. This file
 records the measured numbers and the checks that can be repeated. Verifier
 findings and fixes are appended below.
 
@@ -226,8 +226,8 @@ building radius, making best-spot provisional. The snapshot now stores
 test asserts the 1 km UI radius is restored and the best-spot warning is absent.
 
 After the fixes: **208/208** unit tests, **16/16** merged Playwright,
-**1/1** offline, **12/12** AR, typecheck/build clean. The verifier’s other
-checks passed: no OSM raster prefetch (only 5 viewport tile requests during
+**1/1** offline, **12/12** AR, typecheck/build clean. The verifier’s final
+delta verdict was **PASS** with no remaining defects. Its other checks passed: no OSM raster prefetch (only 5 viewport tile requests during
 prepare), AWS CC-BY caching, Overpass script policy, no fake data, prompt-based
 update with unchanged prepared snapshot, sub-path SW scope, and independent
 4× performance (Sky p95 5.5 ms, Local 3D p95 5.1 ms, AR p95 3.0 ms; SwiftShader
