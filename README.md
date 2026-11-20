@@ -13,11 +13,11 @@ that service forbids prefetch/offline use. See [Deployment](DEPLOYMENT.md),
 [Event-day guide](EVENT-DAY.md) and
 [Real-phone checklist](REAL-PHONE-CHECKLIST.md).
 
-Production build: initial JS **788.73 kB** (214.10 kB gzip), terrain
-**284.99 kB** (81.34 kB gzip), AR **79.99 kB** (23.35 kB gzip) and a
+Production build: initial JS **788.89 kB** (214.13 kB gzip), terrain
+**285.11 kB** (81.36 kB gzip), AR **79.99 kB** (23.35 kB gzip) and a
 best-spot worker **13.63 kB**. Terrain and AR remain separate lazy chunks; the
 service worker precaches them for offline use without executing them.
-Precache: 22 entries, 1,246.34 KiB.
+Precache: 22 entries, 1,246.67 KiB.
 
 ## Run
 
