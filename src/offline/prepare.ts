@@ -352,6 +352,7 @@ export async function prepareOfflineArea(input: PrepareInput): Promise<PrepareRe
     groundElevationM: observer.groundElevationM,
     eyeHeightM: observer.eyeHeightM,
     searchRadiusM,
+    requestedBuildingRadiusM: buildingRadiusM,
     buildingRadiusM: requiredBuildingRadiusM,
     spacingM,
     marginDeg,

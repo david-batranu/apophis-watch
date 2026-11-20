@@ -26,6 +26,9 @@ export interface OfflineAreaInfo {
   groundElevationM: number | null;
   eyeHeightM: number;
   searchRadiusM: number;
+  /** Requested horizon/building radius from the UI, metres. */
+  requestedBuildingRadiusM?: number;
+  /** Prepared Overpass/bundled coverage: search + requested building radius. */
   buildingRadiusM: number;
   spacingM: number;
   marginDeg: number;

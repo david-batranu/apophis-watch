@@ -2304,7 +2304,10 @@ export class TerrainUi implements TerrainWorkstream {
       10_000,
     );
     this.buildingRadiusM = clampNumber(
-      snapshot.area.buildingRadiusM,
+      // Snapshots created before this field existed stored only the prepared
+      // coverage radius; derive the requested radius from search + building.
+      snapshot.area.requestedBuildingRadiusM ??
+        Math.max(50, snapshot.area.buildingRadiusM - snapshot.area.searchRadiusM),
       50,
       5_000,
     );

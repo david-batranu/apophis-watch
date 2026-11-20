@@ -219,6 +219,12 @@ found four defects; all were fixed and re-tested:
    now use `shell.spaceCanvasAria` / `shell.plotCanvasAria`; the i18n test also
    scans `setAttribute('aria-label', ...)`.
 
+The verifier also noted a low-severity residual: a 1 km/1 km prepare stored the
+prepared coverage radius (2 km) but the offline UI applied it as the requested
+building radius, making best-spot provisional. The snapshot now stores
+`requestedBuildingRadiusM` separately from the prepared coverage; the offline
+test asserts the 1 km UI radius is restored and the best-spot warning is absent.
+
 After the fixes: **208/208** unit tests, **16/16** merged Playwright,
 **1/1** offline, **12/12** AR, typecheck/build clean. The verifier’s other
 checks passed: no OSM raster prefetch (only 5 viewport tile requests during
@@ -232,12 +238,12 @@ software renderer).
 | Asset | Raw | Gzip |
 |---|---:|---:|
 | initial JS | 789.25 kB | 214.18 kB |
-| terrain chunk | 287.66 kB | 81.74 kB |
+| terrain chunk | 287.76 kB | 81.77 kB |
 | AR chunk | 79.99 kB | 23.35 kB |
 | best-spot worker | 13.63 kB | — |
 | CSS (initial/terrain/AR) | 12.91 / 24.12 / 8.03 kB | 3.35 / 8.66 / 2.29 kB |
 
-Service-worker precache: 22 entries, 1,249.52 KiB. Terrain and AR remain
+Service-worker precache: 22 entries, 1,249.61 KiB. Terrain and AR remain
 separate lazy chunks; the worker is separate. The worker was 68.7 kB before
 the text/scoring split; moving `describeBestSpot` and compass labels out of the
 worker path brought it back to 13.6 kB.

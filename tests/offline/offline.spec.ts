@@ -60,6 +60,9 @@ test('prepare, go offline, and use sky/local/best-spot/AR from the snapshot', as
   // The prepared 1 km search radius must be restored; otherwise the app asks
   // for a larger DEM than the snapshot contains.
   await expect(page.locator('[data-ref="search-radius"]')).toHaveValue('1000');
+  await expect(page.locator('[data-ref="building-radius"]')).toHaveValue(
+    '1000',
+  );
   await expect(page.locator('[data-ref="dem-info"]')).toContainText(/0 failed/i);
   await expect(page.locator('.tw-offline-basemap')).toHaveCount(1);
   await expect(page.locator('[data-ref="building-info"]')).toContainText(
@@ -78,6 +81,9 @@ test('prepare, go offline, and use sky/local/best-spot/AR from the snapshot', as
     { timeout: 120_000 },
   );
   await expect(page.locator('[data-ref="best-list"] li').first()).toBeVisible();
+  await expect(page.locator('[data-ref="best-warning"]')).not.toContainText(
+    /did not cover|not cover the full/i,
+  );
 
   // Field-check records are local and persist across an offline reload.
   await page.locator('[data-action="field-pass"]').first().click();
