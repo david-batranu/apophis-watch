@@ -1,6 +1,6 @@
 import type { ObserverLocation } from '../ephemeris/types';
 
-export type ViewMode = 'sky' | 'space';
+export type ViewMode = 'sky' | 'space' | 'local' | 'ar';
 export type LocationSource = 'geolocation' | 'manual' | 'preset' | 'url' | 'fallback';
 
 export interface ObserverConfig {
@@ -40,6 +40,8 @@ export interface UiState {
   dataWindowEndMs: number | null;
   ready: boolean;
   error: string | null;
+  /** Messages from the terrain/AR workstreams, shown in the shared shell. */
+  auxStatus: string | null;
 }
 
 export function effectiveElevationM(observer: ObserverConfig): number {
@@ -74,6 +76,7 @@ export const initialUiState: UiState = {
   dataWindowEndMs: null,
   ready: false,
   error: null,
+  auxStatus: null,
 };
 
 export type UiListener = (state: Readonly<UiState>) => void;

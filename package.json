@@ -13,7 +13,8 @@
     "report:phase1": "tsx scripts/report-phase1.ts",
     "eval:site": "tsx scripts/eval-site.ts",
     "test:e2e": "playwright test",
-    "fetch:stars": "tsx scripts/fetch-stars.ts"
+    "fetch:stars": "tsx scripts/fetch-stars.ts",
+    "dev:https": "HTTPS=1 vite --host 0.0.0.0"
   },
   "keywords": [],
   "author": "",

@@ -103,7 +103,9 @@ export class AppModel {
 
     const params = new URLSearchParams(window.location.search);
     const view = params.get('view');
-    if (view === 'space' || view === 'sky') this.setViewMode(view);
+    if (view === 'space' || view === 'sky' || view === 'local' || view === 'ar') {
+      this.setViewMode(view);
+    }
     if (params.get('refraction') === '0') this.setToggle('refraction', false);
     if (params.get('night') === '1') this.setToggle('nightMode', true);
     if (params.get('constellations') === '0') this.setToggle('constellations', false);
@@ -308,6 +310,60 @@ export class AppModel {
 
   setMinGoodElevation(deg: number): void {
     this.store.update({ minGoodElevationDeg: Math.min(90, Math.max(0, deg)) });
+  }
+
+  /**
+   * Shared adapter for the terrain workstream: move the observer, keeping the
+   * clock and the rest of the UI state intact. Returns an error string or null.
+   */
+  setObserverFromExternal(
+    latitudeDeg: number,
+    longitudeDeg: number,
+    groundElevationM: number | null = null,
+  ): string | null {
+    if (!Number.isFinite(latitudeDeg) || latitudeDeg < -90 || latitudeDeg > 90) {
+      return 'Latitude must be between -90 and 90 degrees.';
+    }
+    if (!Number.isFinite(longitudeDeg) || longitudeDeg < -180 || longitudeDeg > 180) {
+      return 'Longitude must be between -180 and 180 degrees.';
+    }
+    if (
+      groundElevationM !== null &&
+      (!Number.isFinite(groundElevationM) ||
+        groundElevationM < -500 ||
+        groundElevationM > 9000)
+    ) {
+      return 'Ground elevation must be between -500 and 9000 m.';
+    }
+    const current = this.store.getState().observer;
+    this.applyObserver(
+      {
+        latitudeDeg,
+        longitudeDeg,
+        groundElevationM,
+        eyeHeightM: current?.eyeHeightM ?? 1.7,
+      },
+      'manual',
+      'Observer moved from the terrain/map panel.',
+    );
+    return null;
+  }
+
+  setGroundElevationM(elevationM: number): void {
+    const current = this.store.getState().observer;
+    if (!current || !Number.isFinite(elevationM)) return;
+    this.applyObserver(
+      {
+        ...current,
+        groundElevationM: Math.min(9000, Math.max(-500, elevationM)),
+      },
+      this.store.getState().locationSource,
+      `Ground elevation ${elevationM.toFixed(1)} m from the terrain DEM; eye height ${current.eyeHeightM.toFixed(1)} m.`,
+    );
+  }
+
+  setStatus(message: string | null): void {
+    this.store.update({ auxStatus: message });
   }
 
   jumpTo(target: JumpTarget): void {
