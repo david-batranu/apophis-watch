@@ -1,4 +1,5 @@
 import type { EphemerisProvider, ObserverLocation } from '../ephemeris/types';
+import type { OfflineSnapshot } from '../offline/snapshot';
 import type { StarCatalogue } from '../sky/catalog';
 import type { SimulationSession } from '../state/session';
 import type { UiState } from '../state/store';
@@ -10,6 +11,10 @@ export interface TerrainHostApi {
   getSession(): SimulationSession | null;
   getEphemeris(): EphemerisProvider | null;
   getCatalogue(): StarCatalogue | null;
+  /** Phase 5: the prepared offline snapshot, if any. */
+  getOfflineSnapshot?(): OfflineSnapshot | null;
+  /** Phase 5: keep the app shell's offline status in sync. */
+  setOfflineSnapshot?(snapshot: OfflineSnapshot | null): void;
   setObserver(lat: number, lon: number, groundElevationM?: number | null): void;
   setGroundElevationM(m: number): void;
   setTimeUtcMs(ms: number): void;

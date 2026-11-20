@@ -129,6 +129,12 @@ export class LocalScene3D {
       this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
       this.renderer.setClearColor(0x070b14, 1);
       this.renderer.domElement.className = 'tw-scene-canvas';
+      this.renderer.domElement.tabIndex = 0;
+      this.renderer.domElement.setAttribute('role', 'application');
+      this.renderer.domElement.setAttribute(
+        'aria-label',
+        'Local 3D terrain view. Arrow keys look around; plus and minus change the field of view; 0 resets the view.',
+      );
       container.appendChild(this.renderer.domElement);
       this.available = true;
     } catch (error) {
@@ -210,6 +216,35 @@ export class LocalScene3D {
       },
       { passive: false },
     );
+    el.addEventListener('keydown', (event) => {
+      const step = 5;
+      if (event.key === 'ArrowLeft') {
+        this.cameraAzimuthDeg = normalizeAzimuth(this.cameraAzimuthDeg - step);
+      } else if (event.key === 'ArrowRight') {
+        this.cameraAzimuthDeg = normalizeAzimuth(this.cameraAzimuthDeg + step);
+      } else if (event.key === 'ArrowUp') {
+        this.cameraElevationDeg = Math.min(85, this.cameraElevationDeg + step);
+      } else if (event.key === 'ArrowDown') {
+        this.cameraElevationDeg = Math.max(-80, this.cameraElevationDeg - step);
+      } else if (event.key === '+' || event.key === '=') {
+        this.fovDeg = Math.max(28, this.fovDeg - 3);
+      } else if (event.key === '-' || event.key === '_') {
+        this.fovDeg = Math.min(88, this.fovDeg + 3);
+      } else if (event.key === '0' || event.key === 'Home') {
+        this.cameraAzimuthDeg = 180;
+        this.cameraElevationDeg = 12;
+        this.fovDeg = 62;
+      } else {
+        return;
+      }
+      event.preventDefault();
+      this.camera.fov = this.fovDeg;
+      this.camera.updateProjectionMatrix();
+      this.applyCameraOrientation();
+      this.dirty = true;
+      this.scheduleRender();
+      this.emitReadout();
+    });
   }
 
   setState(patch: Partial<SceneState>): void {

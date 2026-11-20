@@ -12,17 +12,23 @@ import type { BestSpotSummary, TerrainGrid } from './types';
 export interface TerrainMapOptions {
   onObserverPick: (latitudeDeg: number, longitudeDeg: number) => void;
   onResultPick?: (resultIndex: number) => void;
+  /** Start without the online OSM raster layer (offline boot). */
+  offline?: boolean;
 }
 
 const OSM_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 const OSM_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+const OFFLINE_ATTRIBUTION =
+  'Offline hillshade: Terrain Tiles by Mapzen / AWS Open Data · &copy; OpenStreetMap contributors (ODbL)';
 
 export class TerrainMap {
   private readonly map: L.Map;
   private readonly container: HTMLElement;
   private readonly observerMarker: L.Marker;
-  private readonly tileLayer: L.TileLayer;
+  private tileLayer: L.TileLayer | null = null;
+  private offlineOverlay: L.ImageOverlay | null = null;
+  private offlineMode: boolean;
   private searchCircle: L.Circle | null = null;
   private buildingCircle: L.Circle | null = null;
   private heatmap: L.ImageOverlay | null = null;
@@ -40,10 +46,15 @@ export class TerrainMap {
       preferCanvas: true,
       worldCopyJump: true,
     });
-    this.tileLayer = L.tileLayer(OSM_URL, {
-      maxZoom: 19,
-      attribution: OSM_ATTRIBUTION,
-    }).addTo(this.map);
+    this.offlineMode = options.offline === true;
+    if (!this.offlineMode) {
+      this.tileLayer = L.tileLayer(OSM_URL, {
+        maxZoom: 19,
+        attribution: OSM_ATTRIBUTION,
+      }).addTo(this.map);
+    } else {
+      this.map.attributionControl.addAttribution(OFFLINE_ATTRIBUTION);
+    }
     L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(this.map);
 
     const icon = L.divIcon({
@@ -190,7 +201,7 @@ export class TerrainMap {
         const px = Math.round((candidate.eastM + radius) / spacing);
         const py = Math.round((radius - candidate.northM) / spacing);
         if (px < 0 || px >= size || py < 0 || py >= size) continue;
-        ctx.fillStyle = heatmapColor(candidate.score);
+        ctx.fillStyle = heatmapColor(candidate.scorePessimistic);
         ctx.fillRect(px, py, 1, 1);
       }
       const sw = enuToLatLon(-radius, -radius, grid.originLatDeg, grid.originLonDeg);
@@ -211,12 +222,12 @@ export class TerrainMap {
         radius: 9,
         color: '#ffffff',
         weight: 2,
-        fillColor: heatmapColor(result.score),
+        fillColor: heatmapColor(result.scorePessimistic),
         fillOpacity: 0.95,
         bubblingMouseEvents: false,
       })
         .bindTooltip(
-          `#${index + 1} · ${(result.score * 100).toFixed(0)}% clear`,
+          `#${index + 1} · ${(result.scorePessimistic * 100).toFixed(0)}% clear (pessimistic)`,
           { direction: 'top' },
         )
         .addTo(this.map);
@@ -241,6 +252,55 @@ export class TerrainMap {
     );
   }
 
+  /** Online OSM raster tiles are never kept for offline use. */
+  setOfflineMode(offline: boolean): void {
+    if (this.disposed || this.offlineMode === offline) return;
+    this.offlineMode = offline;
+    if (offline) {
+      if (this.tileLayer) {
+        this.tileLayer.remove();
+        this.tileLayer = null;
+      }
+      this.map.attributionControl.addAttribution(OFFLINE_ATTRIBUTION);
+    } else {
+      this.clearOfflineBaseMap();
+      if (!this.tileLayer) {
+        this.tileLayer = L.tileLayer(OSM_URL, {
+          maxZoom: 19,
+          attribution: OSM_ATTRIBUTION,
+        }).addTo(this.map);
+      }
+      this.map.attributionControl.removeAttribution(OFFLINE_ATTRIBUTION);
+    }
+  }
+
+  /**
+   * Show a locally rendered hillshade image. `dataUrl` comes from cached DEM
+   * tiles plus OSM building footprints, not from map-tile downloads.
+   */
+  setOfflineBaseMap(
+    dataUrl: string,
+    bbox: { south: number; west: number; north: number; east: number },
+  ): void {
+    if (this.disposed) return;
+    this.clearOfflineBaseMap();
+    this.offlineOverlay = L.imageOverlay(dataUrl, [
+      [bbox.south, bbox.west],
+      [bbox.north, bbox.east],
+    ], {
+      opacity: 1,
+      interactive: false,
+      className: 'tw-offline-basemap',
+    }).addTo(this.map);
+  }
+
+  clearOfflineBaseMap(): void {
+    if (this.offlineOverlay) {
+      this.offlineOverlay.remove();
+      this.offlineOverlay = null;
+    }
+  }
+
   setNightMode(night: boolean): void {
     this.container.classList.toggle('tw-night', night);
   }
@@ -253,7 +313,9 @@ export class TerrainMap {
   dispose(): void {
     this.disposed = true;
     this.clearBestSpots();
-    this.tileLayer.off();
+    this.clearOfflineBaseMap();
+    this.tileLayer?.off();
+    this.tileLayer = null;
     this.map.remove();
   }
 }

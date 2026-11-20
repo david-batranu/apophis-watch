@@ -8,6 +8,18 @@
 import { formatLocal, formatUtc } from '../ui/timeFormat';
 import type { UiState } from '../state/store';
 import {
+  buildingsFromSnapshot,
+  clearOfflineData,
+  prepareOfflineArea,
+  verifyPreparedSnapshot,
+} from '../offline/prepare';
+import {
+  formatBytes,
+  formatPreparedDate,
+  storageInfo,
+  type OfflineSnapshot,
+} from '../offline/snapshot';
+import {
   DEFAULT_BUILDING_HEIGHT_M,
   OverpassRateLimitError,
   OverpassRequestError,
@@ -15,12 +27,25 @@ import {
   defaultHeightShare,
   fetchBuildings,
 } from './buildings';
-import { cacheKeyCount, clearBuildingCache, clearTerrainCache } from './cache';
+import {
+  cacheKeyCount,
+  clearBuildingCache,
+  clearTerrainCache,
+  putCachedBuildings,
+} from './cache';
+import { parseImportedBuildings } from './bundledAreas';
 import { latLonToEnu } from './geo';
 import { computeHorizonProfile } from './horizon';
 import { drawHorizonChart } from './horizonChart';
 import type { TerrainHostApi, TerrainWorkstream } from './host';
 import { TerrainMap } from './mapView';
+import { renderOfflineBaseMap } from './offlineMap';
+import {
+  fieldCheckKey,
+  loadFieldChecks,
+  setFieldCheck,
+  type FieldCheckStore,
+} from './fieldChecks';
 import { buildApophisPath, formatSector, observerKey } from './path';
 import { LocalScene3D, type SceneReadout } from './scene3d';
 import {
@@ -153,6 +178,16 @@ export class TerrainUi implements TerrainWorkstream {
   private bestSpotWorker: Worker | null = null;
   private bestSpotRequestId = 0;
 
+  private fieldChecks: FieldCheckStore = loadFieldChecks();
+
+  private offlineBusy = false;
+  private offlineAbort: AbortController | null = null;
+  private offlinePrepared: OfflineSnapshot | null = null;
+  private offlineBuildingsAppliedAt = 0;
+  private lastOfflineRenderKey = '';
+  private lastOfflineMapKey = '';
+  private lastVerifiedPreparedAt = 0;
+
   private chartTimer: number | null = null;
   private timeUpdateRaf: number | null = null;
 
@@ -170,7 +205,9 @@ export class TerrainUi implements TerrainWorkstream {
     this.lastStateEyeHeight = state.observer?.eyeHeightM ?? DEFAULT_EYE_HEIGHT_M;
     this.eyeHeightM = this.lastStateEyeHeight;
     this.lastStateGround = state.observer?.groundElevationM ?? null;
+    this.offlinePrepared = api.getOfflineSnapshot?.() ?? null;
     this.renderStaticText();
+    void this.renderOfflineStatus(true);
   }
 
   private ref<T extends HTMLElement = HTMLElement>(id: string): T {
@@ -246,7 +283,11 @@ export class TerrainUi implements TerrainWorkstream {
               <label class="tw-field">Building radius (m)
                 <input data-ref="building-radius" type="number" min="50" max="5000" step="50" value="1000" />
               </label>
-              <p class="tw-note" data-ref="building-detail">Overpass: one debounced query per settled view; no polling.</p>
+              <label class="tw-field">Import GeoJSON / Overpass JSON
+                <input data-ref="import-file" type="file" accept=".geojson,.json,application/geo+json,application/json" />
+              </label>
+              <p class="tw-note" data-ref="import-status">Optional fallback: import a building file exported from Overpass or another tool. ODbL attribution applies.</p>
+              <p class="tw-note" data-ref="building-detail">Bundled area first, then one debounced live query per settled view; no polling.</p>
             </div>
           </div>
           <div class="tw-credits">
@@ -314,7 +355,23 @@ export class TerrainUi implements TerrainWorkstream {
           <ol class="tw-results" data-ref="best-list"></ol>
         </div>
         <div class="tw-note" data-ref="best-detail"></div>
+        <div class="tw-field-check" data-ref="field-check"></div>
         <p class="tw-note">Light pollution, sky brightness, weather and trees are not modelled. Buildings come from OSM and may be missing or stale; default-height buildings are marked amber in 3D. Score is geometric skyline clearance only.</p>
+      </section>
+
+      <section class="tw-card tw-offline-card" data-ref="offline-card">
+        <h3>Offline <span class="tw-subtitle">prepare the selected area</span></h3>
+        <p class="tw-note tw-strong" data-ref="offline-status">No offline area prepared.</p>
+        <div class="tw-row tw-row-wrap">
+          <button class="tw-btn primary" data-action="prepare-offline" type="button">Prepare for offline</button>
+          <button class="tw-btn danger" data-action="cancel-offline" type="button" disabled>Cancel</button>
+          <button class="tw-btn ghost" data-action="clear-offline" type="button">Clear prepared area</button>
+        </div>
+        <div class="tw-progress" aria-hidden="true"><div data-ref="offline-progress"></div></div>
+        <p class="tw-note" data-ref="offline-storage">Storage status not checked yet.</p>
+        <ul class="tw-offline-list" data-ref="offline-contents"></ul>
+        <p class="tw-note tw-warn" data-ref="offline-warning"></p>
+        <p class="tw-note"><strong>Stored:</strong> ephemeris, star catalogue, AWS Terrarium DEM tiles and OSM building footprints for this area. <strong>Not stored:</strong> OpenStreetMap raster tiles — tile.openstreetmap.org forbids bulk/offline use. The offline base map is a local hillshade plus building footprints. On iOS, Add to Home Screen and open the app weekly; Safari may evict site data after 7 days without a tap.</p>
       </section>
 
       <footer class="tw-footer">
@@ -377,6 +434,21 @@ export class TerrainUi implements TerrainWorkstream {
         case 'use-observer':
           this.useCandidateAsObserver(Number(button.dataset.index));
           break;
+        case 'prepare-offline':
+          void this.prepareOffline();
+          break;
+        case 'cancel-offline':
+          this.cancelOffline();
+          break;
+        case 'clear-offline':
+          void this.clearOffline();
+          break;
+        case 'field-pass':
+          this.recordFieldCheck(Number(button.dataset.index), 'pass');
+          break;
+        case 'field-fail':
+          this.recordFieldCheck(Number(button.dataset.index), 'fail');
+          break;
         default:
           break;
       }
@@ -384,6 +456,10 @@ export class TerrainUi implements TerrainWorkstream {
 
     this.root.addEventListener('input', (event) => {
       const target = event.target as HTMLInputElement;
+      if (target.dataset.fieldNote !== undefined) {
+        this.recordFieldNote(Number(target.dataset.index), target.value);
+        return;
+      }
       switch (target.dataset.ref) {
         case 'eye':
           this.setEyeHeightFromInput(target.value);
@@ -457,6 +533,10 @@ export class TerrainUi implements TerrainWorkstream {
 
     this.root.addEventListener('change', (event) => {
       const target = event.target as HTMLInputElement | HTMLSelectElement;
+      if (target.dataset.ref === 'import-file' && target instanceof HTMLInputElement) {
+        void this.importBuildingsFile(target);
+        return;
+      }
       if (target.dataset.ref === 'eye-mode') {
         this.eyeMode = target.value as 'ground' | 'floor' | 'rooftop';
         this.eyeCustomised = true;
@@ -476,6 +556,7 @@ export class TerrainUi implements TerrainWorkstream {
           this.api.setObserver(lat, lon);
         },
         onResultPick: (index) => this.selectResult(index),
+        offline: this.api.getState().offline.active || navigator.onLine === false,
       });
     }
     if (!this.scene) {
@@ -531,6 +612,9 @@ export class TerrainUi implements TerrainWorkstream {
     this.map?.setNightMode(state.toggles.nightMode);
     this.scene?.setState({ nightMode: state.toggles.nightMode });
     this.syncAll(false);
+    void this.renderOfflineStatus(false);
+    if (state.offline.active) this.applyOfflineBuildings();
+    this.maybeApplyOfflineMap();
   }
 
   private syncAll(initial: boolean): void {
@@ -836,6 +920,16 @@ export class TerrainUi implements TerrainWorkstream {
     const state = this.state;
     const observer = state?.observer;
     if (!observer || !this.mounted) return;
+    if (state?.offline.active && state.offline.mismatch) {
+      this.ref('dem-badge').textContent = 'DEM: not prepared';
+      this.ref('dem-badge').className = 'tw-badge warn';
+      this.setStatus(
+        'Offline: terrain is not prepared for this location. Sky and AR still work. Reconnect or move to the prepared area.',
+        'warn',
+        true,
+      );
+      return;
+    }
     const requestKey = `${observer.latitudeDeg.toFixed(6)}|${observer.longitudeDeg.toFixed(
       6,
     )}|${this.terrainRadius()}`;
@@ -901,6 +995,7 @@ export class TerrainUi implements TerrainWorkstream {
         this.viewpointLonDeg = observer.longitudeDeg;
       }
       this.recomputeProfileAtViewpoint();
+      this.maybeApplyOfflineMap();
       this.setStatus(
         `DEM ready: z${grid.zoom}, ${grid.spacingM.toFixed(
           1,
@@ -1016,6 +1111,17 @@ export class TerrainUi implements TerrainWorkstream {
 
   private scheduleBuildings(): void {
     if (!this.mounted) return;
+    if (this.state?.offline.active) {
+      if (this.offlinePrepared?.buildings) {
+        this.applyOfflineBuildings();
+      } else {
+        this.ref('building-badge').textContent = 'Buildings: offline';
+        this.ref('building-badge').className = 'tw-badge warn';
+        this.ref('building-detail').textContent =
+          'Offline: no building snapshot was stored for this area. The horizon uses terrain only; import a file or re-prepare online.';
+      }
+      return;
+    }
     if (this.buildingDebounce !== null) window.clearTimeout(this.buildingDebounce);
     if (Date.now() < this.buildingCooldownUntil) {
       this.showCooldown();
@@ -1027,12 +1133,96 @@ export class TerrainUi implements TerrainWorkstream {
     }, BUILDING_DEBOUNCE_MS);
   }
 
+  private async importBuildingsFile(input: HTMLInputElement): Promise<void> {
+    const file = input.files?.[0];
+    if (!file) return;
+    const observer = this.state?.observer;
+    if (!observer) {
+      this.ref('import-status').textContent =
+        'Set an observer before importing building data.';
+      return;
+    }
+    const grid = this.grid;
+    if (!grid) {
+      this.ref('import-status').textContent =
+        'Wait for the DEM to load, then import the building file.';
+      return;
+    }
+    try {
+      const text = await file.text();
+      const result = parseImportedBuildings(
+        text,
+        observer.latitudeDeg,
+        observer.longitudeDeg,
+        this.buildingRadiusM,
+        {
+          source: 'import',
+          sourceLabel: file.name,
+          fileName: file.name,
+          retrievedAt: new Date().toISOString(),
+          license: 'ODbL',
+        },
+      );
+      if (result.buildings.length === 0) {
+        this.ref('import-status').textContent =
+          'The file contains no usable building polygons. Nothing was replaced.';
+        return;
+      }
+      this.buildingsResult = result;
+      this.offlineBuildingsAppliedAt = this.offlinePrepared?.preparedAt ?? 0;
+      this.lastBuildingKey = `${result.centerLatDeg.toFixed(5)}|${result.centerLonDeg.toFixed(
+        5,
+      )}|${Math.round(result.queryRadiusM)}`;
+      this.preparedBuildings = prepareBuildings(grid, result.buildings);
+      this.renderBuildingsInfo(result);
+      this.scene?.setState({
+        buildings: this.preparedBuildings,
+        grid,
+        horizon: this.profile,
+      });
+      this.recomputeProfileAtViewpoint();
+      await putCachedBuildings(
+        observer.latitudeDeg,
+        observer.longitudeDeg,
+        this.buildingRadiusM,
+        result,
+      );
+      this.invalidateBestSpot('Buildings imported; run the search again.');
+      this.ref('import-status').textContent = `Imported ${result.buildings.length} buildings from ${file.name}; ${result.defaultHeightCount} use the 8 m default. ODbL attribution applies.`;
+      this.setStatus(
+        `Imported ${result.buildings.length} building ways from ${file.name}.`,
+        'good',
+        true,
+      );
+      input.value = '';
+      void this.updateCacheCounts();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.ref('import-status').textContent = `Import failed: ${message}`;
+      this.setStatus(`Building import failed: ${message}`, 'bad', true);
+    }
+  }
+
   private async fetchBuildingsNow(
     radiusOverride?: number,
     options: { quiet?: boolean } = {},
   ): Promise<BuildingsResult | null> {
     const observer = this.state?.observer;
     if (!observer || !this.mounted) return null;
+    if (navigator.onLine === false) {
+      if (this.offlinePrepared?.buildings) {
+        this.applyOfflineBuildings();
+        if (this.buildingsResult) return this.buildingsResult;
+      }
+      this.setStatus(
+        'Offline: no cached or bundled buildings cover this view. Best-spot scores will be marked incomplete. Reconnect or import a building file.',
+        'warn',
+        true,
+      );
+      this.ref('building-badge').textContent = 'Buildings: offline';
+      this.ref('building-badge').className = 'tw-badge warn';
+      return null;
+    }
     if (this.buildingDebounce !== null) {
       window.clearTimeout(this.buildingDebounce);
       this.buildingDebounce = null;
@@ -1069,6 +1259,8 @@ export class TerrainUi implements TerrainWorkstream {
         latitudeDeg: observer.latitudeDeg,
         longitudeDeg: observer.longitudeDeg,
         radiusM: radius,
+        baseUrl: import.meta.env.BASE_URL,
+        allowBundled: true,
         signal: controller.signal,
         onProgress: (message) => {
           this.ref('building-detail').textContent = message;
@@ -1145,6 +1337,8 @@ export class TerrainUi implements TerrainWorkstream {
     this.ref('building-info').textContent = `Buildings: ${result.buildings.length} ways · ${result.taggedHeightCount} tagged · ${result.defaultHeightCount} default (${(share * 100).toFixed(
       0,
     )}%) · query ${fmtKm(result.queryRadiusM, 1)} · ${result.source}${
+      result.sourceLabel ? ` (${result.sourceLabel})` : ''
+    }${result.retrievedAt ? ` · retrieved ${result.retrievedAt}` : ''}${
       result.osmTimestamp ? ` · OSM ${result.osmTimestamp}` : ''
     }.`;
     this.ref('building-badge').textContent = `Buildings: ${result.buildings.length} (${(share * 100).toFixed(0)}% default)`;
@@ -1573,7 +1767,7 @@ export class TerrainUi implements TerrainWorkstream {
       this.map?.setBestSpots(summary, grid);
       const summaryText = `Search complete: ${
         summary.top[0]
-          ? `${formatClearPercent(summary.top[0].score)}% clear at ${summary.top[0].latitudeDeg.toFixed(5)}°, ${summary.top[0].longitudeDeg.toFixed(5)}°`
+          ? `${formatClearPercent(summary.top[0].scorePessimistic)}% clear (pessimistic) at ${summary.top[0].latitudeDeg.toFixed(5)}°, ${summary.top[0].longitudeDeg.toFixed(5)}°`
           : 'no clear candidates'
       } · ${summary.processed.toLocaleString('en-US')} candidates in ${(
         summary.elapsedMs / 1000
@@ -1690,7 +1884,7 @@ export class TerrainUi implements TerrainWorkstream {
       1,
     )}° margin · ${summary.pathSamples} path samples · ${(
       summary.elapsedMs / 1000
-    ).toFixed(1)} s. Score = fraction of the physical Phase 1 visibility window above the local horizon + margin.`;
+    ).toFixed(1)} s. Ranked by the pessimistic score (default building heights ×1.5); range shows ×0.7 to ×1.5. Score = fraction of the physical Phase 1 visibility window above the local horizon + margin.`;
     this.ref('best-warning').textContent = summary.buildingsIncomplete
       ? 'Warning: the Overpass query did not cover the full search area, so some buildings may be missing. Treat open-looking spots as provisional.'
       : '';
@@ -1712,15 +1906,38 @@ export class TerrainUi implements TerrainWorkstream {
         timeZone,
         marginDeg: this.marginDeg,
       });
+      const blockers = result.blockedByDefaultHeightBuildingSamples > 0
+        ? `${result.blockedByDefaultHeightBuildingSamples} default-height`
+        : result.blockedByRealHeightBuildingSamples > 0
+          ? `${result.blockedByRealHeightBuildingSamples} real-height`
+          : result.blockedByTerrainSamples > 0
+            ? 'terrain'
+            : 'none';
+      const openSpace =
+        result.nearestBuildingM === null
+          ? 'no mapped buildings'
+          : result.nearestBuildingM < 1
+            ? 'inside a building footprint'
+            : `${result.nearestBuildingM.toFixed(0)} m to nearest building`;
+      const rankFlag =
+        result.rankSpread >= 5
+          ? `<span class="tw-badge warn" title="Rank changes with the height assumption">rank ±${result.rankSpread}</span>`
+          : '';
       li.innerHTML = `<span class="tw-rank">#${index + 1}</span>
-        <span class="tw-score" style="--tw-score:${(result.score * 100).toFixed(0)}%">${escapeHtml(
-          formatClearPercent(result.score),
+        <span class="tw-score" style="--tw-score:${(result.scorePessimistic * 100).toFixed(0)}%">${escapeHtml(
+          formatClearPercent(result.scorePessimistic),
         )}%</span>
         <span class="tw-result-text"><strong>${result.latitudeDeg.toFixed(
           5,
-        )}°, ${result.longitudeDeg.toFixed(5)}°</strong><br />${escapeHtml(
-          reason,
-        )}</span>`;
+        )}°, ${result.longitudeDeg.toFixed(5)}°</strong> ${rankFlag}<br />
+          <span class="tw-score-range">${escapeHtml(
+            formatClearPercent(result.scoreOptimistic),
+          )}–${escapeHtml(formatClearPercent(result.scorePessimistic))}% across height assumptions</span><br />
+          ${escapeHtml(reason)}<br />
+          <span class="tw-small">Blockers: ${escapeHtml(blockers)} · ${escapeHtml(
+            openSpace,
+          )}</span>
+        </span>`;
       list.appendChild(li);
     }
     if (summary.top.length === 0) {
@@ -1728,7 +1945,8 @@ export class TerrainUi implements TerrainWorkstream {
         '<li class="tw-result-empty">No scored candidates. Check the DEM coverage.</li>';
     }
     this.ref('best-detail').textContent =
-      'Tap a result to move the local 3D camera and map. The app-wide observer and the shared Phase 1 path are unchanged.';
+      'Tap a result to move the local 3D camera and map. “Rank ±N” means the spot moves N places between optimistic and pessimistic default heights. The app-wide observer and the shared Phase 1 path are unchanged.';
+    this.renderFieldChecks(summary);
   }
 
   private selectResult(index: number): void {
@@ -1754,9 +1972,13 @@ export class TerrainUi implements TerrainWorkstream {
       summary.top.findIndex((item) => item.index === index) + 1
     }</strong> at ${result.latitudeDeg.toFixed(5)}°, ${result.longitudeDeg.toFixed(
       5,
-    )}° · ground ${fmtM(result.groundElevationM)} · score ${(
-      result.score * 100
-    ).toFixed(0)}% · min clearance ${result.minClearanceDeg.toFixed(
+    )}° · ground ${fmtM(result.groundElevationM)} · pessimistic score ${(
+      result.scorePessimistic * 100
+    ).toFixed(0)}% (optimistic ${(result.scoreOptimistic * 100).toFixed(
+      0,
+    )}%) · rank ${result.rankPessimistic} (optimistic rank ${
+      result.rankOptimistic
+    }, spread ${result.rankSpread}) · min clearance ${result.minClearanceDegPessimistic.toFixed(
       1,
     )}°. ${escapeHtml(describeBestSpot(result, {
       timeZone: this.state?.timeZone ?? 'UTC',
@@ -1764,6 +1986,65 @@ export class TerrainUi implements TerrainWorkstream {
     }))} <button class="tw-btn ghost" data-action="use-observer" data-index="${
       result.index
     }" type="button">Make this the observer</button>`;
+  }
+
+  private renderFieldChecks(summary: BestSpotSummary): void {
+    const node = this.ref('field-check');
+    if (summary.top.length === 0) {
+      node.innerHTML = '';
+      return;
+    }
+    const rows = summary.top.slice(0, 3).map((result, index) => {
+      const key = fieldCheckKey(result.latitudeDeg, result.longitudeDeg);
+      const record = this.fieldChecks[key];
+      const status = record?.status ?? 'unknown';
+      return `<div class="tw-field-item">
+        <div class="tw-field-title">#${index + 1} · ${result.latitudeDeg.toFixed(
+          5,
+        )}°, ${result.longitudeDeg.toFixed(5)}°</div>
+        <div class="tw-row tw-row-wrap" role="group" aria-label="Field check result for spot ${index + 1}">
+          <button class="tw-btn small ${status === 'pass' ? 'primary' : 'ghost'}" data-action="field-pass" data-index="${
+            result.index
+          }" aria-pressed="${status === 'pass'}" type="button">Pass</button>
+          <button class="tw-btn small ${status === 'fail' ? 'danger' : 'ghost'}" data-action="field-fail" data-index="${
+            result.index
+          }" aria-pressed="${status === 'fail'}" type="button">Fail</button>
+          <span class="tw-chip">${status === 'unknown' ? 'not checked' : status}</span>
+        </div>
+        <label class="tw-field">Note
+          <input data-field-note data-index="${result.index}" value="${escapeHtml(
+            record?.note ?? '',
+          )}" placeholder="e.g. ridge confirmed, trees blocked the view" />
+        </label>
+      </div>`;
+    });
+    node.innerHTML = `<div class="tw-field-head"><strong>Field check — top 3 spots</strong><span class="tw-note">Record what you actually see on site. Stored only in this browser.</span></div>
+      <div class="tw-field-grid">${rows.join('')}</div>`;
+  }
+
+  private recordFieldCheck(index: number, status: 'pass' | 'fail'): void {
+    const result = this.bestSpot?.top.find((item) => item.index === index);
+    if (!result) return;
+    this.fieldChecks = setFieldCheck(
+      this.fieldChecks,
+      result.latitudeDeg,
+      result.longitudeDeg,
+      status,
+    );
+    if (this.bestSpot) this.renderFieldChecks(this.bestSpot);
+  }
+
+  private recordFieldNote(index: number, note: string): void {
+    const result = this.bestSpot?.top.find((item) => item.index === index);
+    if (!result) return;
+    const key = fieldCheckKey(result.latitudeDeg, result.longitudeDeg);
+    this.fieldChecks = setFieldCheck(
+      this.fieldChecks,
+      result.latitudeDeg,
+      result.longitudeDeg,
+      this.fieldChecks[key]?.status ?? 'unknown',
+      note,
+    );
   }
 
   private useCandidateAsObserver(index: number): void {
@@ -1793,6 +2074,7 @@ export class TerrainUi implements TerrainWorkstream {
     this.ref('best-warning').textContent = '';
     this.ref('best-status').textContent = message;
     this.ref('best-detail').textContent = '';
+    this.ref('field-check').innerHTML = '';
   }
 
   private setProgress(refId: string, fraction: number): void {
@@ -1811,6 +2093,256 @@ export class TerrainUi implements TerrainWorkstream {
     if (notifyHost) this.api.setStatus(message);
   }
 
+  private setOfflineBusy(busy: boolean): void {
+    this.offlineBusy = busy;
+    const prepare = this.root.querySelector<HTMLButtonElement>(
+      '[data-action="prepare-offline"]',
+    );
+    const cancel = this.root.querySelector<HTMLButtonElement>(
+      '[data-action="cancel-offline"]',
+    );
+    const clear = this.root.querySelector<HTMLButtonElement>(
+      '[data-action="clear-offline"]',
+    );
+    if (prepare) prepare.disabled = busy;
+    if (cancel) cancel.disabled = !busy;
+    if (clear) clear.disabled = busy;
+  }
+
+  private async prepareOffline(): Promise<void> {
+    if (this.offlineBusy) return;
+    const observer = this.state?.observer;
+    if (!observer) {
+      this.setStatus('Set an observer before preparing an offline area.', 'warn');
+      return;
+    }
+    if (navigator.onLine === false) {
+      this.setStatus(
+        'Cannot prepare offline data while offline. Reconnect, then press Prepare for offline.',
+        'bad',
+        true,
+      );
+      return;
+    }
+    const controller = new AbortController();
+    this.offlineAbort = controller;
+    this.setOfflineBusy(true);
+    this.setProgress('offline-progress', 0.01);
+    this.ref('offline-status').textContent = 'Preparing offline area…';
+    this.ref('offline-warning').textContent = '';
+    try {
+      const result = await prepareOfflineArea({
+        observer,
+        searchRadiusM: this.searchRadiusM,
+        buildingRadiusM: this.buildingRadiusM,
+        spacingM: this.spacingM,
+        marginDeg: this.marginDeg,
+        baseUrl: import.meta.env.BASE_URL,
+        signal: controller.signal,
+        onProgress: (progress) => {
+          this.setProgress('offline-progress', progress.fraction);
+          this.ref('offline-status').textContent = progress.message;
+        },
+      });
+      this.offlinePrepared = result.snapshot;
+      this.lastVerifiedPreparedAt = result.snapshot.preparedAt;
+      this.api.setOfflineSnapshot?.(result.snapshot);
+      this.setProgress('offline-progress', 1);
+      this.ref('offline-status').textContent = `Offline area ready · ${formatBytes(
+        result.snapshot.totalBytes,
+      )} · prepared ${formatPreparedDate(result.snapshot.preparedAt)}.`;
+      this.ref('offline-warning').textContent = result.warnings.join(' ');
+      this.setStatus('Offline area prepared for this location.', 'good', true);
+      this.renderOfflineStatus(true);
+      this.applyOfflineBuildings();
+      this.maybeApplyOfflineMap();
+    } catch (error) {
+      if (controller.signal.aborted) {
+        this.ref('offline-status').textContent = 'Offline preparation cancelled.';
+        this.setStatus('Offline preparation cancelled.', 'info');
+      } else {
+        const message = error instanceof Error ? error.message : String(error);
+        this.ref('offline-status').textContent = `Offline preparation failed: ${message}`;
+        this.ref('offline-warning').textContent = message;
+        this.setStatus(`Offline preparation failed: ${message}`, 'bad', true);
+      }
+    } finally {
+      this.offlineAbort = null;
+      this.setOfflineBusy(false);
+    }
+  }
+
+  private cancelOffline(): void {
+    this.offlineAbort?.abort();
+    this.offlineAbort = null;
+    this.setProgress('offline-progress', 0);
+    this.ref('offline-status').textContent = 'Offline preparation cancelled.';
+    this.setOfflineBusy(false);
+  }
+
+  private async clearOffline(): Promise<void> {
+    if (this.offlineBusy) return;
+    if (
+      !window.confirm(
+        'Clear the prepared offline area, cached DEM tiles and cached building data? The app shell itself stays installed.',
+      )
+    ) {
+      return;
+    }
+    await clearOfflineData();
+    this.offlinePrepared = null;
+    this.lastVerifiedPreparedAt = 0;
+    this.api.setOfflineSnapshot?.(null);
+    this.map?.clearOfflineBaseMap();
+    this.map?.setOfflineMode(navigator.onLine === false);
+    this.setProgress('offline-progress', 0);
+    this.ref('offline-status').textContent = 'No offline area prepared.';
+    this.ref('offline-contents').innerHTML = '';
+    this.ref('offline-warning').textContent = '';
+    this.setStatus('Offline data cleared.', 'info', true);
+    void this.renderOfflineStatus(true);
+  }
+
+  private async renderOfflineStatus(initial: boolean): Promise<void> {
+    const snapshot =
+      this.api.getOfflineSnapshot?.() ?? this.offlinePrepared ?? null;
+    this.offlinePrepared = snapshot;
+    const state = this.state;
+    const key = [
+      snapshot?.preparedAt,
+      snapshot?.totalBytes,
+      state?.offline.active,
+      state?.offline.mismatch,
+      state?.observer?.latitudeDeg,
+      state?.observer?.longitudeDeg,
+      state?.toggles.nightMode,
+    ].join('|');
+    if (!initial && key === this.lastOfflineRenderKey) return;
+    this.lastOfflineRenderKey = key;
+
+    const status = this.ref('offline-status');
+    const contents = this.ref('offline-contents');
+    const warning = this.ref('offline-warning');
+    if (!snapshot) {
+      status.textContent = state?.offline.active
+        ? 'Offline mode, but no prepared snapshot was found. Reconnect and prepare an area.'
+        : 'No offline area prepared.';
+      contents.innerHTML = '';
+    } else {
+      const b = snapshot.buildings;
+      const active = state?.offline.active ? ' · running offline from this snapshot' : '';
+      status.textContent = `Prepared ${formatPreparedDate(
+        snapshot.preparedAt,
+      )} · ${formatBytes(snapshot.totalBytes)}${active}.`;
+      contents.innerHTML = `
+        <li><strong>Ephemeris:</strong> ${escapeHtml(snapshot.ephemeris.provider)} · solution ${escapeHtml(
+          snapshot.ephemeris.solution,
+        )} · retrieved ${escapeHtml(snapshot.ephemeris.retrievedAt)} · ${formatBytes(
+          snapshot.ephemeris.bytes,
+        )}</li>
+        <li><strong>Stars:</strong> ${
+          snapshot.stars
+            ? `${escapeHtml(snapshot.stars.source)} · ${formatBytes(snapshot.stars.bytes)}`
+            : 'not stored'
+        }</li>
+        <li><strong>Terrain:</strong> ${snapshot.terrain.tileCount} DEM tiles at z${
+          snapshot.area.terrainZoom
+        } · ${formatBytes(snapshot.terrain.bytes)} · ${escapeHtml(
+          snapshot.terrain.attribution,
+        )}</li>
+        <li><strong>Buildings:</strong> ${
+          b
+            ? `${b.count} OSM ways · ${b.defaultHeightCount} default height · ${formatBytes(
+                b.bytes,
+              )} · ${escapeHtml(b.source)}${b.sourceLabel ? ` (${escapeHtml(b.sourceLabel)})` : ''}`
+            : 'not stored; best-spot scores will be marked incomplete'
+        }</li>
+        <li><strong>Base map:</strong> locally rendered hillshade from cached DEM + building footprints; OSM raster tiles are not stored.</li>
+      `;
+    }
+    if (state?.offline.mismatch) {
+      warning.textContent =
+        'This observer is outside the prepared area. Sky and AR still work; terrain maps and best-spot searches for this location do not.';
+    } else if (snapshot?.warnings.length) {
+      warning.textContent = snapshot.warnings.join(' ');
+    } else {
+      warning.textContent = '';
+    }
+
+    if (snapshot && snapshot.preparedAt !== this.lastVerifiedPreparedAt) {
+      this.lastVerifiedPreparedAt = snapshot.preparedAt;
+      const integrity = await verifyPreparedSnapshot();
+      if (integrity && !integrity.ok) {
+        warning.textContent = integrity.message ?? 'Offline data is incomplete.';
+      }
+    }
+
+    const storage = await storageInfo();
+    this.ref('offline-storage').textContent = storage.supported
+      ? `${storage.persisted ? 'Persistent storage granted' : 'Best-effort storage (may be evicted)'} · used ${
+          storage.usageBytes === null ? 'unknown' : formatBytes(storage.usageBytes)
+        } · quota ${storage.quotaBytes === null ? 'unknown' : formatBytes(storage.quotaBytes)}.`
+      : 'Storage API unavailable.';
+    this.maybeApplyOfflineMap();
+  }
+
+  private applyOfflineBuildings(): void {
+    const snapshot = this.offlinePrepared;
+    if (!snapshot || !this.state?.offline.active) return;
+    if (this.offlineBuildingsAppliedAt === snapshot.preparedAt && this.buildingsResult) {
+      return;
+    }
+    const result = buildingsFromSnapshot(snapshot);
+    if (!result) return;
+    this.offlineBuildingsAppliedAt = snapshot.preparedAt;
+    this.buildingsResult = result;
+    this.lastBuildingKey = `${result.centerLatDeg.toFixed(5)}|${result.centerLonDeg.toFixed(
+      5,
+    )}|${Math.round(result.queryRadiusM)}`;
+    this.preparedBuildings = this.grid
+      ? prepareBuildings(this.grid, result.buildings)
+      : [];
+    this.renderBuildingsInfo(result);
+    this.scene?.setState({
+      buildings: this.preparedBuildings,
+      grid: this.grid,
+      horizon: this.profile,
+    });
+    this.recomputeProfileAtViewpoint();
+    this.setStatus(
+      `Loaded ${result.buildings.length} buildings from the offline snapshot (retrieved ${result.retrievedAt ?? 'unknown'}).`,
+      'info',
+    );
+  }
+
+  private maybeApplyOfflineMap(): void {
+    const state = this.state;
+    if (!this.map || !state) return;
+    if (!state.offline.active) {
+      this.map.setOfflineMode(false);
+      return;
+    }
+    this.map.setOfflineMode(true);
+    if (!this.grid || state.offline.mismatch) {
+      this.map.clearOfflineBaseMap();
+      return;
+    }
+    const buildings = this.buildingsResult?.buildings ?? [];
+    const key = `${this.grid.createdAt}|${buildings.length}|${state.toggles.nightMode}`;
+    if (key === this.lastOfflineMapKey) return;
+    this.lastOfflineMapKey = key;
+    const rendered = renderOfflineBaseMap(
+      this.grid,
+      buildings,
+      state.toggles.nightMode,
+    );
+    if (!rendered) {
+      this.map.clearOfflineBaseMap();
+      return;
+    }
+    this.map.setOfflineBaseMap(rendered.dataUrl, this.grid.bbox);
+  }
+
   private renderStaticText(): void {
     this.renderEyeNote();
     this.renderGroundNote();
@@ -1819,5 +2351,9 @@ export class TerrainUi implements TerrainWorkstream {
     this.ref('fov').textContent = '62°';
     this.ref('build-info').textContent =
       'Terrain workstream · cached DEM tiles: — · cached Overpass queries: —';
+    this.ref('offline-status').textContent = 'No offline area prepared.';
+    this.ref('offline-contents').innerHTML = '';
+    this.ref('field-check').innerHTML =
+      '<p class="tw-note">Run a best-spot search to field-check the top 3 spots.</p>';
   }
 }

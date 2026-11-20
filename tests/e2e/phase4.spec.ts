@@ -7,7 +7,7 @@ test('AR tab mounts on black when camera is unavailable and unmounts on leave', 
   page,
 }) => {
   await page.goto(BASE);
-  await page.getByRole('button', { name: 'AR', exact: true }).click();
+  await page.getByRole('tab', { name: 'AR', exact: true }).click();
   await expect(page.locator('.ar-root')).toBeVisible();
   await expect(page.locator('.ar-debug')).toBeVisible();
   await expect(page.locator('.ar-debug')).toContainText('AR DEBUG');
@@ -37,7 +37,7 @@ test('AR tab mounts on black when camera is unavailable and unmounts on leave', 
   await page.locator('.ar-stage').first().screenshot({
     path: 'test-results/phase2/ar-integrated-night.png',
   });
-  await page.getByRole('button', { name: 'Sky view', exact: true }).click();
+  await page.getByRole('tab', { name: 'Sky view', exact: true }).click();
   await expect(page.locator('.ar-root')).toHaveCount(0);
   await expect(page.locator('.sky-canvas')).toBeVisible();
 });

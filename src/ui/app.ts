@@ -2,7 +2,7 @@ import { jdTdbFromDate } from '../core/time';
 import type { ArWorkstream } from '../ar/host';
 import type { TerrainWorkstream } from '../terrain/host';
 import type { SkyPosition } from '../ephemeris/types';
-import type { AppModel } from '../state/appModel';
+import type { AppModel, EphemerisSourceInfo } from '../state/appModel';
 import type { SimulationSession } from '../state/session';
 import type { UiState } from '../state/store';
 import { solarSystemBodies, separationDeg, type BodyPosition } from '../sky/bodies';
@@ -10,8 +10,16 @@ import type { StarCatalogue } from '../sky/catalog';
 import { comparisonAtDistance } from '../sky/sizeComparison';
 import { SkyView, type SkyDebugSnapshot } from '../sky/skyRenderer';
 import { SpaceView } from '../sky/spaceView';
+import { initPwa, type PwaController } from '../pwa';
+import {
+  formatBytes,
+  formatPreparedDate,
+  storageInfo,
+  type OfflineSnapshot,
+} from '../offline/snapshot';
 import { ElevationPlot } from './elevationPlot';
-import { formatLocal, formatUtc, localHhMm } from './timeFormat';
+import { EventGuide } from './eventGuide';
+import { formatLocal, formatLocalLocale, formatUtc, localHhMm } from './timeFormat';
 
 type JumpButton = {
   kind:
@@ -71,6 +79,7 @@ export class AppUi {
   private readonly skyView: SkyView;
   private readonly spaceView: SpaceView;
   private readonly plot: ElevationPlot;
+  private readonly eventGuide: EventGuide;
   private readonly debug: boolean;
   private readonly refs: Record<string, HTMLElement> = {};
   private lastSession: SimulationSession | null = null;
@@ -83,6 +92,11 @@ export class AppUi {
   private arLoading = false;
   private terrain: TerrainWorkstream | null = null;
   private terrainLoading = false;
+  private pwa: PwaController | null = null;
+  private pwaBannerKind: 'update' | 'offline' | null = null;
+  private lastAboutKey = '';
+  private aboutStorageText = 'Storage status not checked yet.';
+  private offlineSnapshot: OfflineSnapshot | null = null;
 
   constructor(
     private readonly root: HTMLElement,
@@ -95,14 +109,69 @@ export class AppUi {
     this.plot = new ElevationPlot(this.ref('plot-host'));
     this.skyView = new SkyView(this.ref('sky-panel'), this.ref('sky-canvas') as HTMLCanvasElement);
     this.spaceView = new SpaceView(this.ref('space-host'));
+    this.eventGuide = new EventGuide(this.ref('event-guide'), app);
     this.bind();
     this.populatePresets();
     this.renderCredits();
+    this.renderAbout();
+    this.initPwa();
     this.app.onState((state) => this.onState(state));
   }
 
   private ref(id: string): HTMLElement {
     return this.refs[id];
+  }
+
+  private initPwa(): void {
+    this.pwa = initPwa({
+      onNeedRefresh: () => {
+        this.showPwaBanner(
+          'update',
+          'A new version is ready. Reload when convenient; the prepared offline area is kept.',
+        );
+      },
+      onOfflineReady: () => {
+        this.showPwaBanner(
+          'offline',
+          'App shell cached for offline use. Open Local 3D and press “Prepare for offline” to store terrain and buildings.',
+        );
+      },
+      onError: (error) => {
+        this.setError(`Service worker: ${String(error)}`);
+      },
+    });
+    this.ref('pwa-primary').addEventListener('click', () => {
+      if (this.pwaBannerKind === 'update') {
+        void this.pwa?.reload();
+      } else {
+        this.hidePwaBanner();
+      }
+    });
+    this.ref('pwa-dismiss').addEventListener('click', () => this.hidePwaBanner());
+    this.ref('check-updates').addEventListener('click', () => {
+      const status = this.ref('update-status');
+      status.textContent = 'Checking for a new build…';
+      void this.pwa?.check().then(() => {
+        window.setTimeout(() => {
+          status.textContent = this.pwa?.hasWaitingUpdate()
+            ? 'A new build is ready; use Reload in the banner.'
+            : 'No update found (or the browser is offline).';
+        }, 1_500);
+      });
+    });
+  }
+
+  private showPwaBanner(kind: 'update' | 'offline', text: string): void {
+    this.pwaBannerKind = kind;
+    this.ref('pwa-banner-text').textContent = text;
+    this.ref('pwa-primary').textContent = kind === 'update' ? 'Reload' : 'Got it';
+    this.ref('pwa-banner').classList.remove('hidden');
+    this.ref('pwa-banner').classList.toggle('update', kind === 'update');
+  }
+
+  private hidePwaBanner(): void {
+    this.pwaBannerKind = null;
+    this.ref('pwa-banner').classList.add('hidden');
   }
 
   private cacheRefs(): void {
@@ -121,36 +190,46 @@ export class AppUi {
     ).join('');
     return `
       <div class="app-shell">
+        <a class="skip-link" href="#main-content">Skip to main content</a>
         <header class="topbar">
           <div class="brand">APOPHIS WATCH <span>(99942) Apophis · 13 April 2029</span></div>
           <div class="top-actions">
             <span class="chip" data-ref="location-chip">Location</span>
-            <button class="btn" data-ref="night-button" type="button">Night mode</button>
+            <button class="chip chip-button" data-ref="offline-chip" type="button" aria-label="Offline status and preparation">Offline: checking…</button>
+            <button class="btn" data-ref="night-button" type="button" aria-pressed="false">Night mode</button>
           </div>
         </header>
-        <main class="main">
+        <div class="app-banner hidden" data-ref="pwa-banner" role="status" aria-live="polite">
+          <span data-ref="pwa-banner-text"></span>
+          <span class="app-banner-actions">
+            <button class="btn small primary" data-ref="pwa-primary" type="button">Reload</button>
+            <button class="btn small ghost" data-ref="pwa-dismiss" type="button">Later</button>
+          </span>
+        </div>
+        <main class="main" id="main-content" tabindex="-1">
           <div class="bar bar-between">
             <div class="tabs" role="tablist" aria-label="View">
-              <button class="tab" data-view="sky" aria-pressed="true" type="button">Sky view</button>
-              <button class="tab" data-view="space" aria-pressed="false" type="button">Space view</button>
-              <button class="tab" data-view="local" aria-pressed="false" type="button">Local 3D</button>
-              <button class="tab" data-view="ar" aria-pressed="false" type="button">AR</button>
+              <button class="tab" id="tab-sky" role="tab" aria-controls="panel-sky" aria-selected="true" tabindex="0" data-view="sky" type="button">Sky view</button>
+              <button class="tab" id="tab-space" role="tab" aria-controls="panel-space" aria-selected="false" tabindex="-1" data-view="space" type="button">Space view</button>
+              <button class="tab" id="tab-local" role="tab" aria-controls="panel-local" aria-selected="false" tabindex="-1" data-view="local" type="button">Local 3D</button>
+              <button class="tab" id="tab-ar" role="tab" aria-controls="panel-ar" aria-selected="false" tabindex="-1" data-view="ar" type="button">AR</button>
             </div>
             <div class="chip" data-ref="window-chip">Data window: —</div>
           </div>
-          <div class="status-line error hidden" data-ref="error-line"></div>
-          <div class="status-line hidden" data-ref="aux-status"></div>
+          <div class="status-line error hidden" data-ref="error-line" role="alert"></div>
+          <div class="status-line hidden" data-ref="aux-status" role="status" aria-live="polite"></div>
+          <div class="status-line offline-line hidden" data-ref="offline-line" role="status"></div>
           <section class="grid-main">
             <div class="stage-card">
-              <div class="sky-stage" data-ref="sky-panel" aria-label="Stereographic sky dome">
-                <canvas class="sky-canvas" data-ref="sky-canvas"></canvas>
+              <div class="sky-stage" id="panel-sky" role="tabpanel" aria-labelledby="tab-sky" data-ref="sky-panel" aria-label="Stereographic sky dome">
+                <canvas class="sky-canvas" data-ref="sky-canvas" tabindex="0" aria-label="Sky dome. Drag or use arrow keys to look; plus and minus zoom; zero resets."></canvas>
                 <div class="stage-topline">
                   <span class="badge" data-ref="sky-refraction-badge">refracted</span>
                   <span class="badge" data-ref="sky-visibility-badge">—</span>
                 </div>
                 <div class="stage-hint">Drag to look · pinch/scroll to zoom · double-click reset</div>
               </div>
-              <div class="space-stage hidden" data-ref="space-panel">
+              <div class="space-stage hidden" id="panel-space" role="tabpanel" aria-labelledby="tab-space" data-ref="space-panel">
                 <div class="space-host" data-ref="space-host"></div>
                 <div class="space-overlay">
                   <button class="btn small" data-camera="earth" type="button">Earth</button>
@@ -164,10 +243,10 @@ export class AppUi {
                   Apophis is a true-scale point; its 340 m disc is invisible at this scale.
                 </div>
               </div>
-              <div class="terrain-view-stage hidden" data-ref="local-panel">
+              <div class="terrain-view-stage hidden" id="panel-local" role="tabpanel" aria-labelledby="tab-local" data-ref="local-panel">
                 <div data-ref="terrain-host"></div>
               </div>
-              <div class="ar-view-stage hidden" data-ref="ar-panel">
+              <div class="ar-view-stage hidden" id="panel-ar" role="tabpanel" aria-labelledby="tab-ar" data-ref="ar-panel">
                 <div class="ar-host" data-ref="ar-host"></div>
               </div>
             </div>
@@ -258,13 +337,34 @@ export class AppUi {
               <p class="status-line">The Phase 1 visibility window (above horizon + Sun &lt; −6°) is unchanged; this threshold only highlights the easier part of the path.</p>
             </section>
           </section>
-          <details>
-            <summary>Data, licences &amp; method</summary>
+          <div data-ref="event-guide"></div>
+          <details class="about-panel" open>
+            <summary>About, data, offline storage &amp; licences</summary>
+            <div class="about-grid">
+              <section>
+                <h3>Build &amp; data source</h3>
+                <div class="about-block" data-ref="about-build">—</div>
+                <div class="bar" style="margin-top: 8px">
+                  <button class="btn small" data-ref="check-updates" type="button">Check for updates</button>
+                  <span class="status-line" data-ref="update-status"></span>
+                </div>
+              </section>
+              <section>
+                <h3>Prepared offline area</h3>
+                <div class="about-block" data-ref="about-offline">Not prepared.</div>
+                <div class="about-block" data-ref="about-storage">Storage status not checked yet.</div>
+              </section>
+              <section>
+                <h3>Bundled building areas</h3>
+                <div class="about-block" data-ref="about-areas">Checking…</div>
+              </section>
+            </div>
             <div class="credits" data-ref="credits"></div>
           </details>
           <div class="footer-note">
             Everything is computed from the committed JPL Horizons state vectors and astronomy-engine.
-            The view is a simulation for planning, not a live feed.
+            The view is a simulation for planning, not a live feed. Offline base maps are rendered
+            from cached terrain tiles; OpenStreetMap raster tiles are never bulk-downloaded.
           </div>
         </main>
         ${this.debug ? '<div class="debug-overlay" data-ref="debug-overlay"></div>' : ''}
@@ -311,6 +411,46 @@ export class AppUi {
       if (target === this.ref('space-reset')) {
         this.spaceView.setCameraPreset('flyby');
       }
+      if (target === this.ref('offline-chip')) {
+        this.app.setViewMode('local');
+        window.setTimeout(() => {
+          this.ref('terrain-host')
+            .querySelector<HTMLElement>('[data-ref="offline-card"]')
+            ?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        }, 150);
+      }
+    });
+
+    const tablist = this.root.querySelector<HTMLElement>('[role="tablist"]');
+    tablist?.addEventListener('keydown', (event) => {
+      const tabs = [
+        ...this.root.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+      ];
+      const index = tabs.indexOf(document.activeElement as HTMLButtonElement);
+      if (index < 0) return;
+      let next = index;
+      if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
+      else if (event.key === 'ArrowLeft') next = (index - 1 + tabs.length) % tabs.length;
+      else if (event.key === 'Home') next = 0;
+      else if (event.key === 'End') next = tabs.length - 1;
+      else return;
+      event.preventDefault();
+      tabs[next].focus();
+      tabs[next].click();
+    });
+
+    const skyCanvas = this.ref('sky-canvas') as HTMLCanvasElement;
+    skyCanvas.addEventListener('keydown', (event) => {
+      const step = 24;
+      if (event.key === 'ArrowLeft') this.skyView.panByPixels(step, 0);
+      else if (event.key === 'ArrowRight') this.skyView.panByPixels(-step, 0);
+      else if (event.key === 'ArrowUp') this.skyView.panByPixels(0, step);
+      else if (event.key === 'ArrowDown') this.skyView.panByPixels(0, -step);
+      else if (event.key === '+' || event.key === '=') this.skyView.zoomBy(1.2);
+      else if (event.key === '-' || event.key === '_') this.skyView.zoomBy(1 / 1.2);
+      else if (event.key === '0' || event.key === 'Home') this.skyView.resetView();
+      else return;
+      event.preventDefault();
     });
 
     this.ref('play-button').addEventListener('click', () => {
@@ -456,9 +596,10 @@ export class AppUi {
     }
     for (const view of ['sky', 'space', 'local', 'ar'] as const) {
       const active = state.viewMode === view;
-      this.root
-        .querySelector<HTMLElement>(`[data-view="${view}"]`)
-        ?.setAttribute('aria-pressed', String(active));
+      const tab = this.root.querySelector<HTMLElement>(`[data-view="${view}"]`);
+      tab?.setAttribute('aria-selected', String(active));
+      tab?.setAttribute('aria-pressed', String(active));
+      if (tab) tab.tabIndex = active ? 0 : -1;
     }
     this.ref('sky-panel').classList.toggle('hidden', state.viewMode !== 'sky');
     this.ref('space-panel').classList.toggle('hidden', state.viewMode !== 'space');
@@ -491,6 +632,33 @@ export class AppUi {
       this.lastPlotKey = '';
     }
     this.updateJumpDisabled(state);
+    this.renderOffline(state);
+    this.eventGuide.update(state);
+    this.renderAbout(state);
+  }
+
+  private renderOffline(state: UiState): void {
+    const chip = this.ref('offline-chip');
+    const line = this.ref('offline-line');
+    if (state.offline.active) {
+      chip.textContent = state.offline.mismatch
+        ? 'Offline: area not prepared'
+        : 'Offline: ready';
+      chip.classList.toggle('warn', state.offline.mismatch);
+      chip.classList.toggle('good', !state.offline.mismatch);
+      line.textContent = state.offline.message ?? 'Offline mode.';
+      line.classList.remove('hidden');
+      line.classList.toggle('warn', state.offline.mismatch);
+      line.classList.toggle('good', !state.offline.mismatch);
+    } else {
+      chip.textContent = state.offline.preparedAt
+        ? 'Offline: prepared'
+        : 'Offline: not prepared';
+      chip.classList.toggle('good', state.offline.preparedAt !== null);
+      chip.classList.toggle('warn', state.offline.preparedAt === null);
+      line.textContent = '';
+      line.classList.add('hidden');
+    }
   }
 
   private presetIdFor(observer: {
@@ -534,6 +702,8 @@ export class AppUi {
         getSession: () => this.app.getSession(),
         getEphemeris: () => this.app.getEphemeris(),
         getCatalogue: () => this.app.getCatalogue(),
+        getOfflineSnapshot: () => this.app.getOfflineSnapshot(),
+        setOfflineSnapshot: (snapshot) => this.app.setOfflineSnapshot(snapshot),
         setObserver: (lat, lon, groundElevationM) => {
           const error = this.app.setObserverFromExternal(lat, lon, groundElevationM);
           if (error) this.app.setStatus(error);
@@ -737,6 +907,135 @@ export class AppUi {
       overlay.dataset.horizon = String(d.horizonRadiusPx);
       overlay.dataset.canvasW = String(d.canvasWidth);
       overlay.dataset.canvasH = String(d.canvasHeight);
+    }
+  }
+
+  private renderAbout(state?: UiState): void {
+    const source = this.app.getEphemerisSource();
+    const snapshot = this.app.getOfflineSnapshot();
+    this.offlineSnapshot = snapshot;
+    const key = [
+      source?.activeSource,
+      source?.solution,
+      source?.retrievedAt,
+      snapshot?.preparedAt,
+      state?.offline.active,
+      state?.timeZone,
+      state?.formatLocale,
+    ].join('|');
+    if (key === this.lastAboutKey) return;
+    this.lastAboutKey = key;
+
+    const sourceInfo: EphemerisSourceInfo | null = source;
+    const buildDate = typeof __BUILD_TIME__ === 'string'
+      ? formatPreparedDate(Date.parse(__BUILD_TIME__), state?.timeZone)
+      : 'development';
+    this.ref('about-build').innerHTML = `
+      <p><strong>App</strong> v${esc(__APP_VERSION__)} · built ${esc(buildDate)}</p>
+      <p><strong>Ephemeris</strong> ${esc(sourceInfo?.provider ?? '—')} · solution <strong>${esc(
+        sourceInfo?.solution ?? '—',
+      )}</strong> · retrieved <strong>${esc(sourceInfo?.retrievedAt ?? '—')}</strong></p>
+      <p><strong>This session is using</strong> ${esc(
+        sourceInfo?.activeSource === 'prepared'
+          ? 'the prepared offline snapshot'
+          : 'the built-in data file',
+      )}.${sourceInfo?.queryUrl ? ` <a href="${esc(sourceInfo.queryUrl)}">Exact Horizons query</a>.` : ''}</p>
+      <p><strong>Stars</strong> HYG Database v4.4 (CC BY-SA 4.0) · WMM2025 (NOAA/NCEI + BGS) · astronomy-engine (MIT).</p>
+    `;
+
+    if (!snapshot) {
+      this.ref('about-offline').innerHTML =
+        '<p>No offline area is prepared. Open <strong>Local 3D</strong> and press <strong>Prepare for offline</strong>.</p>';
+    } else {
+      const b = snapshot.buildings;
+      this.ref('about-offline').innerHTML = `
+        <p><strong>Prepared</strong> ${esc(
+          formatPreparedDate(snapshot.preparedAt, state?.timeZone),
+        )} · ${esc(formatBytes(snapshot.totalBytes))}</p>
+        <p><strong>Area</strong> ${esc(snapshot.area.label)} · search radius ${Math.round(
+          snapshot.area.searchRadiusM,
+        ).toLocaleString('ro-RO')} m · buildings within ${Math.round(
+          snapshot.area.buildingRadiusM,
+        ).toLocaleString('ro-RO')} m</p>
+        <p><strong>Ephemeris</strong> solution ${esc(
+          snapshot.ephemeris.solution,
+        )} · retrieved ${esc(snapshot.ephemeris.retrievedAt)} · ${esc(
+          formatBytes(snapshot.ephemeris.bytes),
+        )}</p>
+        <p><strong>Stars</strong> ${snapshot.stars ? `${esc(snapshot.stars.source)} · ${esc(formatBytes(snapshot.stars.bytes))}` : 'not stored'}</p>
+        <p><strong>Terrain</strong> ${snapshot.terrain.tileCount} DEM tiles (z${snapshot.area.terrainZoom}) · ${esc(
+          formatBytes(snapshot.terrain.bytes),
+        )} · ${esc(snapshot.terrain.attribution)}</p>
+        <p><strong>Buildings</strong> ${b ? `${b.count} OSM ways · ${b.defaultHeightCount} default height · ${esc(
+          formatBytes(b.bytes),
+        )} · ${esc(b.source)}${b.sourceLabel ? ` (${esc(b.sourceLabel)})` : ''} · retrieved ${esc(b.retrievedAt)}` : 'not stored (best-spot scores marked incomplete)'}</p>
+        <p><strong>Base map</strong> ${esc(snapshot.baseMap.note)}</p>
+        ${snapshot.warnings.length ? `<p class="status-line warn">${snapshot.warnings.map(esc).join('<br />')}</p>` : ''}
+        <p><strong>Data source</strong> ${esc(snapshot.ephemeris.provider)} · solution ${esc(
+          snapshot.ephemeris.solution,
+        )}.</p>
+      `;
+    }
+
+    void storageInfo().then((info) => {
+      if (!info.supported) {
+        this.aboutStorageText =
+          'Storage API is unavailable in this browser; offline data cannot be inspected.';
+      } else {
+        const parts = [
+          info.persisted ? 'persistent storage granted' : 'best-effort storage (may be evicted)',
+          info.usageBytes !== null ? `used ${formatBytes(info.usageBytes)}` : 'usage unknown',
+          info.quotaBytes !== null ? `quota ${formatBytes(info.quotaBytes)}` : 'quota unknown',
+        ];
+        this.aboutStorageText = `${parts.join(' · ')}. On iOS, Add to Home Screen and open the app at least once a week to avoid the 7-day eviction rule.`;
+      }
+      this.ref('about-storage').textContent = this.aboutStorageText;
+    });
+    this.ref('about-storage').textContent = this.aboutStorageText;
+
+    void this.loadBundledAreasForAbout();
+  }
+
+  private async loadBundledAreasForAbout(): Promise<void> {
+    const node = this.ref('about-areas');
+    try {
+      const response = await fetch(
+        `${import.meta.env.BASE_URL}data/areas/index.json`,
+        { cache: 'no-cache' },
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const manifest = (await response.json()) as {
+        areas?: Array<{
+          name?: string;
+          latitudeDeg?: number;
+          longitudeDeg?: number;
+          radiusM?: number;
+          retrievedAt?: string;
+          source?: string;
+          buildingCount?: number;
+        }>;
+      };
+      const areas = Array.isArray(manifest.areas) ? manifest.areas : [];
+      if (areas.length === 0) {
+        node.innerHTML =
+          '<p>No bundled building areas. Use <code>npm run fetch:buildings</code> at build time, or import a GeoJSON/Overpass file in Local 3D.</p>';
+        return;
+      }
+      node.innerHTML = `<ul class="about-list">${areas
+        .map(
+          (area) =>
+            `<li><strong>${esc(area.name ?? 'Area')}</strong> · ${Number(
+              area.latitudeDeg ?? 0,
+            ).toFixed(4)}°, ${Number(area.longitudeDeg ?? 0).toFixed(4)}° · r=${Math.round(
+              area.radiusM ?? 0,
+            )} m · ${area.buildingCount ?? '?'} buildings · retrieved ${esc(
+              area.retrievedAt ?? '—',
+            )}${area.source ? ` · ${esc(area.source)}` : ''}</li>`,
+        )
+        .join('')}</ul>`;
+    } catch {
+      node.innerHTML =
+        '<p>No bundled building manifest is available (offline or not built). Live Overpass and manual import remain available.</p>';
     }
   }
 

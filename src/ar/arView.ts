@@ -415,7 +415,7 @@ export class ArView implements ArWorkstream {
     return `
       <div class="ar-stage">
         <video class="ar-video" data-role="video" playsinline muted autoplay></video>
-        <canvas class="ar-canvas" data-role="canvas" aria-label="Augmented reality sky overlay"></canvas>
+        <canvas class="ar-canvas" data-role="canvas" tabindex="0" aria-label="Augmented reality sky overlay. Arrow keys pan the virtual view when touch mode is active."></canvas>
         <div class="ar-vignette"></div>
         <div class="ar-top">
           <span class="ar-chip" data-role="status-camera">Camera</span>
@@ -668,6 +668,28 @@ export class ArView implements ArWorkstream {
     this.canvas.addEventListener('pointermove', pointerMove);
     this.canvas.addEventListener('pointerup', pointerUp);
     this.canvas.addEventListener('pointercancel', pointerUp);
+    this.canvas.addEventListener('keydown', (event) => {
+      const step = 4;
+      let handled = true;
+      if (event.key === 'ArrowLeft') {
+        this.virtualHeadingDeg = (this.virtualHeadingDeg - step + 360) % 360;
+      } else if (event.key === 'ArrowRight') {
+        this.virtualHeadingDeg = (this.virtualHeadingDeg + step) % 360;
+      } else if (event.key === 'ArrowUp') {
+        this.virtualPitchDeg = Math.min(85, this.virtualPitchDeg + step);
+      } else if (event.key === 'ArrowDown') {
+        this.virtualPitchDeg = Math.max(-85, this.virtualPitchDeg - step);
+      } else {
+        handled = false;
+      }
+      if (!handled) return;
+      event.preventDefault();
+      this.touchMode = true;
+      this.touchToggle.checked = true;
+      this.root.classList.add('ar-touch');
+      this.snapNextFrame = true;
+      this.updateSensorStatus();
+    });
 
     this.screenOrientationHandler = () => {
       this.updateScreenAngle();
@@ -1179,7 +1201,10 @@ export class ArView implements ArWorkstream {
     }
     this.measuredHeadingDeg = headingFromQuat(measured);
     const target = quatAddHeading(measured, this.calibration.headingOffsetDeg);
-    if (!this.displayQuat || this.snapNextFrame) {
+    const reduceMotion =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!this.displayQuat || this.snapNextFrame || reduceMotion) {
       this.displayQuat = target;
     } else {
       const angle = quatAngleBetween(this.displayQuat, target);

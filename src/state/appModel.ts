@@ -1,6 +1,15 @@
 import { TableEphemeris } from '../ephemeris/hermite';
 import type { ApophisDataFile } from '../ephemeris/types';
-import { loadStarCatalogue, type StarCatalogue } from '../sky/catalog';
+import {
+  loadStarCatalogue,
+  validateStarCatalogue,
+  type StarCatalogue,
+} from '../sky/catalog';
+import {
+  isInsidePreparedArea,
+  loadPreparedSnapshot,
+  type OfflineSnapshot,
+} from '../offline/snapshot';
 import { SimulationSession, type JumpTarget } from './session';
 import {
   effectiveElevationM,
@@ -9,11 +18,30 @@ import {
   type DisplayToggles,
   type LocationSource,
   type ObserverConfig,
+  type OfflineUiState,
   type UiState,
   type UiStore,
   type ViewMode,
 } from './store';
 import { PRESETS, type PresetLocation } from './appTypes';
+
+export interface EphemerisSourceInfo {
+  provider: string;
+  solution: string;
+  retrievedAt: string;
+  queryUrl: string | null;
+  activeSource: 'built-in' | 'prepared';
+  preparedAt: number | null;
+}
+
+export class OfflineUnavailableError extends Error {
+  constructor() {
+    super(
+      'No offline area is prepared. Connect to the internet, open Local 3D and use “Prepare for offline”, then try again.',
+    );
+    this.name = 'OfflineUnavailableError';
+  }
+}
 
 export interface ManualObserverInput {
   latitudeDeg: number;
@@ -35,9 +63,12 @@ export class AppModel {
   private readonly store: UiStore;
   private readonly baseUrl: string;
   private ephem: TableEphemeris | null = null;
+  private dataFile: ApophisDataFile | null = null;
   private session: SimulationSession | null = null;
   private catalogue: StarCatalogue | null = null;
   private geolocationRequested = false;
+  private offlineSnapshot: OfflineSnapshot | null = null;
+  private usingOfflineData = false;
 
   constructor(store: UiStore = uiStore, baseUrl = import.meta.env.BASE_URL) {
     this.store = store;
@@ -57,6 +88,13 @@ export class AppModel {
   }
 
   useBrowserLocation(): void {
+    if (this.usingOfflineData) {
+      this.store.update({
+        locationStatus:
+          'Browser location is not used offline. Set coordinates manually or reconnect.',
+      });
+      return;
+    }
     this.geolocationRequested = false;
     this.store.update({ locationStatus: 'Requesting browser location…' });
     this.requestGeolocation();
@@ -70,27 +108,95 @@ export class AppModel {
     return this.catalogue;
   }
 
-  async init(): Promise<AppModelInitResult> {
-    const response = await fetch(`${this.baseUrl}data/apophis-2029.json`);
-    if (!response.ok) throw new Error(`Ephemeris fetch failed: HTTP ${response.status}`);
-    const data = (await response.json()) as ApophisDataFile;
-    this.ephem = new TableEphemeris(data);
+  getOfflineSnapshot(): OfflineSnapshot | null {
+    return this.offlineSnapshot;
+  }
 
+  isUsingOfflineData(): boolean {
+    return this.usingOfflineData;
+  }
+
+  getEphemerisSource(): EphemerisSourceInfo | null {
+    if (!this.dataFile) return null;
+    return {
+      provider: this.dataFile.source.provider,
+      solution: this.dataFile.target.solution,
+      retrievedAt: this.dataFile.source.retrievedAt,
+      queryUrl: this.dataFile.source.queryUrl ?? null,
+      activeSource: this.usingOfflineData ? 'prepared' : 'built-in',
+      preparedAt: this.offlineSnapshot?.preparedAt ?? null,
+    };
+  }
+
+  async init(): Promise<AppModelInitResult> {
+    this.offlineSnapshot = await loadPreparedSnapshot();
+    const online = typeof navigator === 'undefined' || navigator.onLine !== false;
+    let data: ApophisDataFile;
+
+    if (online) {
+      try {
+        const response = await fetch(`${this.baseUrl}data/apophis-2029.json`, {
+          cache: 'no-store',
+          credentials: 'omit',
+        });
+        if (!response.ok) {
+          throw new Error(`Ephemeris fetch failed: HTTP ${response.status}`);
+        }
+        data = (await response.json()) as ApophisDataFile;
+      } catch (error) {
+        if (!this.offlineSnapshot) throw error;
+        data = JSON.parse(this.offlineSnapshot.ephemeris.text) as ApophisDataFile;
+        this.usingOfflineData = true;
+      }
+    } else {
+      if (!this.offlineSnapshot) throw new OfflineUnavailableError();
+      data = JSON.parse(this.offlineSnapshot.ephemeris.text) as ApophisDataFile;
+      this.usingOfflineData = true;
+    }
+
+    this.dataFile = data;
+    this.ephem = new TableEphemeris(data);
+    const snapshot = this.offlineSnapshot;
     const urlObserver = this.observerFromUrl();
     const fallback = this.observerFromPreset(PRESETS[0]);
-    this.applyObserver(
-      urlObserver ?? fallback,
-      urlObserver ? 'url' : 'fallback',
-      urlObserver
+    const offlineObserver = snapshot
+      ? {
+          latitudeDeg: snapshot.area.latitudeDeg,
+          longitudeDeg: snapshot.area.longitudeDeg,
+          groundElevationM: snapshot.area.groundElevationM,
+          eyeHeightM: snapshot.area.eyeHeightM,
+        }
+      : null;
+    const observer = this.usingOfflineData
+      ? urlObserver ?? offlineObserver ?? fallback
+      : urlObserver ?? fallback;
+    const source: LocationSource = this.usingOfflineData
+      ? 'offline'
+      : urlObserver
+        ? 'url'
+        : 'fallback';
+    const status = this.usingOfflineData
+      ? this.offlineLocationStatus(observer, urlObserver !== null)
+      : urlObserver
         ? 'Observer set from URL parameters.'
-        : 'Locating you… showing Brasov preview. You can set a location manually.',
-      false,
-    );
+        : 'Locating you… showing Brasov preview. You can set a location manually.';
+    this.applyObserver(observer, source, status, false);
 
-    this.catalogue = await loadStarCatalogue(this.baseUrl);
+    if (this.usingOfflineData && snapshot?.stars) {
+      try {
+        this.catalogue = validateStarCatalogue(
+          JSON.parse(snapshot.stars.text) as unknown,
+        );
+      } catch {
+        this.catalogue = null;
+      }
+    } else {
+      this.catalogue = await loadStarCatalogue(this.baseUrl);
+    }
     this.store.update({ ready: true });
+    this.refreshOfflineState();
 
-    if (!urlObserver) {
+    if (!urlObserver && !this.usingOfflineData) {
       this.requestGeolocation();
     }
 
@@ -114,6 +220,63 @@ export class AppModel {
     if (Number.isFinite(minEl)) this.setMinGoodElevation(minEl);
 
     return { catalogue: this.catalogue };
+  }
+
+  private offlineLocationStatus(
+    observer: ObserverConfig,
+    fromUrl: boolean,
+  ): string {
+    const snapshot = this.offlineSnapshot;
+    if (!snapshot) return 'Offline mode: no prepared area.';
+    const inside = isInsidePreparedArea(
+      snapshot,
+      observer.latitudeDeg,
+      observer.longitudeDeg,
+    );
+    if (!inside) {
+      return `Offline: this location is not prepared. Terrain, buildings and the offline base map are only available near ${snapshot.area.label}. Sky and AR still work for the selected coordinates.`;
+    }
+    return `Offline: using the prepared area ${snapshot.area.label}${
+      fromUrl ? ' (URL coordinates)' : ''
+    }. Prepared ${new Date(snapshot.preparedAt).toISOString()}.`;
+  }
+
+  /** Called by the terrain tab after Prepare/Clear. */
+  setOfflineSnapshot(snapshot: OfflineSnapshot | null): void {
+    this.offlineSnapshot = snapshot;
+    this.refreshOfflineState();
+  }
+
+  private refreshOfflineState(): void {
+    const snapshot = this.offlineSnapshot;
+    const state = this.store.getState();
+    const observer = state.observer;
+    const mismatch =
+      this.usingOfflineData && snapshot && observer
+        ? !isInsidePreparedArea(
+            snapshot,
+            observer.latitudeDeg,
+            observer.longitudeDeg,
+          )
+        : false;
+    const offline: OfflineUiState = {
+      active: this.usingOfflineData,
+      preparedAt: snapshot?.preparedAt ?? null,
+      areaLabel: snapshot?.area.label ?? null,
+      areaLatDeg: snapshot?.area.latitudeDeg ?? null,
+      areaLonDeg: snapshot?.area.longitudeDeg ?? null,
+      areaRadiusM: snapshot?.area.terrainRadiusM ?? null,
+      searchRadiusM: snapshot?.area.searchRadiusM ?? null,
+      mismatch,
+      message: this.usingOfflineData
+        ? mismatch
+          ? `Offline: terrain and buildings are only prepared for ${snapshot?.area.label ?? 'one area'}. Sky and AR still work here.`
+          : `Offline: all sky/AR data and the prepared terrain area are available. Prepared ${new Date(
+              snapshot?.preparedAt ?? Date.now(),
+            ).toISOString()}.`
+        : null,
+    };
+    this.store.update({ offline });
   }
 
   private observerFromUrl(): ObserverConfig | null {
@@ -187,6 +350,7 @@ export class AppModel {
       ready: true,
       error: null,
     });
+    this.refreshOfflineState();
   }
 
   private requestGeolocation(): void {

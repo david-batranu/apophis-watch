@@ -5,6 +5,7 @@
   "scripts": {
     "test": "vitest run",
     "fetch:ephemeris": "tsx scripts/fetch-ephemeris.ts",
+    "fetch:buildings": "tsx scripts/fetch-buildings.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "dev": "vite",
@@ -13,6 +14,8 @@
     "report:phase1": "tsx scripts/report-phase1.ts",
     "eval:site": "tsx scripts/eval-site.ts",
     "test:e2e": "playwright test",
+    "test:offline": "playwright test -c tests/offline/playwright.offline.config.ts",
+    "measure:perf": "node scripts/measure-perf.mjs",
     "fetch:stars": "tsx scripts/fetch-stars.ts",
     "dev:https": "HTTPS=1 vite --host 0.0.0.0"
   },

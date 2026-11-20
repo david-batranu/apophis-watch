@@ -1,28 +1,39 @@
 # Apophis Watch
 
 A static, mobile-first simulator for the **13 April 2029** close approach of
-(99942) Apophis. Phases 1–4 are implemented: ephemeris validation, sky/space
-views, local terrain/buildings/best-spot search, and camera AR. Phase 5
-(offline PWA packaging) is not part of this build.
+(99942) Apophis. Phases 1–5 are implemented: ephemeris validation, sky/space
+views, local terrain/buildings/best-spot search, camera AR, and an installable
+offline PWA with a prepared-area snapshot.
 
-Production build: initial JS **711.85 kB** (gzip 190.40 kB) plus a **246 kB**
-terrain chunk (73.24 kB gzip), **81.6 kB** AR chunk (24.59 kB gzip), and a
-**7.41 kB** best-spot worker; CSS is split similarly. Terrain and AR load only
-when their tabs are opened.
+The offline cache is explicit, not a hidden “download the map” feature: the app
+stores the ephemeris, star catalogue, AWS Terrarium DEM tiles and OSM building
+footprints for one selected area, plus a locally rendered hillshade base map.
+It does **not** bulk-download `tile.openstreetmap.org` raster tiles, because
+that service forbids prefetch/offline use. See [Deployment](DEPLOYMENT.md),
+[Event-day guide](EVENT-DAY.md) and
+[Real-phone checklist](REAL-PHONE-CHECKLIST.md).
+
+Production build (Phase 5, final numbers are refreshed in the validation
+report): initial JS is about **712 kB** (190 kB gzip), with separate terrain,
+AR and best-spot-worker chunks. Terrain and AR remain lazy-loaded; the service
+worker precaches them for offline use without executing them.
 
 ## Run
 
 ```bash
-npm install
+npm ci
 npm run dev                 # Vite dev server (HTTP)
 npm run dev:https           # HTTPS for phone camera/orientation testing
 npm run build               # typecheck + production build
-npm test                    # 162 Vitest tests
-npm run test:e2e            # 12 merged Playwright smoke tests (needs Chromium)
-npx playwright test -c tests/ar/playwright.ar.config.ts  # 12 AR mock tests
+npm test                    # Vitest unit/data tests
+npm run test:e2e            # merged Playwright smoke tests (needs Chromium)
+npm run test:offline        # production build + service worker + offline test
+npx playwright test -c tests/ar/playwright.ar.config.ts  # AR mock tests
+npm run measure:perf        # 4× CPU + 10-minute memory measurement
 npm run typecheck
 npm run fetch:ephemeris     # refresh the committed JPL Horizons data
 npm run fetch:stars         # rebuild HYG + ConstellationLines JSON
+npm run fetch:buildings -- --lat=45.6427 --lon=25.5887 --radius=1500 --name=brasov
 npm run report:phase1       # regenerate PHASE1-VALIDATION.md
 ```
 
@@ -58,9 +69,20 @@ ignored. The shared sky/AR observer uses the preset/manual ground elevation or
 - `src/workers/` — best-spot scoring worker.
 - `src/ar/` — camera AR, orientation/quaternion pipeline, WMM declination,
   calibration, rehearsal and fallbacks.
+- `src/offline/` — prepared-area snapshot in IndexedDB, storage/quota helpers,
+  snapshot preparation and integrity checks. The snapshot is separate from
+  the service-worker cache.
+- `src/pwa.ts` — `vite-plugin-pwa` registration, update prompt and periodic
+  update checks. The worker is prompt-based and never skips waiting
+  automatically; data JSON is excluded from precache.
 - `src/ui/` — panel shell, controls, readout, elevation/magnitude plot,
-  debug overlay, time formatting.
+  event-day guide, About/offline panel, debug overlay, time formatting.
 - `src/core/` — vector and time-scale utilities.
+
+The service worker precaches the app shell, terrain chunk and AR chunk, but not
+`public/data/*.json`. Offline astronomy data comes from the prepared snapshot,
+so an app refresh cannot silently replace it. The prepared snapshot is only
+changed by **Prepare for offline** or **Clear prepared area**.
 
 `ObserverState`, `SkyPosition` and `EphemerisProvider` are frozen and guarded by
 `tests/interfaces.test.ts`.
@@ -144,6 +166,44 @@ WMM2025 is bundled via `geomagnetism` (Apache-2.0); it covers the 2029 flyby.
 The package window ends 2029-11-13, after which the module explicitly marks
 extrapolated/unsupported declination rather than silently trusting it.
 
+## Offline PWA (Phase 5)
+
+Open **Local 3D → Prepare for offline**. The app requests persistent storage,
+downloads the committed ephemeris and star catalogue, caches AWS Terrarium DEM
+tiles, and obtains OSM building footprints from a bundled area or one polite
+Overpass request. It shows progress and a Cancel button, then lists exactly
+what is stored, the cache size and the prepared date. **Clear prepared area**
+removes the snapshot and cached DEM/building data.
+
+The offline base map is rendered locally from the cached DEM plus building
+footprints. OSM raster tiles are **online-only**; `tile.openstreetmap.org`
+forbids prefetch/bulk/offline use. A full Protomaps vector extract is the
+recommended future upgrade, not part of this build.
+
+Service-worker updates are prompt-based: a new build waits and the app shows a
+Reload banner. The prepared snapshot is stored separately in IndexedDB and is
+not replaced by an app refresh. About shows the ephemeris provider, solution
+ID, retrieval date, prepared date, storage/quota state and bundled-area
+provenance.
+
+iOS durability: without Add to Home Screen, Safari can evict script-writable
+storage, service-worker registrations and caches after seven days without a
+tap. Install the PWA and open it at least weekly. Android Chrome grants
+persistent storage by engagement/installation and evicts best-effort origins
+under pressure.
+
+Deployment: see [DEPLOYMENT.md](DEPLOYMENT.md). Cloudflare Pages is recommended
+for `_headers` and native SPA fallback; GitHub Pages works at a root or
+sub-path but has no custom headers and a soft 100 GB/month bandwidth limit.
+
+## Event-day guide
+
+The in-app **Event day** panel derives the closest-approach time, look
+direction, visible window and expected appearance from the current session.
+It also has a persisted checklist. [EVENT-DAY.md](EVENT-DAY.md) is the printable
+version, and [REAL-PHONE-CHECKLIST.md](REAL-PHONE-CHECKLIST.md) is the ordered
+hardware test list.
+
 ## Known limitations
 
 - UT1−UTC for 2029 is unknown; the leap-second bound gives ≤13.54″ frame
@@ -167,4 +227,13 @@ extrapolated/unsupported declination rather than silently trusting it.
   sign, screen-rotation timing and permission behaviour can only be confirmed
   on real hardware.
 - Pinch gestures are implemented but only wheel/drag/reset are automated.
-- Phase 5 (offline pre-cache, PWA install, deployment docs) is not started.
+- Offline base maps are hillshade + building footprints, not a full street
+  map. There are no offline street labels or addressed search.
+- iOS may evict offline data after seven days without interaction unless the
+  app is installed and opened; the app warns and offers re-prepare.
+- The 10-minute memory/perf run is headless Chromium with 4× CPU throttling,
+  not a physical phone. GPU cost and thermal throttling are not measured.
+- Bundled building areas are only as fresh as their retrieval date; live
+  Overpass is best-effort and may be at capacity.
+- Service-worker update discovery on GitHub Pages can be delayed by its
+  `sw.js` cache; Cloudflare Pages is recommended.

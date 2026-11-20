@@ -19,8 +19,8 @@ test('Local 3D tab mounts the Leaflet map with OSM attribution and DEM controls'
   });
   await page.locator('[data-ref="night-button"]').click();
   await expect(page.locator('.tw-root')).toHaveClass(/tw-night/);
-  await page.getByRole('button', { name: 'Sky view', exact: true }).click();
+  await page.getByRole('tab', { name: 'Sky view', exact: true }).click();
   await expect(page.locator('.tw-root')).toBeHidden();
-  await page.getByRole('button', { name: 'Local 3D', exact: true }).click();
+  await page.getByRole('tab', { name: 'Local 3D', exact: true }).click();
   await expect(page.locator('.tw-root')).toBeVisible();
 });

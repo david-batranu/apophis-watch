@@ -1,5 +1,11 @@
 /** Formatting helpers for UTC and the browser's IANA local time zone. */
 
+/**
+ * The UI copy is English in this build. Romanian is the default formatting
+ * locale for the 2029 event (24-hour clock, metric units, ro-RO date order).
+ */
+export const DEFAULT_FORMAT_LOCALE = 'ro-RO';
+
 const PART_OPTIONS: Intl.DateTimeFormatOptions = {
   year: 'numeric',
   month: '2-digit',
@@ -65,4 +71,34 @@ export function localHhMm(ms: number, timeZone: string): string {
 export function localDateHhMm(ms: number, timeZone: string): string {
   const p = parts(ms, timeZone);
   return `${p.month}-${p.day} ${p.hour}:${p.minute}`;
+}
+
+/** Locale-formatted local date/time for the event-day plan and About panel. */
+export function formatLocalLocale(
+  ms: number,
+  timeZone: string,
+  locale = DEFAULT_FORMAT_LOCALE,
+): string {
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      dateStyle: 'medium',
+      timeStyle: 'medium',
+      timeZone,
+    }).format(new Date(ms));
+  } catch {
+    return formatLocal(ms, timeZone).label;
+  }
+}
+
+/** Locale-formatted number, defaulting to Romanian grouping/decimal marks. */
+export function formatNumberLocale(
+  value: number,
+  locale = DEFAULT_FORMAT_LOCALE,
+  options: Intl.NumberFormatOptions = {},
+): string {
+  try {
+    return new Intl.NumberFormat(locale, options).format(value);
+  } catch {
+    return value.toString();
+  }
 }

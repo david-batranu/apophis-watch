@@ -1,5 +1,6 @@
 import './styles.css';
 import { jdTdbFromDate } from './core/time';
+import { createPerfApi } from './perf';
 import { AppModel } from './state/appModel';
 import { solarSystemBodies, type BodyPosition } from './sky/bodies';
 import { AppUi } from './ui/app';
@@ -11,6 +12,9 @@ async function boot(): Promise<void> {
   await app.init();
   const ui = new AppUi(root, app, app.getCatalogue());
 
+  const perf = createPerfApi();
+  window.__apophisPerf = perf;
+
   let last = performance.now();
   let lastReadout = 0;
   let lastPlot = 0;
@@ -18,41 +22,55 @@ async function boot(): Promise<void> {
   let bodyCache: BodyPosition[] = [];
 
   const frame = (now: number): void => {
-    const dt = Math.min(100, now - last);
-    last = now;
-    app.advance(dt);
-    const state = app.getState();
-    const session = app.getSession();
-    if (session && state.utcMs !== null) {
-      const sky = session.skyAt(state.utcMs, state.toggles.refraction);
-      // Sun/Moon/planets move slowly; 5 simulated minutes is far below one
-      // pixel at the dome scale. Cache them to keep 60 fps headroom.
-      const bodyKey = [
-        Math.floor(state.utcMs / 300_000),
-        state.toggles.refraction,
-        session.observer.latitudeDeg,
-        session.observer.longitudeDeg,
-        session.observer.elevationM,
-      ].join('|');
-      if (bodyKey !== bodyCacheKey) {
-        bodyCacheKey = bodyKey;
-        bodyCache = solarSystemBodies(
-          session.observer,
-          jdTdbFromDate(new Date(state.utcMs)),
+    const frameStart = performance.now();
+    performance.mark('apophis-frame-start');
+    try {
+      const dt = Math.min(100, now - last);
+      last = now;
+      app.advance(dt);
+      const state = app.getState();
+      const session = app.getSession();
+      if (session && state.utcMs !== null) {
+        const sky = session.skyAt(state.utcMs, state.toggles.refraction);
+        // Sun/Moon/planets move slowly; 5 simulated minutes is far below one
+        // pixel at the dome scale. Cache them to keep 60 fps headroom.
+        const bodyKey = [
+          Math.floor(state.utcMs / 300_000),
           state.toggles.refraction,
-        );
+          session.observer.latitudeDeg,
+          session.observer.longitudeDeg,
+          session.observer.elevationM,
+        ].join('|');
+        if (bodyKey !== bodyCacheKey) {
+          bodyCacheKey = bodyKey;
+          bodyCache = solarSystemBodies(
+            session.observer,
+            jdTdbFromDate(new Date(state.utcMs)),
+            state.toggles.refraction,
+          );
+        }
+        ui.renderViews(state, sky, bodyCache);
+        if (now - lastReadout > 100) {
+          ui.updateFrame(state, sky, bodyCache);
+          lastReadout = now;
+        }
+        if (now - lastPlot > 300) {
+          ui.updatePlot(state);
+          lastPlot = now;
+        }
       }
-      ui.renderViews(state, sky, bodyCache);
-      if (now - lastReadout > 100) {
-        ui.updateFrame(state, sky, bodyCache);
-        lastReadout = now;
+    } finally {
+      performance.mark('apophis-frame-end');
+      performance.measure('apophis-frame', 'apophis-frame-start', 'apophis-frame-end');
+      // Keep the User Timing buffer bounded during long sessions.
+      performance.clearMarks('apophis-frame-start');
+      performance.clearMarks('apophis-frame-end');
+      if (perf.monitor.frameCount % 600 === 0) {
+        performance.clearMeasures('apophis-frame');
       }
-      if (now - lastPlot > 300) {
-        ui.updatePlot(state);
-        lastPlot = now;
-      }
+      perf.monitor.record(performance.now() - frameStart);
+      requestAnimationFrame(frame);
     }
-    requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
 }
@@ -60,9 +78,18 @@ async function boot(): Promise<void> {
 boot().catch((error) => {
   const root = document.getElementById('app');
   if (root) {
-    root.innerHTML = `<main class="main"><section class="panel"><h2>Startup error</h2><p class="status-line error">${String(
-      error,
-    )}</p><p class="status-line">Check that public/data/apophis-2029.json is served and reload.</p></section></main>`;
+    const message = error instanceof Error ? error.message : String(error);
+    root.innerHTML = `<main class="main"><section class="panel"><h2>Apophis Watch could not start</h2><p class="status-line error">${message.replace(
+      /[&<>"']/g,
+      (c) =>
+        ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;',
+        })[c]!,
+    )}</p><p class="status-line">If you are offline, prepare an area while online first: open <strong>Local 3D</strong> → <strong>Prepare for offline</strong>. Then reload.</p></section></main>`;
   }
   console.error(error);
 });

@@ -279,7 +279,7 @@ test('night mode red-on-black covers panels, controls and canvas', async ({ page
   });
   await page.locator('.sky-stage').screenshot({ path: resolve(SHOTS, 'sky-night.png') });
   await page.screenshot({ path: resolve(SHOTS, 'night-full.png'), fullPage: true });
-  await page.getByRole('button', { name: 'Space view' }).click();
+  await page.getByRole('tab', { name: 'Space view' }).click();
   await page.waitForTimeout(500);
   const spaceShot = await page.locator('.space-stage').screenshot({
     path: resolve(SHOTS, 'space-night.png'),
@@ -305,7 +305,7 @@ test('night mode red-on-black covers panels, controls and canvas', async ({ page
 
 test('space view renders and camera presets respond', async ({ page }) => {
   await gotoAt(page, '2029-04-13T21:45:03.557Z');
-  await page.getByRole('button', { name: 'Space view' }).click();
+  await page.getByRole('tab', { name: 'Space view' }).click();
   await expect(page.locator('.space-stage')).toBeVisible();
   for (const name of ['Earth', 'Moon orbit', 'Top-down', 'Flyby']) {
     await page.getByRole('button', { name, exact: true }).click();

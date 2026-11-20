@@ -203,6 +203,17 @@ export class SkyView {
     this.invalidate();
   }
 
+  /** Keyboard-accessible look controls; pixel deltas match a drag. */
+  panByPixels(dx: number, dy: number): void {
+    this.projection.panByPixels(dx, dy);
+    this.invalidate();
+  }
+
+  zoomBy(factor: number): void {
+    this.projection.zoomBy(factor);
+    this.invalidate();
+  }
+
   getDebugSnapshot(): SkyDebugSnapshot {
     return this.lastDebug;
   }
