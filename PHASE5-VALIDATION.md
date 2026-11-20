@@ -1,0 +1,198 @@
+# Phase 5 validation — offline PWA, robustness, accessibility
+
+Status: implementation complete; final independent verifier pending. This file
+records the measured numbers and the checks that can be repeated.
+
+## Research findings that changed the plan
+
+1. **OSM standard raster tiles cannot be used offline.** The current
+   `tile.openstreetmap.org` policy says: “Offline use is not permitted” and
+   “Bulk downloading is any pre-emptive fetching of tiles other than those a
+   user is actively viewing.” The app therefore never prefetches or stores OSM
+   raster tiles. Online they are a viewport-only Leaflet layer. Offline the
+   base map is a locally rendered hillshade from cached AWS Terrarium DEM plus
+   OSM building footprints.
+2. **AWS Terrarium is CC-BY 4.0 and explicit caching is allowed.** The S3
+   objects have no `Cache-Control` header, so the app caches decoded tiles in
+   IndexedDB deliberately.
+3. **Overpass needs multi-mirror, serial, identified clients.** 406 is an
+   Apache User-Agent block, 429 asks for ~30 s, 502/504 need 30→60→120 s
+   backoff. The build script uses dresel first for Europe/NA, then
+   overpass-api.de, mail.ru and private.coffee; the runtime live query uses
+   dresel then overpass-api.de. No parallel scripts, no UA rotation.
+4. **iOS storage is evictable.** Safari/WebKit applies a 7-day cap to
+   script-writable storage (including service workers, Cache API and
+   IndexedDB) after no user interaction. Home-screen web apps are exempt.
+   `navigator.storage.persist()` is granted heuristically; on iOS installation
+   is the reliable path. The app requests persistence, shows whether it was
+   granted, warns about eviction, and offers re-prepare.
+5. **Hosting:** Cloudflare Pages is recommended (custom `_headers`, native SPA
+   fallback, unlimited static bandwidth). GitHub Pages works at a root or
+   sub-path but has no custom headers and a soft 100 GB/month limit.
+
+## Implemented
+
+- **Prepare for offline** in Local 3D: persistent-storage request, progress,
+  cancel, size, prepared date, exact stored-item list, clear button.
+- Ephemeris + star catalogue text stored in an IndexedDB snapshot, separate
+  from the service-worker precache. A refresh cannot silently replace it.
+- AWS Terrarium DEM tiles cached for the prepared area (z14, 81 tiles at the
+  default 3 km search / 4 km building radius in Brasov).
+- OSM buildings from a bundled 2 km Brasov area (9,979 ways) or one polite
+  live Overpass query; manual GeoJSON/Overpass import.
+- Offline base map: local hillshade + building footprints. No OSM raster
+  prefetch.
+- PWA manifest, icons, prompt-based service-worker updates, periodic update
+  checks, About/data source/solution/retrieval date/storage status.
+- Height-uncertainty best-spot ranking: default 8 m (base), ×1.5 pessimistic,
+  ×0.7 optimistic; pessimistic primary ranking, score range, rank spread,
+  blocker type, nearest-building distance.
+- Field-check Pass/Fail/note panel for the top 3 spots, persisted locally.
+- Event-day plan derived from the current session + checklist; `EVENT-DAY.md`.
+- i18n extraction to `src/i18n/en.ts`; Romanian `ro-RO` is the default
+  date/time/number formatting locale, UI copy remains English.
+- Keyboard tabs (arrow keys/Home/End), keyboard sky and local-3D canvases,
+  AR virtual-look keys, visible focus, labels, reduced-motion CSS and AR snap.
+- Performance instrumentation: `window.__apophisPerf` with per-frame
+  `performance.measure` p50/p95/max, renderer detection and memory snapshots;
+  `npm run measure:perf`.
+
+## Offline test (Playwright, production build, real service worker)
+
+`npm run test:offline` starts a fresh `vite preview`, prepares a 1 km search
+area, reloads online to become service-worker controlled, then disables the
+network and reloads.
+
+Verified:
+
+- App shell loads from the service-worker cache; offline line and chip say
+  `Offline: ready`.
+- Sky readout is computed from the prepared ephemeris.
+- Local 3D loads the cached DEM (`81 tiles, 81 cached, 0 network` in the
+  default-area manual run) and shows the offline hillshade overlay.
+- The prepared snapshot's building radius is used, not a narrower stale cache
+  entry.
+- Best-spot search completes entirely offline; top results and field-check
+  controls render.
+- AR mounts with the fake camera and shows Apophis from the prepared
+  catalogue/session.
+- An unprepared observer URL shows “terrain and buildings are only prepared
+  for 45.6427°, 25.5887°” and the DEM badge says “not prepared”; it does not
+  fail silently.
+
+Manual full-size preparation at Brasov (3 km search, 4 km buildings) produced:
+
+| Item | Value |
+|---|---|
+| Snapshot size | 32.5 MB |
+| DEM | 81 tiles, z14, 21.2 MB |
+| Buildings | 22,107 OSM ways, 20,217 default height, 10.1 MB |
+| Ephemeris | 936.7 kB, solution JPL#220, retrieved 2026-11-19 |
+| Stars | 187.6 kB |
+| Persistent storage | not granted in headless Chromium; warned |
+| Offline sky at 20:45 UTC | az 213.987°, el 42.308° |
+| Offline AR at 20:45 UTC | Apophis 214.0° / +42.3°, range 40,404 km |
+
+## Service-worker update
+
+Manually verified with a rebuild while the preview server was live:
+
+1. Page controlled by the old worker, no banner.
+2. `npm run build` produced new hashed assets and a new `sw.js`.
+3. `registration.update()` installed the waiting worker.
+4. Banner appeared: “A new version is ready. Reload when convenient; the
+   prepared offline area is kept.”
+5. Reload activated the new build; banner disappeared; prepared data remained
+   in IndexedDB.
+
+`registerType: 'prompt'`, `skipWaiting: false`, `clientsClaim: false`.
+`sw.js`/`workbox-*.js` are `no-cache` in `public/_headers`.
+
+## Sub-path deployment
+
+Served `dist/` at `http://127.0.0.1:4180/sub/` with a plain static server:
+
+- service worker scope `http://127.0.0.1:4180/sub/`
+- second load controlled
+- offline reload served the cached shell
+- no absolute-root asset URLs
+
+This exercises the same relative-`base` behaviour used by GitHub Pages
+sub-path hosting.
+
+## Bundled area and import
+
+- `npm run fetch:buildings -- --lat=45.6427 --lon=25.5887 --radius=2000
+  --name=brasov` fetched 9,979 ways from `ovp.dresel.systems`, 417 tagged,
+  9,562 default, OSM timestamp 2026-11-19T21:22:20Z, retrieval
+  2026-11-20T12:15:14.819Z. The GeoJSON is 4.6 MB compact.
+- A fresh Local 3D load used the bundled area (`source bundled`) and made no
+  Overpass request for the building query.
+- A manual one-building GeoJSON import produced `source import`, 1 way,
+  preserved ODbL attribution and the file name.
+
+## Accessibility
+
+- Tab through the shell: skip link, tabs, controls; visible 2 px focus outline.
+- ArrowRight/ArrowLeft/Home/End move and activate tabs; roving tabindex.
+- Sky canvas: arrow keys pan, `+`/`-` zoom, `0`/Home reset.
+- Local 3D canvas: arrow keys look, `+`/`-` FOV, `0` reset.
+- AR canvas: arrow keys pan virtual look and enable touch mode.
+- Night contrast: `--muted` raised to `#d05a4a` (5.2:1 on black) from the
+  earlier 3.2:1; body text `#ff8a7a` is 9.2:1. Day muted is 5.6:1 on panels.
+- `prefers-reduced-motion: reduce` collapses CSS transitions/animations and
+  makes AR orientation snap instead of slerp.
+- Canvas labels added for sky, local 3D, AR, space and elevation plot; the
+  Leaflet container keeps an accessible name.
+
+## Performance
+
+Pending final run (`npm run measure:perf`), which measures:
+
+- per-frame main-thread time via `performance.measure` around the render loop
+  (p50/p95/max), not just requestAnimationFrame interval;
+- Sky, Local 3D and AR at 390×844 with 4× CPU throttling;
+- a 10-minute mixed session sampling JS heap and per-frame stats;
+- WebGL renderer string (SwiftShader indicates headless software rendering).
+
+Headless GPU cost is not a phone measurement. The final report will state
+whether the run used software rendering and will not claim phone GPU
+performance.
+
+## Build (current, before final i18n merge)
+
+| Asset | Raw | Gzip |
+|---|---:|---:|
+| initial JS | 738.50 kB | 198.88 kB |
+| terrain chunk | 287.16 kB | 84.66 kB |
+| AR chunk | 81.59 kB | 24.58 kB |
+| best-spot worker | 11.40 kB | — |
+| CSS (initial/terrain/AR) | 12.85 / 23.92 / 8.03 kB | 3.33 / 8.61 / 2.29 kB |
+
+Service-worker precache: 22 entries, ~1.2 MB. Terrain and AR remain separate
+lazy chunks; the worker is separate.
+
+## Known limitations / uncertainties
+
+- Offline base map is hillshade + building footprints, not a full street map
+  with labels. A Protomaps PMTiles extract is the recommended future upgrade.
+- iOS may evict all script-writable storage after 7 days without interaction
+  unless installed; persistence is not guaranteed. The app warns and offers
+  re-prepare, but cannot prevent eviction.
+- A 3 km search + 4 km building snapshot is ~32.5 MB at Brasov; users can
+  choose smaller radii. Storage quota varies.
+- Live Overpass remains best-effort; 406/502/504 are possible. Bundled areas
+  and manual import are fallbacks. No fake building data is written when all
+  sources fail.
+- Building heights are mostly default; the pessimistic ranking is a
+  mitigation, not a survey.
+- Offline street tiles are not available by design (OSM policy).
+- Headless Chromium performance is not a real-phone result; GPU, thermal and
+  battery behaviour need the real-phone checklist.
+
+## Real-phone checks
+
+See `REAL-PHONE-CHECKLIST.md` for the ordered list. The critical unverified
+items are trusted HTTPS/installation, iOS storage persistence, real compass
+accuracy/drift, real camera FOV/crop, screen-rotation timing, sensor
+permissions, thermals/battery, and on-site field checks of the top three spots.

@@ -60,6 +60,24 @@ async function perfSummary(page) {
   });
 }
 
+async function cdpHeap(cdp) {
+  try {
+    const metrics = await cdp.send('Performance.getMetrics');
+    const values = Object.fromEntries(
+      metrics.metrics.map((metric) => [metric.name, metric.value]),
+    );
+    return {
+      JSHeapUsedSize: values.JSHeapUsedSize ?? null,
+      JSHeapTotalSize: values.JSHeapTotalSize ?? null,
+      Nodes: values.Nodes ?? null,
+      JSEventListeners: values.JSEventListeners ?? null,
+      Documents: values.Documents ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function measureView(page, view, settleMs, sampleMs) {
   await page.goto(`${BASE}${URL_BASE}&view=${view}`, {
     waitUntil: 'domcontentloaded',
@@ -68,12 +86,34 @@ async function measureView(page, view, settleMs, sampleMs) {
     timeout: 30_000,
   });
   await sleep(settleMs);
+  // Exercise the active render loop, not an idle scene. 60× is enough to
+  // update every frame; 600× only changes simulated time.
+  await page.evaluate(() => {
+    const speed = document.querySelector('[data-ref="speed-select"]');
+    if (speed instanceof HTMLSelectElement) {
+      speed.value = '60';
+      speed.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    const play = document.querySelector('[data-ref="play-button"]');
+    if (play instanceof HTMLButtonElement && /Play/.test(play.textContent ?? '')) {
+      play.click();
+    }
+  });
+  await sleep(1_000);
   await resetPerf(page);
   const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Performance.enable');
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
   await sleep(sampleMs);
   const result = await perfSummary(page);
+  result.cdpHeap = await cdpHeap(cdp);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+  await page.evaluate(() => {
+    const play = document.querySelector('[data-ref="play-button"]');
+    if (play instanceof HTMLButtonElement && /Pause/.test(play.textContent ?? '')) {
+      play.click();
+    }
+  });
   return result;
 }
 
@@ -131,16 +171,17 @@ try {
   await page.waitForFunction(() => Boolean(window.__apophisPerf), null, {
     timeout: 30_000,
   });
+  // Keep the clock paused for the 10-minute lifecycle/memory run: a 600×
+  // playback plus 4× CPU throttle can starve the very tab clicks we need to
+  // measure. The per-view samples above already exercise the render loop.
   await page.evaluate(() => {
-    const speed = document.querySelector('[data-ref="speed-select"]');
-    if (speed instanceof HTMLSelectElement) {
-      speed.value = '600';
-      speed.dispatchEvent(new Event('change', { bubbles: true }));
-    }
     const play = document.querySelector('[data-ref="play-button"]');
-    if (play instanceof HTMLButtonElement) play.click();
+    if (play instanceof HTMLButtonElement && /Pause/.test(play.textContent ?? '')) {
+      play.click();
+    }
   });
   const cdp = await context.newCDPSession(page);
+  await cdp.send('Performance.enable');
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
   const memory = [];
   const started = Date.now();
@@ -151,23 +192,29 @@ try {
     const view = viewsCycle[cycle % viewsCycle.length];
     if (cycle > 0) {
       const tab = page.locator(`[data-view="${view}"]`);
-      if (await tab.count()) await tab.click();
+      if (await tab.count()) await tab.click({ timeout: 60_000 });
       await sleep(1_500);
     }
     const snapshot = await page.evaluate(() => window.__apophisPerf?.memory() ?? null);
     const main = await page.evaluate(() =>
       window.__apophisPerf?.summary(900) ?? null,
     );
+    const heap = await cdpHeap(cdp);
     memory.push({
       elapsedSeconds: Math.round((Date.now() - started) / 1000),
       view,
       memory: snapshot,
+      cdpHeap: heap,
       mainThread: main,
     });
     process.stderr.write(
       `  ${Math.round((Date.now() - started) / 1000)}s ${view} heap ${
-        snapshot ? Math.round(snapshot.usedJSHeapSize / 1024 / 1024) : '?'
-      } MiB\n`,
+        heap?.JSHeapUsedSize
+          ? (heap.JSHeapUsedSize / 1024 / 1024).toFixed(1)
+          : snapshot
+            ? (snapshot.usedJSHeapSize / 1024 / 1024).toFixed(1)
+            : '?'
+      } MiB · listeners ${heap?.JSEventListeners ?? '?'}\n`,
     );
     cycle++;
     await sleep(Math.min(60_000, Math.max(1_000, sessionEnd - Date.now())));
@@ -179,6 +226,7 @@ try {
     viewport: '390x844',
     cpuThrottle: 4,
     sessionMinutes,
+    sessionPlayback: 'paused (tab lifecycle / memory only)',
     views,
     sessionMemory: memory,
     note:

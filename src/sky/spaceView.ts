@@ -142,6 +142,10 @@ export class SpaceView {
     this.renderer.domElement.style.display = 'block';
     this.renderer.domElement.style.width = '100%';
     this.renderer.domElement.style.height = '100%';
+    this.renderer.domElement.setAttribute(
+      'aria-label',
+      'Space view: Apophis, Earth and Moon to scale. Camera preset buttons are beside the view.',
+    );
     host.appendChild(this.renderer.domElement);
 
     this.camera = new THREE.PerspectiveCamera(48, 1, 0.05, 5000);

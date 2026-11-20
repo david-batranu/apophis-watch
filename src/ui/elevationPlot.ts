@@ -52,6 +52,10 @@ export class ElevationPlot {
   constructor(private readonly host: HTMLElement) {
     this.canvas = document.createElement('canvas');
     this.canvas.className = 'plot-canvas';
+    this.canvas.setAttribute(
+      'aria-label',
+      'Elevation and magnitude of Apophis versus time. The same values are in the live readout.',
+    );
     host.appendChild(this.canvas);
     const ctx = this.canvas.getContext('2d');
     if (!ctx) throw new Error('Canvas 2D is unavailable');

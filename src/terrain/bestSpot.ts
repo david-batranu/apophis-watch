@@ -18,7 +18,12 @@ import {
   normalizeAzimuth,
   pointInPolygon,
 } from './geo';
-import { computeHorizonSlopes, slopeToElevationDeg } from './horizon';
+import {
+  computeHorizonSlopes,
+  computeScenarioHorizonSlopes,
+  slopeToElevationDeg,
+  type HorizonSlopes,
+} from './horizon';
 import { formatUtcHhMm } from './path';
 import { sampleGridEnu } from './terrainGrid';
 import type {
@@ -182,11 +187,89 @@ interface ScenarioBuildings {
   optimistic: PreparedBuilding[];
 }
 
+interface BuildingSpatialIndex {
+  cellSizeM: number;
+  cells: Map<string, number[]>;
+  buildings: PreparedBuilding[];
+}
+
+function buildingCellKey(cx: number, cy: number): string {
+  return `${cx},${cy}`;
+}
+
+/**
+ * Uniform-grid index over building bounding boxes. Best-spot scoring asks for
+ * the same ~1 km neighbourhood for every candidate; without this, each of the
+ * three height scenarios scans every building in the prepared area.
+ */
+function buildBuildingSpatialIndex(
+  buildings: PreparedBuilding[],
+  cellSizeM = 500,
+): BuildingSpatialIndex {
+  const cells = new Map<string, number[]>();
+  for (let index = 0; index < buildings.length; index++) {
+    const building = buildings[index];
+    const cx0 = Math.floor(building.minEastM / cellSizeM);
+    const cx1 = Math.floor(building.maxEastM / cellSizeM);
+    const cy0 = Math.floor(building.minNorthM / cellSizeM);
+    const cy1 = Math.floor(building.maxNorthM / cellSizeM);
+    for (let cx = cx0; cx <= cx1; cx++) {
+      for (let cy = cy0; cy <= cy1; cy++) {
+        const key = buildingCellKey(cx, cy);
+        const list = cells.get(key);
+        if (list) list.push(index);
+        else cells.set(key, [index]);
+      }
+    }
+  }
+  return { cellSizeM, cells, buildings };
+}
+
+function nearbyBuildingIndices(
+  index: BuildingSpatialIndex,
+  eastM: number,
+  northM: number,
+  radiusM: number,
+): number[] {
+  const cellSize = index.cellSizeM;
+  const cx0 = Math.floor((eastM - radiusM) / cellSize);
+  const cx1 = Math.floor((eastM + radiusM) / cellSize);
+  const cy0 = Math.floor((northM - radiusM) / cellSize);
+  const cy1 = Math.floor((northM + radiusM) / cellSize);
+  const seen = new Set<number>();
+  const result: number[] = [];
+  for (let cx = cx0; cx <= cx1; cx++) {
+    for (let cy = cy0; cy <= cy1; cy++) {
+      const list = index.cells.get(buildingCellKey(cx, cy));
+      if (!list) continue;
+      for (const buildingIndex of list) {
+        if (seen.has(buildingIndex)) continue;
+        seen.add(buildingIndex);
+        const building = index.buildings[buildingIndex];
+        if (
+          distanceToBoxM(
+            eastM,
+            northM,
+            building.minEastM,
+            building.maxEastM,
+            building.minNorthM,
+            building.maxNorthM,
+          ) <= radiusM
+        ) {
+          result.push(buildingIndex);
+        }
+      }
+    }
+  }
+  return result;
+}
+
 interface SearchContext {
   bins: PathBins;
   stepM: number;
   buildingsById: Map<number, PreparedBuilding>;
   buildings: ScenarioBuildings;
+  buildingIndex: BuildingSpatialIndex;
 }
 
 function prepareSearch(input: BestSpotInput): SearchContext {
@@ -213,6 +296,7 @@ function prepareSearch(input: BestSpotInput): SearchContext {
       input.buildings.map((building) => [building.id, building]),
     ),
     buildings,
+    buildingIndex: buildBuildingSpatialIndex(input.buildings),
   };
 }
 
@@ -254,6 +338,8 @@ function evaluateScenario(
   buildings: PreparedBuilding[],
   buildingsById: Map<number, PreparedBuilding>,
   collectDetail: boolean,
+  terrainSlopes?: HorizonSlopes,
+  scenarioSlopes?: HorizonSlopes,
 ): ScenarioEvaluation {
   const point = {
     latitudeDeg: candidate.latitudeDeg,
@@ -298,13 +384,16 @@ function evaluateScenario(
     };
   }
 
-  const slopes = computeHorizonSlopes(input.grid, point, buildings, {
-    azimuthsDeg: bins.keys,
-    stepDeg: 1,
-    buildingMaxDistanceM: input.buildingRadiusM,
-    stepM,
-    curvature: input.curvature,
-  });
+  const slopes =
+    scenarioSlopes ??
+    computeHorizonSlopes(input.grid, point, buildings, {
+      azimuthsDeg: bins.keys,
+      stepDeg: 1,
+      buildingMaxDistanceM: input.buildingRadiusM,
+      stepM,
+      curvature: input.curvature,
+      baseSlopes: terrainSlopes,
+    });
   const horizonByBin = new Float64Array(bins.keys.length);
   for (let i = 0; i < bins.keys.length; i++) {
     horizonByBin[i] = slopeToElevationDeg(slopes.slopes[i]);
@@ -390,32 +479,86 @@ function scoreCandidate(
   candidate: BestSpotCandidate,
   context: SearchContext,
 ): BestSpotResult {
+  const nearby = nearbyBuildingIndices(
+    context.buildingIndex,
+    candidate.eastM,
+    candidate.northM,
+    input.buildingRadiusM,
+  );
+  const terrainSlopes = computeHorizonSlopes(
+    input.grid,
+    {
+      latitudeDeg: candidate.latitudeDeg,
+      longitudeDeg: candidate.longitudeDeg,
+      groundElevationM: candidate.groundElevationM,
+      eyeHeightM: input.eyeHeightM,
+    },
+    [],
+    {
+      azimuthsDeg: context.bins.keys,
+      stepDeg: 1,
+      stepM: context.stepM,
+      curvature: input.curvature,
+    },
+  );
+  const baseBuildings = nearby.map((index) => context.buildings.base[index]);
+  const pessimisticBuildings = nearby.map(
+    (index) => context.buildings.pessimistic[index],
+  );
+  const optimisticBuildings = nearby.map(
+    (index) => context.buildings.optimistic[index],
+  );
+  const scenarioSlopes = computeScenarioHorizonSlopes(
+    input.grid,
+    {
+      latitudeDeg: candidate.latitudeDeg,
+      longitudeDeg: candidate.longitudeDeg,
+      groundElevationM: candidate.groundElevationM,
+      eyeHeightM: input.eyeHeightM,
+    },
+    [baseBuildings, pessimisticBuildings, optimisticBuildings],
+    {
+      azimuthsDeg: context.bins.keys,
+      stepDeg: 1,
+      stepM: context.stepM,
+      buildingMaxDistanceM: input.buildingRadiusM,
+      buildingStepM: 2,
+      curvature: input.curvature,
+      baseSlopes: terrainSlopes,
+    },
+  );
   const base = evaluateScenario(
     input,
     candidate,
     context.bins,
     context.stepM,
-    context.buildings.base,
+    baseBuildings,
     context.buildingsById,
     true,
+    terrainSlopes,
+    scenarioSlopes[0],
   );
   const pessimistic = evaluateScenario(
     input,
     candidate,
     context.bins,
     context.stepM,
-    context.buildings.pessimistic,
+    pessimisticBuildings,
     context.buildingsById,
     false,
+    terrainSlopes,
+    scenarioSlopes[1],
   );
   const optimistic = evaluateScenario(
     input,
     candidate,
     context.bins,
     context.stepM,
-    context.buildings.optimistic,
+    optimisticBuildings,
     context.buildingsById,
     false,
+    terrainSlopes,
+    scenarioSlopes[2],
   );
 
   return {

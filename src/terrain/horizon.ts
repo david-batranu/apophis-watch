@@ -51,6 +51,13 @@ export interface HorizonOptions {
   earthRadiusM?: number;
   /** Optional cancellation callback, polled per azimuth. */
   shouldCancel?: () => boolean;
+  /**
+   * Precomputed terrain-only slopes. When supplied, the terrain ray march is
+   * skipped and these arrays are cloned before building contributions are
+   * added. Best-spot scoring uses this to share one terrain horizon across its
+   * three building-height scenarios.
+   */
+  baseSlopes?: HorizonSlopes;
 }
 
 export interface HorizonSlopes {
@@ -109,19 +116,27 @@ export function computeHorizonSlopes(
 ): HorizonSlopes {
   const stepDeg = options.stepDeg ?? 1;
   const count = Math.max(1, Math.round(360 / stepDeg));
-  const azimuths =
-    options.azimuthsDeg && options.azimuthsDeg.length > 0
+  const base = options.baseSlopes;
+  const azimuths = base
+    ? base.azimuthsDeg.slice()
+    : options.azimuthsDeg && options.azimuthsDeg.length > 0
       ? options.azimuthsDeg.map(normalizeAzimuth)
       : Array.from({ length: count }, (_, i) => i * stepDeg);
-  const slopes = new Float64Array(azimuths.length);
-  slopes.fill(-Infinity);
-  const sources = new Uint8Array(azimuths.length);
-  const distances = new Float32Array(azimuths.length);
-  distances.fill(Number.NaN);
-  const topElevations = new Float32Array(azimuths.length);
-  topElevations.fill(Number.NaN);
-  const sourceIds = new Int32Array(azimuths.length);
-  sourceIds.fill(-1);
+  const slopes = base
+    ? new Float64Array(base.slopes)
+    : new Float64Array(azimuths.length).fill(-Infinity);
+  const sources = base
+    ? new Uint8Array(base.sources)
+    : new Uint8Array(azimuths.length);
+  const distances = base
+    ? new Float32Array(base.distancesM)
+    : new Float32Array(azimuths.length).fill(Number.NaN);
+  const topElevations = base
+    ? new Float32Array(base.topElevationsM)
+    : new Float32Array(azimuths.length).fill(Number.NaN);
+  const sourceIds = base
+    ? new Int32Array(base.sourceIds)
+    : new Int32Array(azimuths.length).fill(-1);
 
   const pointEnu = latLonToEnu(
     point.latitudeDeg,
@@ -167,7 +182,7 @@ export function computeHorizonSlopes(
     binToIndex.set(Math.round(azimuths[i] / stepDeg) % count, i);
   }
 
-  if (insideGrid) {
+  if (!base && insideGrid) {
     for (let a = 0; a < azimuths.length; a++) {
       if (options.shouldCancel?.()) break;
       const az = azimuths[a] * (Math.PI / 180);
@@ -262,6 +277,111 @@ export function computeHorizonSlopes(
     topElevationsM: topElevations,
     sourceIds,
   };
+}
+
+/**
+ * Add building contributions for several height scenarios in one pass.
+ *
+ * The building geometry and edge samples are identical across scenarios; only
+ * the roof height changes. This is used by the best-spot worker to avoid
+ * walking every building three times. `scenarioBuildings[s][i]` must be the
+ * same footprint as `scenarioBuildings[0][i]`, in the same order.
+ */
+export function computeScenarioHorizonSlopes(
+  grid: TerrainGrid,
+  point: HorizonPointInput,
+  scenarioBuildings: PreparedBuilding[][],
+  options: HorizonOptions = {},
+): HorizonSlopes[] {
+  if (scenarioBuildings.length === 0) return [];
+  const geometry = scenarioBuildings[0];
+  const base =
+    options.baseSlopes ?? computeHorizonSlopes(grid, point, [], options);
+  const stepDeg = options.stepDeg ?? 1;
+  const count = Math.max(1, Math.round(360 / stepDeg));
+  const outputs: HorizonSlopes[] = scenarioBuildings.map(() => ({
+    azimuthsDeg: base.azimuthsDeg.slice(),
+    slopes: new Float64Array(base.slopes),
+    sources: new Uint8Array(base.sources),
+    distancesM: new Float32Array(base.distancesM),
+    topElevationsM: new Float32Array(base.topElevationsM),
+    sourceIds: new Int32Array(base.sourceIds),
+  }));
+  if (geometry.length === 0) return outputs;
+
+  const pointEnu = latLonToEnu(
+    point.latitudeDeg,
+    point.longitudeDeg,
+    grid.originLatDeg,
+    grid.originLonDeg,
+  );
+  const eyeElevationM = point.groundElevationM + point.eyeHeightM;
+  const earthRadius = options.earthRadiusM ?? EARTH_MEAN_RADIUS_M;
+  const curvature = options.curvature !== false;
+  const dropFor = (distanceM: number): number =>
+    curvature ? (distanceM * distanceM) / (2 * earthRadius) : 0;
+  const binToIndex = new Map<number, number>();
+  for (let i = 0; i < base.azimuthsDeg.length; i++) {
+    binToIndex.set(Math.round(base.azimuthsDeg[i] / stepDeg) % count, i);
+  }
+  const maxBuildingDistance = options.buildingMaxDistanceM ?? 1_000;
+  const buildingStepM = options.buildingStepM ?? 2;
+
+  for (let buildingIndex = 0; buildingIndex < geometry.length; buildingIndex++) {
+    const building = geometry[buildingIndex];
+    if (
+      distanceToBoxM(
+        pointEnu.eastM,
+        pointEnu.northM,
+        building.minEastM,
+        building.maxEastM,
+        building.minNorthM,
+        building.maxNorthM,
+      ) > maxBuildingDistance
+    ) {
+      continue;
+    }
+    const ring = building.ringEnu;
+    for (let i = 0; i < ring.length; i++) {
+      const p1 = ring[i];
+      const p2 = ring[(i + 1) % ring.length];
+      const edgeLength = Math.hypot(
+        p2.eastM - p1.eastM,
+        p2.northM - p1.northM,
+      );
+      if (edgeLength <= 0) continue;
+      const samples = Math.max(1, Math.ceil(edgeLength / buildingStepM));
+      for (let k = 0; k < samples; k++) {
+        const t = k / samples;
+        const east = p1.eastM + (p2.eastM - p1.eastM) * t;
+        const north = p1.northM + (p2.northM - p1.northM) * t;
+        const dx = east - pointEnu.eastM;
+        const dy = north - pointEnu.northM;
+        const distance = Math.hypot(dx, dy);
+        if (distance < 0.5) continue;
+        const azimuth = normalizeAzimuth(Math.atan2(dx, dy) * RAD);
+        const index = binToIndex.get(Math.round(azimuth / stepDeg) % count);
+        if (index === undefined) continue;
+        const drop = dropFor(distance);
+        for (let scenario = 0; scenario < outputs.length; scenario++) {
+          const roofElevationM =
+            building.baseElevationM +
+            (scenarioBuildings[scenario][buildingIndex]?.heightM ??
+              building.heightM);
+          const slope = (roofElevationM - eyeElevationM - drop) / distance;
+          const output = outputs[scenario];
+          if (slope > output.slopes[index]) {
+            output.slopes[index] = slope;
+            output.sources[index] = SOURCE_BUILDING;
+            output.distancesM[index] = distance;
+            output.topElevationsM[index] = roofElevationM;
+            output.sourceIds[index] = building.id;
+          }
+        }
+      }
+    }
+  }
+  return outputs;
 }
 
 /** Full profile with decoded sources, for the chart and the 3D horizon line. */

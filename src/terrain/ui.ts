@@ -953,6 +953,7 @@ export class TerrainUi implements TerrainWorkstream {
         longitudeDeg: observer.longitudeDeg,
         radiusM: this.terrainRadius(),
         maxTiles: MAX_TILES,
+        maxZoom: 14,
         signal: controller.signal,
         onProgress: (progress) => this.onTerrainProgress(progress),
       });
@@ -1906,13 +1907,17 @@ export class TerrainUi implements TerrainWorkstream {
         timeZone,
         marginDeg: this.marginDeg,
       });
-      const blockers = result.blockedByDefaultHeightBuildingSamples > 0
-        ? `${result.blockedByDefaultHeightBuildingSamples} default-height`
-        : result.blockedByRealHeightBuildingSamples > 0
-          ? `${result.blockedByRealHeightBuildingSamples} real-height`
-          : result.blockedByTerrainSamples > 0
-            ? 'terrain'
-            : 'none';
+      const blockerParts: string[] = [];
+      if (result.blockedByDefaultHeightBuildingSamples > 0) {
+        blockerParts.push(`${result.blockedByDefaultHeightBuildingSamples} default-height`);
+      }
+      if (result.blockedByRealHeightBuildingSamples > 0) {
+        blockerParts.push(`${result.blockedByRealHeightBuildingSamples} real-height`);
+      }
+      if (result.blockedByTerrainSamples > 0) {
+        blockerParts.push(`${result.blockedByTerrainSamples} terrain`);
+      }
+      const blockers = blockerParts.length > 0 ? blockerParts.join(' · ') : 'none';
       const openSpace =
         result.nearestBuildingM === null
           ? 'no mapped buildings'

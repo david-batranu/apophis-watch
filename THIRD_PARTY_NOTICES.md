@@ -39,12 +39,17 @@ time, precession/nutation and rise/set helpers.
 - **Terrain Tiles by Mapzen / AWS Open Data**:
   <https://registry.opendata.aws/terrain-tiles> and
   <https://github.com/tilezen/joerd/blob/master/docs/attribution.md>.
+  Licensed **CC-BY 4.0**; persistent IndexedDB/offline caching is permitted.
   Required sources include Copernicus EU-DEM, USGS 3DEP/SRTM/GMTED2010,
   NOAA ETOPO1, and national datasets listed at the attribution link.
-- **Buildings and map tiles:** © OpenStreetMap contributors, ODbL 1.0
-  (<https://www.openstreetmap.org/copyright>), queried through the Overpass API
-  (<https://overpass-api.de/>). No bulk scraping; one building query per settled
-  view, cached in IndexedDB.
+- **Buildings and map data:** © OpenStreetMap contributors, ODbL 1.0
+  (<https://www.openstreetmap.org/copyright>). Buildings come from the Overpass
+  API or a bundled GeoJSON/Overpass import. The build-time fetch is serial,
+  identified, and rate-limited; no bulk scraping or polling.
+- **OSM standard raster tiles:** online viewport display only. The app does not
+  prefetch, bulk-download or store `tile.openstreetmap.org` tiles; their usage
+  policy forbids offline use. The offline base map is locally rendered from
+  cached terrain tiles and building footprints.
 - **Leaflet:** BSD-2-Clause, <https://leafletjs.com/>.
 
 ## World Magnetic Model

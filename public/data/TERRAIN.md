@@ -17,17 +17,29 @@ NOAA ETOPO1, ArcticDEM (DigitalGlobe/NSF), Geoscience Australia, DGM Austria,
 Canada OGL, INEGI Mexico, LINZ New Zealand, Kartverket Norway, and the UK
 Environment Agency. The app uses the Terrarium PNG tiles at
 `elevation-tiles-prod.s3.amazonaws.com` (256×256, max zoom 15) and caches them
-in IndexedDB.
+in IndexedDB. Terrain Tiles are licensed **CC-BY 4.0**; explicit persistent
+caching and offline storage are permitted. The S3 objects have no
+`Cache-Control` header, so the app caches them deliberately.
 
 ## Buildings and map tiles
 
 **© OpenStreetMap contributors**, data under the **Open Database Licence
 (ODbL) 1.0**: <https://www.openstreetmap.org/copyright>
 
-Buildings are queried through the **Overpass API** (<https://overpass-api.de/>)
-with a debounced, cached, building-only query per settled view. No bulk
-scraping or polling. Map tiles are displayed with the required OSM attribution
-in the Leaflet map.
+Buildings are queried through the **Overpass API** with a debounced, cached,
+building-only query per settled view. No bulk scraping or polling. The app
+checks a bundled GeoJSON area first, then a live mirror (dresel EU/NA, then
+overpass-api.de), and offers a manual GeoJSON/Overpass import as a fallback.
+The build-time script uses one serial request with a descriptive User-Agent,
+2.5 s spacing and 30→60→120 s backoff; it never runs in parallel. See
+`public/data/areas/README.md`.
+
+**OpenStreetMap raster tiles are online-only.** The standard tile service
+(`tile.openstreetmap.org`) explicitly forbids bulk downloading, prefetching and
+offline use. The app never prefetches or stores those tiles. When offline, the
+base map is a locally rendered hillshade from cached AWS Terrarium DEM plus OSM
+building footprints. Online, the Leaflet map displays raster tiles only for the
+current viewport with the required attribution.
 
 ## Leaflet
 

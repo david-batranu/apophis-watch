@@ -139,12 +139,18 @@ At Brasov the Phase 1 visible pass covers **az 124.3° → 320.1°**, elevation
 **0 → 42.29°**; the topocentric CA is 21:35:42 UTC. The 5 km parallax is
 **27.13″** at geocentric CA and **29.81″** at topocentric CA, far below the 1°
 horizon bin. A real 1 km Brasov building query returned 2,828 ways and 97%
-using the 8 m default height, so building heights are clearly incomplete. A
-2,821-candidate best-spot run took **4.4 s** in the worker on desktop.
+using the 8 m default height, so building heights are clearly incomplete. The
+committed 2 km Brasov bundled area contains **9,979 ways** (9,562 default,
+417 tagged), retrieved 2026-11-20 from OSM/Overpass; the app checks it before a
+live query. A 2,821-candidate best-spot run took **4.4 s** in the worker on
+desktop (single-scenario; the three height scenarios cost about 3×).
 
-Terrain: **Terrain Tiles by Mapzen / AWS Open Data**; buildings and map:
-**© OpenStreetMap contributors, ODbL** via Overpass/Leaflet. Light pollution,
-weather and trees are not modelled. See `src/terrain/README.md`.
+Terrain: **Terrain Tiles by Mapzen / AWS Open Data** (CC-BY 4.0; explicit
+caching allowed). Buildings: **© OpenStreetMap contributors, ODbL** via
+Overpass or a bundled/imported file. OSM standard raster tiles are online
+viewport-only; the service forbids bulk/offline use, so they are never
+prefetched or stored. Light pollution, weather and trees are not modelled. See
+`src/terrain/README.md` and `public/data/TERRAIN.md`.
 
 ## AR mode (Phase 4)
 

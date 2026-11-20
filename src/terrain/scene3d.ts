@@ -123,7 +123,7 @@ export class LocalScene3D {
     this.camera = new THREE.PerspectiveCamera(62, 1, 0.1, 250_000);
     try {
       this.renderer = new THREE.WebGLRenderer({
-        antialias: true,
+        antialias: false,
         powerPreference: 'high-performance',
       });
       this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
@@ -348,7 +348,7 @@ export class LocalScene3D {
     if (key !== this.terrainKey) {
       this.terrainKey = key;
       const data = buildTerrainMesh(grid, {
-        maxDimension: 512,
+        maxDimension: 256,
         observerGroundElevationM: sceneGroundElevationM(grid),
       });
       const geometry = new THREE.BufferGeometry();

@@ -802,7 +802,9 @@ async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
 
   await writeFileAtomic(
     geojsonPath,
-    `${JSON.stringify(geojson, null, 2)}\n`,
+    // Compact GeoJSON: the file is fetched on demand by the app; pretty
+    // printing triples the size of a city-sized building extract.
+    `${JSON.stringify(geojson)}\n`,
   );
   await writeFileAtomic(
     metadataPath,
