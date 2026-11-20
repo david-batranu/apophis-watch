@@ -79,12 +79,13 @@ describe('device orientation quaternion', () => {
 
   it('produces a level, north-facing screen in all four screen orientations', () => {
     // Each raw pose is the same physical state: camera pointing north with the
-    // displayed screen upright, for a screen rotated 0/90/180/270 clockwise.
+    // displayed screen upright. Screen orientation is clockwise from natural:
+    // 90 = top edge left, 270 = top edge right.
     const poses = [
       { screen: 0, alpha: 0, beta: 90, gamma: 0 },
-      { screen: 90, alpha: 270, beta: 0, gamma: 90 },
+      { screen: 90, alpha: 90, beta: 0, gamma: -90 },
       { screen: 180, alpha: 90, beta: -90, gamma: -90 },
-      { screen: 270, alpha: 90, beta: 0, gamma: -90 },
+      { screen: 270, alpha: 270, beta: 0, gamma: 90 },
     ];
     for (const pose of poses) {
       const q = quatFromDeviceOrientation(

@@ -50,8 +50,11 @@ uses `min-height: 70vh` as a fallback.
 1. `deviceorientationabsolute` / `deviceorientation` gives W3C Z-X'-Y''
    angles. The W3C matrix is `R = Rz(alpha) Rx(beta) Ry(gamma)`.
 2. `screen.orientation.angle` (0/90/180/270) is applied as
-   `R_screen = R_device * Rz(theta)`. `window.orientation` is the fallback
-   (normalised from ±90 to 0..270). The change event forces a snap.
+   `R_screen = R_device * Rz(-theta)` for DeviceOrientation angles. This is
+   the W3C/Chrome/Firefox sign; the opposite sign rolls landscape by 180°.
+   Screen angle 270 is the top-edge-right pose and 90 is top-edge-left.
+   `window.orientation` is the fallback (normalised from ±90 to 0..270). The
+   change event forces a snap.
 3. If `webkitCompassHeading` is available (iOS) it replaces the yaw from raw
    alpha, and `webkitCompassAccuracy < 0` is treated as unusable. Otherwise an
    absolute event is used as-is; a non-absolute event is clearly labelled
@@ -76,16 +79,29 @@ about +6.7° at Brasov); this can only be confirmed on real hardware.
 - Heading offset slider ±180° plus −1°, −0.1°, +0.1°, +1° nudges.
 - One tap: choose Sun, Moon, a planet or a named bright star above the
   horizon, centre it, tap “Align on target”. The offset is set exactly.
-- Two-point: mark target A, point at target B, tap again. The app averages the
-  two implied offsets and reports half their disagreement as a residual. It
-  does not pretend to remove a compass's nonlinear error.
+- Two-point heading: mark target A, point at target B, tap again. The app
+  averages the two implied heading offsets and reports half their disagreement
+  as a residual. This is **not** FOV calibration; it cannot remove a compass's
+  nonlinear error.
+- FOV from two taps: choose two named targets at least 5° apart, then press
+  “Tap A” and tap target A in the camera image, then “Tap B” and tap target B.
+  The solver uses the pixel positions and the known az/el angular separation
+  to solve the pinhole focal length and horizontal FOV. It reports the
+  reprojection residual in pixels and degrees. It rejects targets that are too
+  close, taps that are degenerate, targets behind the camera, or a solved FOV
+  outside the 30–100° range.
 - Horizontal FOV slider 30–100°, default 60° (screen width, not the camera
-  sensor's landscape spec). Tune it until the horizon and star spacing look
-  right; phone preview crops differ.
-- Everything is stored under `apophis-ar-calibration-v1` in `localStorage`.
+  sensor's landscape spec). The manual slider remains available and clears the
+  solved two-tap result when moved. Tune it until the horizon and star spacing
+  look right; phone preview crops differ.
+- Everything is stored under `apophis-ar-calibration-v1` in `localStorage`,
+  including the two-tap FOV provenance/residual. A manual heading nudge, a
+  one-tap alignment, or Reset clears a stale heading residual.
 - The pointing-error readout uses the device-reported `webkitCompassAccuracy`
-  when present, otherwise an explicit “5–15° typical” assumption. A 2026
-  iPhone field test saw ±14–16°. This is a finder, not a measuring instrument.
+  when present and positive, otherwise an explicit “5–15° typical”
+  assumption. Accuracy 0 is treated as unknown, not as arcsecond precision. A
+  2026 iPhone field test saw ±14–16°. This is a finder, not a measuring
+  instrument.
 
 ## Time modes
 
@@ -95,11 +111,11 @@ about +6.7° at Brasov); this can only be confirmed on real hardware.
   Apophis is hidden because the committed ephemeris covers only 13–14 April
   2029 UTC. This mode exists to practice aim and calibration on real objects.
 
-## HTTPS LAN testing (shared config request)
+## HTTPS LAN testing
 
-The current shared `vite.config.ts` is HTTP-only. Do **not** edit it from this
-worktree. The orchestrator should add `@vitejs/plugin-basic-ssl` (already in
-`devDependencies`) as follows:
+The shared app shell already adds `@vitejs/plugin-basic-ssl` (already in
+`devDependencies`) for HTTPS. No further shared change is requested; the
+settings used are recorded here for the phone-testing workflow:
 
 ```ts
 // vite.config.ts
@@ -160,7 +176,7 @@ issue; the code only requires a secure context.
 ## Tests
 
 ```bash
-npx vitest run tests/ar          # 43 pure maths/calibration/declination tests
+npx vitest run tests/ar          # 48 pure maths/calibration/declination tests
 npx tsc --noEmit
 npx playwright test -c tests/ar/playwright.ar.config.ts
 ```
@@ -171,12 +187,15 @@ camera and mocked `deviceorientationabsolute` / `deviceorientation` events.
 It covers:
 
 - the Apophis marker moving when mocked heading changes;
-- all four screen orientations (unit tests) and a landscape screen-angle
-  screenshot;
-- FOV scaling;
-- one-tap and two-point calibration and localStorage persistence;
+- all four screen orientations (unit tests) and a 270° (top-edge-right)
+  landscape screenshot;
+- manual FOV scaling and a real two-tap FOV solve that changes 60° to 50°;
+- one-tap and two-point heading calibration and localStorage persistence;
 - night mode and touch-drag fallback;
 - camera denial with a black-background overlay;
+- WMM supported/extrapolated/unsupported warnings after host time changes;
+- unmount/remount resetting touch state and avoiding duplicate click handlers;
+- sensor permission denial preserving its cause;
 - iOS-style `webkitCompassHeading` and negative `webkitCompassAccuracy`.
 
 Screenshots are committed under `tests/ar/screenshots/`.

@@ -227,8 +227,13 @@ export function buildSkySnapshot(input: BuildSnapshotInput): ArSkySnapshot {
   const bodies = solarSystemBodies(observer, jdTdb, refraction);
   const targets = bodies.map(bodyTarget);
   const stars = horizontalStars(catalogue, observer, utcMs);
+  const inSessionWindow = Boolean(
+    session && utcMs >= session.windowStartMs && utcMs <= session.windowEndMs,
+  );
   const apophis =
-    mode === 'rehearsal' && session ? session.skyAt(utcMs, refraction) : null;
+    mode === 'rehearsal' && inSessionWindow && session
+      ? session.skyAt(utcMs, refraction)
+      : null;
   if (apophis) {
     targets.unshift({
       id: 'apophis',
@@ -251,7 +256,7 @@ export function buildSkySnapshot(input: BuildSnapshotInput): ArSkySnapshot {
     alignTargets: buildAlignmentTargets(targets, stars),
     trail:
       input.trail ??
-      (mode === 'rehearsal'
+      (mode === 'rehearsal' && inSessionWindow
         ? trailPoints(session, utcMs, refraction, timeZone, trailHoursEachSide)
         : []),
   };

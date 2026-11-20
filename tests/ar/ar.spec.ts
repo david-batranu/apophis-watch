@@ -34,10 +34,10 @@ interface DebugData {
 
 async function boot(
   page: import('@playwright/test').Page,
-  options: { denyCamera?: boolean } = {},
+  options: { denyCamera?: boolean; denySensors?: boolean; autoOrientation?: boolean } = {},
 ): Promise<void> {
   await page.addInitScript(
-    ({ denyCamera }) => {
+    ({ denyCamera, denySensors, autoOrientation }) => {
       if (denyCamera && navigator.mediaDevices) {
         try {
           Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
@@ -49,6 +49,23 @@ async function boot(
           // ignore
         }
       }
+      if (denySensors) {
+        class FakeDeviceOrientationEvent extends Event {
+          static requestPermission(): Promise<string> {
+            return Promise.resolve('denied');
+          }
+        }
+        try {
+          Object.defineProperty(window, 'DeviceOrientationEvent', {
+            configurable: true,
+            value: FakeDeviceOrientationEvent,
+          });
+        } catch {
+          // ignore
+        }
+      }
+      (window as unknown as { __arHarnessAutoOrientation: boolean }).__arHarnessAutoOrientation =
+        autoOrientation !== false;
       (window as unknown as { __mockScreenAngle: number }).__mockScreenAngle = 0;
       const fake = {
         get angle() {
@@ -81,17 +98,28 @@ async function boot(
           String(error);
       }
     },
-    { denyCamera: options.denyCamera === true },
+    {
+      denyCamera: options.denyCamera === true,
+      denySensors: options.denySensors === true,
+      autoOrientation: options.autoOrientation !== false,
+    },
   );
   await page.goto('/tests/ar/harness.html?debug=1');
   await page.waitForFunction(
     () => (window as unknown as { __arHarness?: { ready?: boolean } }).__arHarness?.ready === true,
   );
   await expect(page.locator('[data-role="debug"]')).toBeVisible();
-  await page.waitForFunction(() => {
-    const el = document.querySelector<HTMLElement>('[data-role="debug"]');
-    return Boolean(el?.dataset.headingTrue && el?.dataset.apophisX);
-  });
+  if (options.autoOrientation !== false) {
+    await page.waitForFunction(() => {
+      const el = document.querySelector<HTMLElement>('[data-role="debug"]');
+      return Boolean(el?.dataset.headingTrue && el?.dataset.apophisX);
+    });
+  } else {
+    await page.waitForFunction(() => {
+      const el = document.querySelector<HTMLElement>('[data-role="debug"]');
+      return Boolean(el?.dataset.cameraState);
+    });
+  }
   await page.waitForTimeout(500);
 }
 
@@ -169,8 +197,8 @@ test('overlay follows mocked absolute orientation and screen rotation', async ({
   await page.screenshot({ path: resolve(SHOTS, 'ar-03-heading-299.png') });
 
   // Landscape screen: move to 22:40 UTC, when Apophis is close to the
-  // horizon. screen angle 90, level pose: alpha = 270 - magnetic heading,
-  // beta = 0, gamma = 90.
+  // horizon. Screen angle 270 is the top-edge-right pose (W3C/Chrome/Firefox):
+  // level pose alpha = 270 - magnetic heading, beta = 0, gamma = 90.
   await page.setViewportSize({ width: 844, height: 390 });
   await page.evaluate(() => {
     const harness = (
@@ -183,11 +211,11 @@ test('overlay follows mocked absolute orientation and screen rotation', async ({
       }
     ).__arHarness;
     harness.setTime(Date.parse('2029-04-13T22:40:00Z'));
-    harness.setScreenAngle(90);
+    harness.setScreenAngle(270);
     harness.dispatchOrientation({ alpha: 319.07, beta: 0, gamma: 90, absolute: true });
   });
   await page.waitForFunction(
-    () => document.querySelector<HTMLElement>('[data-role="debug"]')?.dataset.screenAngle === '90',
+    () => document.querySelector<HTMLElement>('[data-role="debug"]')?.dataset.screenAngle === '270',
   );
   await page.waitForFunction(() =>
     (document.querySelector<HTMLElement>('[data-role="debug"]')?.dataset.utc ?? '').includes(
@@ -196,12 +224,12 @@ test('overlay follows mocked absolute orientation and screen rotation', async ({
   );
   await page.waitForTimeout(700);
   const landscape = await debugData(page);
-  expect(landscape.screenAngle).toBe('90');
+  expect(landscape.screenAngle).toBe('270');
   expect(Math.abs(num(landscape.headingTrue) - 317.648)).toBeLessThan(2);
   expect(Math.abs(num(landscape.pitch))).toBeLessThan(2);
   expect(num(landscape.apophisY)).toBeGreaterThan(120);
   expect(num(landscape.apophisY)).toBeLessThan(260);
-  await page.screenshot({ path: resolve(SHOTS, 'ar-04-landscape-90.png') });
+  await page.screenshot({ path: resolve(SHOTS, 'ar-04-landscape-270.png') });
 });
 
 test('FOV slider changes the projected scale', async ({ page }) => {
@@ -391,6 +419,114 @@ test('night mode and touch fallback are usable', async ({ page }) => {
   await page.screenshot({ path: resolve(SHOTS, 'ar-08-touch-night.png') });
 });
 
+test('two tapped targets solve and change the horizontal FOV', async ({ page }) => {
+  await boot(page);
+  await page.locator('.ar-panel').first().locator('summary').click();
+  const pair = await page.evaluate(() => {
+    const harness = (
+      window as unknown as {
+        __arHarness: {
+          getAlignTargets: () => {
+            id: string;
+            name: string;
+            azimuthDeg: number;
+            elevationDeg: number;
+          }[];
+          getProjectedTarget: (
+            id: string,
+          ) => { x: number; y: number; inFront: boolean; visible: boolean } | null;
+        };
+      }
+    ).__arHarness;
+    const targets = harness.getAlignTargets()
+      .map((t) => ({ ...t, projected: harness.getProjectedTarget(t.id) }))
+      .filter((t) => t.projected?.visible);
+    let best: (typeof targets)[number][] | null = null;
+    let bestDistance = 0;
+    for (let i = 0; i < targets.length; i++) {
+      for (let j = i + 1; j < targets.length; j++) {
+        const a = targets[i];
+        const b = targets[j];
+        const d = Math.hypot(
+          b.projected!.x - a.projected!.x,
+          b.projected!.y - a.projected!.y,
+        );
+        if (d > bestDistance) {
+          bestDistance = d;
+          best = [a, b];
+        }
+      }
+    }
+    return best ? { targets: best } : null;
+  });
+  expect(pair).not.toBeNull();
+  const [a, b] = pair!.targets;
+  expect(a.name).not.toBe(b.name);
+  const box = await page.locator('[data-role="canvas"]').boundingBox();
+  expect(box).not.toBeNull();
+  const cx = box!.width / 2;
+  const cy = box!.height / 2;
+  // The projection was made at the default 60° FOV. A 50° projection has
+  // focal length f50 = (width/2)/tan(25°), so pixel offsets scale by
+  // f50/f60 = tan(30°)/tan(25°).
+  const scale = Math.tan((30 * Math.PI) / 180) / Math.tan((25 * Math.PI) / 180);
+  const tapA = {
+    x: cx + (a.projected!.x - cx) * scale,
+    y: cy + (a.projected!.y - cy) * scale,
+  };
+  const tapB = {
+    x: cx + (b.projected!.x - cx) * scale,
+    y: cy + (b.projected!.y - cy) * scale,
+  };
+  expect(tapA.x).toBeGreaterThan(5);
+  expect(tapA.x).toBeLessThan(box!.width - 5);
+  expect(tapB.x).toBeGreaterThan(5);
+  expect(tapB.x).toBeLessThan(box!.width - 5);
+
+  await page.locator('[data-role="fov-target-a"]').selectOption(a.id);
+  await page.locator('[data-role="fov-target-b"]').selectOption(b.id);
+  await page.locator('[data-role="fov-tap-a"]').click();
+  await expect(page.locator('[data-role="tap-capture"]')).toBeVisible();
+  await page.mouse.click(box!.x + tapA.x, box!.y + tapA.y);
+  await page.waitForTimeout(150);
+  await page.locator('.ar-panel').first().locator('summary').click();
+  await page.locator('[data-role="fov-tap-b"]').click();
+  await expect(page.locator('[data-role="tap-capture"]')).toBeVisible();
+  await page.mouse.click(box!.x + tapB.x, box!.y + tapB.y);
+  await page.waitForFunction(
+    () => Math.abs(Number(document.querySelector<HTMLElement>('[data-role="debug"]')?.dataset.fov ?? '0') - 50) < 1,
+  );
+  const after = await debugData(page);
+  expect(num(after.fov)).toBeCloseTo(50, 0);
+  const stored = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('apophis-ar-calibration-v1') ?? '{}'),
+  );
+  expect(stored.horizontalFovDeg).toBeCloseTo(50, 0);
+  expect(stored.twoPointFov).toBeTruthy();
+  expect(stored.twoPointFov.targetAId).toBe(a.id);
+  expect(stored.twoPointFov.targetBId).toBe(b.id);
+  await page.screenshot({ path: resolve(SHOTS, 'ar-13-fov-two-point.png') });
+});
+
+test('WMM warnings update on host time changes without a sensor event', async ({ page }) => {
+  await boot(page);
+  const check = async (ms: number, pattern: RegExp): Promise<void> => {
+    await page.evaluate((utcMs) => {
+      (
+        window as unknown as { __arHarness: { setState: (patch: object) => void } }
+      ).__arHarness.setState({ utcMs });
+    }, ms);
+    await expect(page.locator('.ar-message').filter({ hasText: pattern })).toBeVisible();
+    await page.waitForTimeout(150);
+  };
+  await check(Date.parse('2024-11-01T00:00:00Z'), /WMM2025 starts 2024-11-13/i);
+  await check(Date.parse('2029-11-14T00:00:00Z'), /Extrapolated WMM2025/i);
+  await check(Date.parse('2030-01-01T00:00:00Z'), /officially valid to 2029-12-31/i);
+  const after = await debugData(page);
+  expect(after.declinationStatus).toBe('unsupported');
+  expect(after.declination).toBe('');
+});
+
 test('rehearsal time input, jump buttons and tonight practice work', async ({ page }) => {
   await boot(page);
   await page.locator('.ar-panel').nth(1).locator('summary').click();
@@ -423,6 +559,71 @@ test('rehearsal time input, jump buttons and tonight practice work', async ({ pa
   await expect(page.locator('[data-role="reading"]')).toContainText(/Apophis hidden/i);
   expect(tonight.utc).not.toContain('2029-04-13');
   await page.screenshot({ path: resolve(SHOTS, 'ar-12-tonight-practice.png') });
+});
+
+test('unmount/remount resets touch mode and keeps one click handler', async ({ page }) => {
+  await boot(page);
+  await page.locator('.ar-panel').nth(1).locator('summary').click();
+  await page.locator('[data-role="touch-toggle"]').check();
+  await expect(page.locator('.ar-root')).toHaveClass(/ar-touch/);
+
+  await page.evaluate(() => {
+    (
+      window as unknown as { __arHarness: { workstream: { unmount: () => void } } }
+    ).__arHarness.workstream.unmount();
+  });
+  await expect(page.locator('.ar-root')).toHaveCount(0);
+  await page.evaluate(() => {
+    (
+      window as unknown as { __arHarness: { workstream: { mount: () => void } } }
+    ).__arHarness.workstream.mount();
+  });
+  await expect(page.locator('[data-role="debug"]')).toBeVisible();
+  await page.waitForTimeout(500);
+
+  await expect(page.locator('.ar-root')).not.toHaveClass(/ar-touch/);
+  await page.locator('.ar-panel').first().locator('summary').click();
+  await expect(page.locator('[data-role="touch-toggle"]')).not.toBeChecked();
+
+  // The sensor path must work again after remount.
+  await page.evaluate(() => {
+    (
+      window as unknown as {
+        __arHarness: {
+          dispatchOrientation: (options: Record<string, unknown>) => void;
+        };
+      }
+    ).__arHarness.dispatchOrientation({ alpha: 127.715, beta: 120, gamma: 0, absolute: true });
+  });
+  await page.waitForFunction(
+    () =>
+      Math.abs(
+        Number(
+          document.querySelector<HTMLElement>('[data-role="debug"]')?.dataset.headingTrue ?? '0',
+        ) - 239,
+      ) < 2,
+  );
+  const before = await debugData(page);
+  expect(num(before.offset)).toBeCloseTo(0, 1);
+
+  // If the old root click handler leaked, one nudge would apply twice.
+  await page.locator('[data-nudge="1"]').click();
+  await page.waitForTimeout(150);
+  const after = await debugData(page);
+  expect(num(after.offset)).toBeCloseTo(1, 1);
+  await page.screenshot({ path: resolve(SHOTS, 'ar-14-remount.png') });
+});
+
+test('sensor denial keeps its cause and enables touch fallback', async ({ page }) => {
+  await boot(page, { denySensors: true, autoOrientation: false });
+  await page.locator('[data-role="enable-sensors-top"]').click();
+  await expect(page.locator('[data-role="status-sensor"]')).toContainText(/Sensors denied/);
+  await expect(page.locator('.ar-message')).toContainText(/Sensor permission denied/i);
+  await expect(page.locator('.ar-root')).toHaveClass(/ar-touch/);
+  await page.waitForTimeout(3200);
+  await expect(page.locator('[data-role="status-sensor"]')).toContainText(/Sensors denied/);
+  await expect(page.locator('.ar-message')).toContainText(/denied/i);
+  await expect(page.locator('.ar-message')).not.toContainText(/No motion sensor data arrived/i);
 });
 
 test('camera state is explicit and the overlay survives a denied/fake camera', async ({ page }) => {
