@@ -957,16 +957,37 @@ export class TerrainUi implements TerrainWorkstream {
 
   private renderGroundNote(): void {
     const observer = this.state?.observer;
-    const ground = observer?.groundElevationM;
-    if (ground === null || ground === undefined) {
+    const grid = this.grid;
+    const sharedGround = grid
+      ? grid.observerGroundElevationM
+      : observer?.groundElevationM ?? null;
+    if (
+      sharedGround === null ||
+      sharedGround === undefined ||
+      !Number.isFinite(sharedGround)
+    ) {
       this.ref('ground-note').textContent =
         'Ground elevation: unknown until the DEM loads. GPS altitude is not used.';
       return;
     }
+    const localGround = grid ? sceneGroundElevationM(grid) : sharedGround;
+    const difference = localGround - sharedGround;
+    if (Number.isFinite(localGround) && Math.abs(difference) > 0.1) {
+      this.ref('ground-note').textContent = `Local scene ground (ENU anchor): ${fmtM(
+        localGround,
+      )}; shared astronomy ground (Mercator sample): ${fmtM(
+        sharedGround,
+      )}. Difference ${fmtM(
+        Math.abs(difference),
+      )}: the horizon profile, 3D mesh and eye height use the local anchor, while the shared ephemeris/session uses the Mercator ground. GPS altitude is ignored. Local eye altitude: ${fmtM(
+        localGround + this.eyeHeightM,
+      )}.`;
+      return;
+    }
     this.ref('ground-note').textContent = `Ground elevation from DEM: ${fmtM(
-      ground,
-    )} above sea level. Browser GPS altitude is ignored; it is only a cross-check. Effective eye altitude: ${fmtM(
-      ground + this.eyeHeightM,
+      sharedGround,
+    )} above sea level. Local scene anchor and shared astronomy ground agree within 0.1 m. Browser GPS altitude is ignored; it is only a cross-check. Effective eye altitude: ${fmtM(
+      localGround + this.eyeHeightM,
     )}.`;
   }
 
@@ -979,7 +1000,7 @@ export class TerrainUi implements TerrainWorkstream {
       1,
     )} km · ${grid.requestedTiles} tiles (${grid.cachedTiles} cached, ${
       grid.networkTiles
-    } network, ${grid.failedTiles} failed) · ground ${Number.isFinite(
+    } network, ${grid.failedTiles} failed) · Mercator ground ${Number.isFinite(
       grid.observerGroundElevationM,
     ) ? fmtM(grid.observerGroundElevationM) : 'unknown'}.`;
     this.ref('dem-badge').textContent = `DEM: z${grid.zoom} ${grid.spacingM.toFixed(
@@ -1262,14 +1283,19 @@ export class TerrainUi implements TerrainWorkstream {
   }
 
   private recomputeProfileAtViewpoint(): void {
-    if (!this.grid) return;
+    const grid = this.grid;
+    if (!grid) return;
+    // The observer horizon must share the local ENU anchor with the 3D mesh
+    // and camera. The Mercator observer sample (grid.observerGroundElevationM)
+    // stays the shared astronomy ground, not the local scene ground. At Cape
+    // Town the two differ by 0.92 m, which matters for a near obstruction.
     const point = {
       latitudeDeg: this.viewpointLatDeg,
       longitudeDeg: this.viewpointLonDeg,
       groundElevationM:
         this.viewingCandidate && Number.isFinite(this.viewpoint.groundElevationM)
           ? this.viewpoint.groundElevationM
-          : this.grid.observerGroundElevationM,
+          : sceneGroundElevationM(grid),
       eyeHeightM: this.eyeHeightM,
     };
     if (!Number.isFinite(point.groundElevationM)) return;
@@ -1277,8 +1303,8 @@ export class TerrainUi implements TerrainWorkstream {
     const enu = latLonToEnu(
       this.viewpointLatDeg,
       this.viewpointLonDeg,
-      this.grid.originLatDeg,
-      this.grid.originLonDeg,
+      grid.originLatDeg,
+      grid.originLonDeg,
     );
     const inside = buildingAtPoint(
       this.preparedBuildings,
@@ -1293,7 +1319,7 @@ export class TerrainUi implements TerrainWorkstream {
       this.viewpointInsideBuilding = inside;
     }
     this.profile = computeHorizonProfile(
-      this.grid,
+      grid,
       point,
       this.preparedBuildings,
       {
@@ -1303,7 +1329,7 @@ export class TerrainUi implements TerrainWorkstream {
     );
     this.scene?.setState({
       horizon: this.profile,
-      grid: this.grid,
+      grid,
       buildings: this.preparedBuildings,
       viewpoint: this.viewpoint,
       eyeHeightM: this.eyeHeightM,
@@ -1338,6 +1364,17 @@ export class TerrainUi implements TerrainWorkstream {
           this.viewpointInsideBuilding.heightM,
         )} high); the ground 3D view is inside its walls. Choose Rooftop or move the point.`
       : '';
+    const anchorNote =
+      !this.viewingCandidate &&
+      this.grid &&
+      Number.isFinite(this.grid.observerGroundElevationM) &&
+      Math.abs(
+        profile.groundElevationM - this.grid.observerGroundElevationM,
+      ) > 0.1
+        ? ` Local ENU anchor; shared astronomy ground is ${fmtM(
+            this.grid.observerGroundElevationM,
+          )} (Mercator).`
+        : '';
     this.ref('horizon-info').textContent = `Horizon at ${location}: ground ${fmtM(
       profile.groundElevationM,
     )} + eye ${fmtM(profile.eyeHeightM)} = ${fmtM(
@@ -1351,7 +1388,7 @@ export class TerrainUi implements TerrainWorkstream {
     }); ${profile.buildingCount} buildings considered (within ${fmtKm(
       this.buildingRadiusM,
       1,
-    )}). Terrain ray distance is limited by the DEM patch.${insideWarning}`;
+    )}). Terrain ray distance is limited by the DEM patch.${anchorNote}${insideWarning}`;
   }
 
   private scheduleChart(): void {
