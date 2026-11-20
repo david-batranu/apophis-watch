@@ -985,3 +985,9 @@ summary {
     scroll-behavior: auto !important;
   }
 }
+
+.clock-local-ro {
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 2px;
+}

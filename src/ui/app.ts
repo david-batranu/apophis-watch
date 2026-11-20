@@ -283,6 +283,7 @@ export class AppUi {
                 <div class="clock-block">
                   <div class="clock-utc" data-ref="utc-clock">—</div>
                   <div class="clock-local" data-ref="local-clock">—</div>
+                  <div class="clock-local-ro" data-ref="local-clock-ro"></div>
                 </div>
                 <div class="time-controls" style="margin-top: 10px">
                   <div class="bar">
@@ -546,6 +547,11 @@ export class AppUi {
         zone: local.zone,
         iana: state.timeZone,
       });
+      this.ref('local-clock-ro').textContent = formatLocalLocale(
+        state.utcMs,
+        state.timeZone,
+        state.formatLocale,
+      );
     }
     this.ref('play-button').textContent = state.playing
       ? t('shell.pause')
