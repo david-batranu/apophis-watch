@@ -13,6 +13,7 @@
 
 import {
   compass8Long,
+  distanceToBoxM,
   enuToLatLon,
   normalizeAzimuth,
   pointInPolygon,
@@ -25,9 +26,49 @@ import type {
   BestSpotCandidate,
   BestSpotResult,
   BestSpotSummary,
+  HeightScenarios,
   PreparedBuilding,
   TerrainGrid,
 } from './types';
+
+/**
+ * The three building-height assumptions. Only buildings whose height came
+ * from the 8 m OSM fallback (`heightSource === 'default'`) are scaled;
+ * explicit height/levels values are kept unchanged.
+ */
+export const HEIGHT_SCENARIOS: HeightScenarios = {
+  base: {
+    id: 'base',
+    label: 'Base (8 m default ×1.0)',
+    multiplier: 1,
+  },
+  pessimistic: {
+    id: 'pessimistic',
+    label: 'Pessimistic (12 m default ×1.5)',
+    multiplier: 1.5,
+  },
+  optimistic: {
+    id: 'optimistic',
+    label: 'Optimistic (5.6 m default ×0.7)',
+    multiplier: 0.7,
+  },
+};
+
+/**
+ * Return a building array whose default-height footprints are scaled. Explicit
+ * height/levels buildings are returned unchanged (same object).
+ */
+export function scaleDefaultBuildingHeights(
+  buildings: PreparedBuilding[],
+  multiplier: number,
+): PreparedBuilding[] {
+  if (multiplier === 1) return buildings;
+  return buildings.map((building) =>
+    building.heightSource === 'default'
+      ? { ...building, heightM: building.heightM * multiplier }
+      : building,
+  );
+}
 
 export interface BestSpotInput {
   grid: TerrainGrid;
@@ -110,24 +151,79 @@ function pathBins(path: ApophisPathSample[]): PathBins {
   return { keys, indexOf };
 }
 
-function scoreOne(
-  input: BestSpotInput,
-  candidate: BestSpotCandidate,
-  bins: PathBins,
-  stepM: number,
-): BestSpotResult {
-  const point = {
-    latitudeDeg: candidate.latitudeDeg,
-    longitudeDeg: candidate.longitudeDeg,
-    groundElevationM: candidate.groundElevationM,
-    eyeHeightM: input.eyeHeightM,
-  };
-  const eyeElevationM = candidate.groundElevationM + input.eyeHeightM;
+interface FirstBlockedSample {
+  utcMs: number | null;
+  azimuthDeg: number | null;
+  elevationDeg: number | null;
+  horizonDeg: number;
+  source: 'terrain' | 'building' | null;
+  sourceId: number | null;
+  distanceM: number | null;
+}
 
-  // A ground-level point inside a building footprint is not an observing spot.
-  // A rooftop point whose eye is above the roof is allowed.
-  let insideBuildingId: number | null = null;
-  for (const building of input.buildings) {
+interface ScenarioEvaluation {
+  score: number;
+  clearSamples: number;
+  totalSamples: number;
+  minClearanceDeg: number;
+  maxObstructionDeg: number;
+  insideBuildingId: number | null;
+  firstBlocked: FirstBlockedSample | null;
+  blockedByTerrainSamples: number;
+  blockedByRealHeightBuildingSamples: number;
+  blockedByDefaultHeightBuildingSamples: number;
+  blockerBuildingIds: number[];
+}
+
+/** Height-scaled building arrays, built once per search. */
+interface ScenarioBuildings {
+  base: PreparedBuilding[];
+  pessimistic: PreparedBuilding[];
+  optimistic: PreparedBuilding[];
+}
+
+interface SearchContext {
+  bins: PathBins;
+  stepM: number;
+  buildingsById: Map<number, PreparedBuilding>;
+  buildings: ScenarioBuildings;
+}
+
+function prepareSearch(input: BestSpotInput): SearchContext {
+  const buildings = {
+    base: input.buildings,
+    pessimistic: scaleDefaultBuildingHeights(
+      input.buildings,
+      HEIGHT_SCENARIOS.pessimistic.multiplier,
+    ),
+    optimistic: scaleDefaultBuildingHeights(
+      input.buildings,
+      HEIGHT_SCENARIOS.optimistic.multiplier,
+    ),
+  };
+  return {
+    bins: pathBins(input.path),
+    stepM:
+      input.stepM ??
+      Math.max(
+        6,
+        Math.min(input.grid.spacingEastM, input.grid.spacingNorthM) * 1.1,
+      ),
+    buildingsById: new Map(
+      input.buildings.map((building) => [building.id, building]),
+    ),
+    buildings,
+  };
+}
+
+function pointInsideBuilding(
+  candidate: BestSpotCandidate,
+  eyeElevationM: number,
+  buildings: PreparedBuilding[],
+): PreparedBuilding | null {
+  // A ground-level point inside a footprint is not an observing spot. A
+  // rooftop point whose eye is above the roof is allowed.
+  for (const building of buildings) {
     if (
       candidate.eastM < building.minEastM ||
       candidate.eastM > building.maxEastM ||
@@ -140,33 +236,69 @@ function scoreOne(
       continue;
     }
     if (eyeElevationM < building.baseElevationM + building.heightM - 0.1) {
-      insideBuildingId = building.id;
-      break;
+      return building;
     }
   }
+  return null;
+}
 
+/**
+ * Score one candidate under one height scenario. `collectDetail` enables the
+ * base-scenario-only fields (first blocker and blocker classification).
+ */
+function evaluateScenario(
+  input: BestSpotInput,
+  candidate: BestSpotCandidate,
+  bins: PathBins,
+  stepM: number,
+  buildings: PreparedBuilding[],
+  buildingsById: Map<number, PreparedBuilding>,
+  collectDetail: boolean,
+): ScenarioEvaluation {
+  const point = {
+    latitudeDeg: candidate.latitudeDeg,
+    longitudeDeg: candidate.longitudeDeg,
+    groundElevationM: candidate.groundElevationM,
+    eyeHeightM: input.eyeHeightM,
+  };
+  const eyeElevationM = candidate.groundElevationM + input.eyeHeightM;
+  const insideBuilding = pointInsideBuilding(
+    candidate,
+    eyeElevationM,
+    buildings,
+  );
   const totalSamples = input.path.length;
-  if (insideBuildingId !== null || totalSamples === 0) {
+
+  if (insideBuilding !== null || totalSamples === 0) {
     const first = input.path[0] ?? null;
+    const isDefaultHeight = insideBuilding?.heightSource === 'default';
     return {
-      ...candidate,
       score: 0,
       clearSamples: 0,
       totalSamples,
       minClearanceDeg: -90,
       maxObstructionDeg: 90,
-      firstBlockedUtcMs: first?.utcMs ?? null,
-      firstBlockedAzimuthDeg: first?.azimuthDeg ?? null,
-      firstBlockedElevationDeg: first?.elevationDeg ?? null,
-      firstBlockedHorizonDeg: 90,
-      firstBlockedSource: insideBuildingId !== null ? 'building' : null,
-      firstBlockedSourceId: insideBuildingId,
-      firstBlockedDistanceM: null,
-      insideBuildingId,
+      insideBuildingId: insideBuilding?.id ?? null,
+      firstBlocked: {
+        utcMs: first?.utcMs ?? null,
+        azimuthDeg: first?.azimuthDeg ?? null,
+        elevationDeg: first?.elevationDeg ?? null,
+        horizonDeg: 90,
+        source: insideBuilding !== null ? 'building' : null,
+        sourceId: insideBuilding?.id ?? null,
+        distanceM: null,
+      },
+      blockedByTerrainSamples: 0,
+      blockedByRealHeightBuildingSamples:
+        insideBuilding !== null && !isDefaultHeight ? totalSamples : 0,
+      blockedByDefaultHeightBuildingSamples:
+        insideBuilding !== null && isDefaultHeight ? totalSamples : 0,
+      blockerBuildingIds:
+        insideBuilding !== null ? [insideBuilding.id] : [],
     };
   }
 
-  const slopes = computeHorizonSlopes(input.grid, point, input.buildings, {
+  const slopes = computeHorizonSlopes(input.grid, point, buildings, {
     azimuthsDeg: bins.keys,
     stepDeg: 1,
     buildingMaxDistanceM: input.buildingRadiusM,
@@ -181,15 +313,11 @@ function scoreOne(
   let clearSamples = 0;
   let minClearanceDeg = Number.POSITIVE_INFINITY;
   let maxObstructionDeg = -90;
-  let firstBlocked: {
-    utcMs: number;
-    azimuthDeg: number;
-    elevationDeg: number;
-    horizonDeg: number;
-    source: 'terrain' | 'building' | null;
-    sourceId: number | null;
-    distanceM: number | null;
-  } | null = null;
+  let firstBlocked: FirstBlockedSample | null = null;
+  let blockedByTerrainSamples = 0;
+  let blockedByRealHeightBuildingSamples = 0;
+  let blockedByDefaultHeightBuildingSamples = 0;
+  const blockerBuildingIds: number[] = [];
 
   for (const sample of input.path) {
     const key = Math.round(normalizeAzimuth(sample.azimuthDeg)) % 360;
@@ -201,7 +329,11 @@ function scoreOne(
     if (horizonDeg > maxObstructionDeg) maxObstructionDeg = horizonDeg;
     if (clearance >= input.marginDeg) {
       clearSamples++;
-    } else if (firstBlocked === null) {
+      continue;
+    }
+    if (!collectDetail) continue;
+
+    if (firstBlocked === null) {
       const sourceCode = slopes.sources[binIndex];
       firstBlocked = {
         utcMs: sample.utcMs,
@@ -217,28 +349,120 @@ function scoreOne(
           : null,
       };
     }
+
+    const sourceCode = slopes.sources[binIndex];
+    if (sourceCode === 1) {
+      blockedByTerrainSamples++;
+    } else if (sourceCode === 2) {
+      const sourceId = slopes.sourceIds[binIndex];
+      const building =
+        sourceId >= 0 ? buildingsById.get(sourceId) : undefined;
+      if (building?.heightSource === 'default') {
+        blockedByDefaultHeightBuildingSamples++;
+      } else {
+        blockedByRealHeightBuildingSamples++;
+      }
+      if (sourceId >= 0 && !blockerBuildingIds.includes(sourceId)) {
+        blockerBuildingIds.push(sourceId);
+      }
+    }
   }
 
   if (!Number.isFinite(minClearanceDeg)) minClearanceDeg = -90;
+  blockerBuildingIds.sort((a, b) => a - b);
   return {
-    ...candidate,
     score: clearSamples / totalSamples,
     clearSamples,
     totalSamples,
     minClearanceDeg,
     maxObstructionDeg,
-    firstBlockedUtcMs: firstBlocked?.utcMs ?? null,
-    firstBlockedAzimuthDeg: firstBlocked?.azimuthDeg ?? null,
-    firstBlockedElevationDeg: firstBlocked?.elevationDeg ?? null,
-    firstBlockedHorizonDeg: firstBlocked?.horizonDeg ?? null,
-    firstBlockedSource: firstBlocked?.source ?? null,
-    firstBlockedSourceId: firstBlocked?.sourceId ?? null,
-    firstBlockedDistanceM: firstBlocked?.distanceM ?? null,
     insideBuildingId: null,
+    firstBlocked,
+    blockedByTerrainSamples,
+    blockedByRealHeightBuildingSamples,
+    blockedByDefaultHeightBuildingSamples,
+    blockerBuildingIds,
   };
 }
 
-function sortRanked(results: BestSpotResult[]): BestSpotResult[] {
+function scoreCandidate(
+  input: BestSpotInput,
+  candidate: BestSpotCandidate,
+  context: SearchContext,
+): BestSpotResult {
+  const base = evaluateScenario(
+    input,
+    candidate,
+    context.bins,
+    context.stepM,
+    context.buildings.base,
+    context.buildingsById,
+    true,
+  );
+  const pessimistic = evaluateScenario(
+    input,
+    candidate,
+    context.bins,
+    context.stepM,
+    context.buildings.pessimistic,
+    context.buildingsById,
+    false,
+  );
+  const optimistic = evaluateScenario(
+    input,
+    candidate,
+    context.bins,
+    context.stepM,
+    context.buildings.optimistic,
+    context.buildingsById,
+    false,
+  );
+
+  return {
+    ...candidate,
+    score: base.score,
+    clearSamples: base.clearSamples,
+    totalSamples: base.totalSamples,
+    minClearanceDeg: base.minClearanceDeg,
+    maxObstructionDeg: base.maxObstructionDeg,
+    firstBlockedUtcMs: base.firstBlocked?.utcMs ?? null,
+    firstBlockedAzimuthDeg: base.firstBlocked?.azimuthDeg ?? null,
+    firstBlockedElevationDeg: base.firstBlocked?.elevationDeg ?? null,
+    firstBlockedHorizonDeg: base.firstBlocked?.horizonDeg ?? null,
+    firstBlockedSource: base.firstBlocked?.source ?? null,
+    firstBlockedSourceId: base.firstBlocked?.sourceId ?? null,
+    firstBlockedDistanceM: base.firstBlocked?.distanceM ?? null,
+    insideBuildingId: base.insideBuildingId,
+
+    scorePessimistic: pessimistic.score,
+    scoreOptimistic: optimistic.score,
+    clearSamplesPessimistic: pessimistic.clearSamples,
+    clearSamplesOptimistic: optimistic.clearSamples,
+    minClearanceDegPessimistic: pessimistic.minClearanceDeg,
+    minClearanceDegOptimistic: optimistic.minClearanceDeg,
+    rankPessimistic: 0,
+    rankBase: 0,
+    rankOptimistic: 0,
+    rankSpread: 0,
+
+    blockedByTerrainSamples: base.blockedByTerrainSamples,
+    blockedByRealHeightBuildingSamples:
+      base.blockedByRealHeightBuildingSamples,
+    blockedByDefaultHeightBuildingSamples:
+      base.blockedByDefaultHeightBuildingSamples,
+    blockerBuildingIds: base.blockerBuildingIds,
+    onlyDefaultHeightBlockers:
+      base.blockedByDefaultHeightBuildingSamples > 0 &&
+      base.blockedByRealHeightBuildingSamples === 0 &&
+      base.blockedByTerrainSamples === 0,
+
+    nearestBuildingM: null,
+    nearestBuildingId: null,
+    nearestBuildingHeightSource: null,
+  };
+}
+
+function sortByBase(results: BestSpotResult[]): BestSpotResult[] {
   return [...results].sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
     if (b.minClearanceDeg !== a.minClearanceDeg) {
@@ -248,15 +472,142 @@ function sortRanked(results: BestSpotResult[]): BestSpotResult[] {
   });
 }
 
+function sortByPessimistic(results: BestSpotResult[]): BestSpotResult[] {
+  return [...results].sort((a, b) => {
+    if (b.scorePessimistic !== a.scorePessimistic) {
+      return b.scorePessimistic - a.scorePessimistic;
+    }
+    if (b.minClearanceDegPessimistic !== a.minClearanceDegPessimistic) {
+      return b.minClearanceDegPessimistic - a.minClearanceDegPessimistic;
+    }
+    // Base score is the documented third tie-break, then candidate index.
+    if (b.score !== a.score) return b.score - a.score;
+    return a.index - b.index;
+  });
+}
+
+function sortByOptimistic(results: BestSpotResult[]): BestSpotResult[] {
+  return [...results].sort((a, b) => {
+    if (b.scoreOptimistic !== a.scoreOptimistic) {
+      return b.scoreOptimistic - a.scoreOptimistic;
+    }
+    if (b.minClearanceDegOptimistic !== a.minClearanceDegOptimistic) {
+      return b.minClearanceDegOptimistic - a.minClearanceDegOptimistic;
+    }
+    if (b.score !== a.score) return b.score - a.score;
+    return a.index - b.index;
+  });
+}
+
+function segmentDistanceM(
+  eastM: number,
+  northM: number,
+  a: { eastM: number; northM: number },
+  b: { eastM: number; northM: number },
+): number {
+  const dx = b.eastM - a.eastM;
+  const dy = b.northM - a.northM;
+  const lengthSquared = dx * dx + dy * dy;
+  let t = 0;
+  if (lengthSquared > 0) {
+    t =
+      ((eastM - a.eastM) * dx + (northM - a.northM) * dy) / lengthSquared;
+    t = Math.max(0, Math.min(1, t));
+  }
+  return Math.hypot(eastM - (a.eastM + dx * t), northM - (a.northM + dy * t));
+}
+
+/** Exact 2-D point-to-footprint distance; 0 when inside the polygon. */
+function pointToPolygonDistanceM(
+  eastM: number,
+  northM: number,
+  ring: Array<{ eastM: number; northM: number }>,
+): number {
+  if (pointInPolygon(eastM, northM, ring)) return 0;
+  let best = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i];
+    const b = ring[(i + 1) % ring.length];
+    best = Math.min(best, segmentDistanceM(eastM, northM, a, b));
+  }
+  return best;
+}
+
+function nearestBuilding(
+  candidate: BestSpotCandidate,
+  buildings: PreparedBuilding[],
+): { building: PreparedBuilding; distanceM: number } | null {
+  let best: { building: PreparedBuilding; distanceM: number } | null = null;
+  for (const building of buildings) {
+    const boxDistance = distanceToBoxM(
+      candidate.eastM,
+      candidate.northM,
+      building.minEastM,
+      building.maxEastM,
+      building.minNorthM,
+      building.maxNorthM,
+    );
+    if (best !== null && boxDistance > best.distanceM) continue;
+    const distanceM = pointToPolygonDistanceM(
+      candidate.eastM,
+      candidate.northM,
+      building.ringEnu,
+    );
+    if (!Number.isFinite(distanceM)) continue;
+    if (
+      best === null ||
+      distanceM < best.distanceM ||
+      (distanceM === best.distanceM && building.id < best.building.id)
+    ) {
+      best = { building, distanceM };
+    }
+  }
+  return best;
+}
+
 function buildSummary(
   input: BestSpotInput,
   results: BestSpotResult[],
   startMs: number,
   cancelled: boolean,
 ): BestSpotSummary {
+  const baseOrder = sortByBase(results);
+  baseOrder.forEach((result, index) => {
+    result.rankBase = index + 1;
+  });
+  const pessimisticOrder = sortByPessimistic(results);
+  pessimisticOrder.forEach((result, index) => {
+    result.rankPessimistic = index + 1;
+  });
+  const optimisticOrder = sortByOptimistic(results);
+  optimisticOrder.forEach((result, index) => {
+    result.rankOptimistic = index + 1;
+  });
+  for (const result of results) {
+    result.rankSpread = Math.abs(
+      result.rankPessimistic - result.rankOptimistic,
+    );
+  }
+
+  // Nearest footprints are only needed for the ten displayed results.
+  const top = pessimisticOrder.slice(0, 10);
+  for (const result of top) {
+    const nearest = nearestBuilding(result, input.buildings);
+    if (nearest !== null) {
+      result.nearestBuildingM = nearest.distanceM;
+      result.nearestBuildingId = nearest.building.id;
+      result.nearestBuildingHeightSource = nearest.building.heightSource;
+    }
+  }
+
   return {
     candidates: results,
-    top: sortRanked(results).slice(0, 10),
+    top,
+    heightScenarios: {
+      base: { ...HEIGHT_SCENARIOS.base },
+      pessimistic: { ...HEIGHT_SCENARIOS.pessimistic },
+      optimistic: { ...HEIGHT_SCENARIOS.optimistic },
+    },
     processed: results.length,
     total: input.candidates.length,
     elapsedMs: Date.now() - startMs,
@@ -278,10 +629,7 @@ export function searchBestSpotsSync(
   options: BestSpotRunOptions = {},
 ): BestSpotSummary {
   const startMs = Date.now();
-  const bins = pathBins(input.path);
-  const stepM =
-    input.stepM ??
-    Math.max(6, Math.min(input.grid.spacingEastM, input.grid.spacingNorthM) * 1.1);
+  const context = prepareSearch(input);
   const results: BestSpotResult[] = [];
   const total = input.candidates.length;
   const progressEvery = Math.max(1, Math.floor(total / 100));
@@ -289,7 +637,7 @@ export function searchBestSpotsSync(
     if (options.shouldCancel?.()) {
       return buildSummary(input, results, startMs, true);
     }
-    results.push(scoreOne(input, input.candidates[i], bins, stepM));
+    results.push(scoreCandidate(input, input.candidates[i], context));
     if ((i + 1) % progressEvery === 0 || i === total - 1) {
       options.onProgress?.(i + 1, total);
     }
@@ -306,10 +654,7 @@ export async function searchBestSpots(
   options: BestSpotRunOptions = {},
 ): Promise<BestSpotSummary> {
   const startMs = Date.now();
-  const bins = pathBins(input.path);
-  const stepM =
-    input.stepM ??
-    Math.max(6, Math.min(input.grid.spacingEastM, input.grid.spacingNorthM) * 1.1);
+  const context = prepareSearch(input);
   const results: BestSpotResult[] = [];
   const total = input.candidates.length;
   const progressEvery = Math.max(1, Math.floor(total / 100));
@@ -318,7 +663,7 @@ export async function searchBestSpots(
     if (options.shouldCancel?.()) {
       return buildSummary(input, results, startMs, true);
     }
-    results.push(scoreOne(input, input.candidates[i], bins, stepM));
+    results.push(scoreCandidate(input, input.candidates[i], context));
     if ((i + 1) % progressEvery === 0 || i === total - 1) {
       options.onProgress?.(i + 1, total);
     }

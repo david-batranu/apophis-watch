@@ -1,4 +1,5 @@
 import type {
+  HeightSource,
   PreparedBuilding,
   TerrainGrid,
 } from '../../src/terrain/types';
@@ -60,6 +61,7 @@ export function makeBuilding(options: {
   widthM?: number;
   depthM?: number;
   heightM?: number;
+  heightSource?: HeightSource;
   baseElevationM?: number;
 }): PreparedBuilding {
   const id = options.id ?? 1;
@@ -84,7 +86,7 @@ export function makeBuilding(options: {
     maxNorthM: northM + halfD,
     baseElevationM: options.baseElevationM ?? 0,
     heightM: options.heightM ?? 2,
-    heightSource: 'height',
+    heightSource: options.heightSource ?? 'height',
     tags: {},
   };
 }
