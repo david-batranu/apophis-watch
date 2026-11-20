@@ -301,7 +301,7 @@ export class AppModel {
   }
 
   setViewMode(mode: ViewMode): void {
-    this.store.update({ viewMode: mode });
+    this.store.update({ viewMode: mode, auxStatus: null });
   }
 
   setToggle<K extends keyof DisplayToggles>(key: K, value: DisplayToggles[K]): void {
