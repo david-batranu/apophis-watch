@@ -35,6 +35,49 @@ function baseInput(overrides: Partial<BestSpotInput> = {}): BestSpotInput {
   };
 }
 
+function makeResult(overrides: Partial<BestSpotResult> = {}): BestSpotResult {
+  return {
+    index: 1,
+    eastM: 0,
+    northM: 0,
+    latitudeDeg: 45,
+    longitudeDeg: 25,
+    groundElevationM: 600,
+    score: 0.5,
+    clearSamples: 50,
+    totalSamples: 100,
+    minClearanceDeg: 1.2,
+    maxObstructionDeg: 0.1,
+    firstBlockedUtcMs: Date.parse('2029-04-13T22:10:00Z'),
+    firstBlockedAzimuthDeg: 90,
+    firstBlockedElevationDeg: 1.3,
+    firstBlockedHorizonDeg: 0.1,
+    firstBlockedSource: 'terrain',
+    firstBlockedSourceId: null,
+    firstBlockedDistanceM: 800,
+    insideBuildingId: null,
+    scorePessimistic: 0.5,
+    scoreOptimistic: 0.5,
+    clearSamplesPessimistic: 50,
+    clearSamplesOptimistic: 50,
+    minClearanceDegPessimistic: 1.2,
+    minClearanceDegOptimistic: 1.2,
+    rankPessimistic: 1,
+    rankBase: 1,
+    rankOptimistic: 1,
+    rankSpread: 0,
+    blockedByTerrainSamples: 0,
+    blockedByRealHeightBuildingSamples: 0,
+    blockedByDefaultHeightBuildingSamples: 0,
+    blockerBuildingIds: [],
+    onlyDefaultHeightBlockers: false,
+    nearestBuildingM: null,
+    nearestBuildingId: null,
+    nearestBuildingHeightSource: null,
+    ...overrides,
+  };
+}
+
 describe('best-spot scoring', () => {
   it('scores a clear candidate at 100% and a building-blocked candidate at 0%', () => {
     const wall = makeBuilding({
@@ -150,13 +193,12 @@ describe('best-spot scoring', () => {
   });
 
   it('describes the obstruction direction and first blocked time', () => {
-    const result: BestSpotResult = {
+    const result = makeResult({
       index: 7,
       eastM: -120,
       northM: 240,
       latitudeDeg: 45.1,
       longitudeDeg: 25.2,
-      groundElevationM: 600,
       score: 0.78,
       clearSamples: 78,
       totalSamples: 100,
@@ -169,8 +211,7 @@ describe('best-spot scoring', () => {
       firstBlockedSource: 'building',
       firstBlockedSourceId: 123,
       firstBlockedDistanceM: 420,
-      insideBuildingId: null,
-    };
+    });
     const reason = describeBestSpot(result, {
       timeZone: 'Europe/Bucharest',
       marginDeg: 2,
@@ -182,13 +223,7 @@ describe('best-spot scoring', () => {
   });
 
   it('uses a margin-specific reason when the path is above the horizon', () => {
-    const result: BestSpotResult = {
-      index: 1,
-      eastM: 0,
-      northM: 0,
-      latitudeDeg: 45,
-      longitudeDeg: 25,
-      groundElevationM: 600,
+    const result = makeResult({
       score: 0.5,
       clearSamples: 50,
       totalSamples: 100,
@@ -201,8 +236,7 @@ describe('best-spot scoring', () => {
       firstBlockedSource: 'terrain',
       firstBlockedSourceId: null,
       firstBlockedDistanceM: 800,
-      insideBuildingId: null,
-    };
+    });
     const reason = describeBestSpot(result);
     expect(reason).toContain('less than the 1.2° margin');
   });
@@ -215,13 +249,7 @@ describe('best-spot scoring', () => {
   });
 
   it('uses the configured margin in the margin-limited reason', () => {
-    const result: BestSpotResult = {
-      index: 1,
-      eastM: 0,
-      northM: 0,
-      latitudeDeg: 45,
-      longitudeDeg: 25,
-      groundElevationM: 600,
+    const result = makeResult({
       score: 0.9992,
       clearSamples: 99,
       totalSamples: 100,
@@ -234,8 +262,7 @@ describe('best-spot scoring', () => {
       firstBlockedSource: 'terrain',
       firstBlockedSourceId: null,
       firstBlockedDistanceM: 800,
-      insideBuildingId: null,
-    };
+    });
     const reason = describeBestSpot(result, { marginDeg: 2 });
     expect(reason).toContain('2.0° margin');
     expect(reason).toContain('99.9%');

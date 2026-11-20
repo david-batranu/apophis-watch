@@ -167,8 +167,27 @@ export interface BestSpotCandidate {
   groundElevationM: number;
 }
 
+/** Identifies one of the three building-height assumptions. */
+export type HeightScenarioKey = 'base' | 'pessimistic' | 'optimistic';
+
+/** A building-height assumption applied to OSM default-height buildings. */
+export interface HeightScenarioDefinition {
+  id: HeightScenarioKey;
+  /** Human-readable label, e.g. "Pessimistic (default ×1.5)". */
+  label: string;
+  /** Multiplier applied only to buildings with heightSource === 'default'. */
+  multiplier: number;
+}
+
+/** The three height assumptions used for every candidate. */
+export type HeightScenarios = Record<HeightScenarioKey, HeightScenarioDefinition>;
+
 export interface BestSpotResult extends BestSpotCandidate {
-  /** Fraction 0..1 of the physical visibility window above the horizon + margin. */
+  /**
+   * Base-scenario fraction 0..1 of the physical visibility window above the
+   * horizon + margin. Kept as `score` for backward compatibility; `top` is
+   * ranked by `scorePessimistic`.
+   */
   score: number;
   clearSamples: number;
   totalSamples: number;
@@ -184,11 +203,58 @@ export interface BestSpotResult extends BestSpotCandidate {
   firstBlockedDistanceM: number | null;
   /** Building id when the candidate falls inside a footprint. */
   insideBuildingId: number | null;
+
+  /** Score when default-height buildings are scaled by 1.5 (12 m). */
+  scorePessimistic: number;
+  /** Score when default-height buildings are scaled by 0.7 (5.6 m). */
+  scoreOptimistic: number;
+  clearSamplesPessimistic: number;
+  clearSamplesOptimistic: number;
+  /** Smallest clearance under the pessimistic building heights, degrees. */
+  minClearanceDegPessimistic: number;
+  /** Smallest clearance under the optimistic building heights, degrees. */
+  minClearanceDegOptimistic: number;
+  /** 1-based rank among all processed candidates (pessimistic order). */
+  rankPessimistic: number;
+  /** 1-based rank among all processed candidates (base order). */
+  rankBase: number;
+  /** 1-based rank among all processed candidates (optimistic order). */
+  rankOptimistic: number;
+  /** Absolute pessimistic-vs-optimistic rank difference. */
+  rankSpread: number;
+
+  /**
+   * Base-scenario blocked path samples, classified by the obstruction that
+   * defines the horizon in that sample's azimuth bin.
+   */
+  blockedByTerrainSamples: number;
+  blockedByRealHeightBuildingSamples: number;
+  blockedByDefaultHeightBuildingSamples: number;
+  /** Unique building ids blocking base-scenario samples, ascending. */
+  blockerBuildingIds: number[];
+  /**
+   * True only when the base scenario has at least one blocker and every
+   * blocker is a default-height building (no terrain or explicit-height
+   * building blockers). Such a spot is especially sensitive to the height
+   * assumption.
+   */
+  onlyDefaultHeightBlockers: boolean;
+
+  /**
+   * Exact 2-D point-to-footprint distance, metres (0 when inside). Populated
+   * for the top 10 results only; null elsewhere.
+   */
+  nearestBuildingM: number | null;
+  nearestBuildingId: number | null;
+  nearestBuildingHeightSource: HeightSource | null;
 }
 
 export interface BestSpotSummary {
   candidates: BestSpotResult[];
+  /** Pessimistic top 10 (ranked by scorePessimistic). */
   top: BestSpotResult[];
+  /** Labels and multipliers for the three height assumptions. */
+  heightScenarios: HeightScenarios;
   processed: number;
   total: number;
   elapsedMs: number;
