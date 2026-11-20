@@ -280,3 +280,43 @@ See `REAL-PHONE-CHECKLIST.md` for the ordered list. The critical unverified
 items are trusted HTTPS/installation, iOS storage persistence, real compass
 accuracy/drift, real camera FOV/crop, screen-rotation timing, sensor
 permissions, thermals/battery, and on-site field checks of the top three spots.
+
+## Post-validation UX pass (2026-11-20)
+
+A focused mobile/first-run usability pass was added after the acceptance run.
+Changes:
+
+- The compact header no longer widens the document at 320/390 px; Night mode
+  and Share stay on screen. Header controls use 44 px targets on phones.
+- A mobile time dock (play, scrub, closest approach, UTC/local clock) sits
+  directly under the sky view, so the dome and time controls are visible
+  together.
+- First-run onboarding is an explicit location card (Use my location / preset /
+  coordinates). Geolocation is no longer requested on page load.
+- Observer, night mode, display toggles, minimum elevation and last non-AR view
+  are stored in `apophis-ui-preferences-v1`; AR is deliberately not restored so
+  the camera is not prompted on launch. The location can be forgotten.
+- The first-run offline banner is dismissible and remembered; the offline chip
+  reads “Save offline area” rather than warning before anything is wrong.
+- Share copies or opens the OS share sheet with the current observer/time/view
+  deep link.
+- Two pre-existing URL bugs were fixed: an absent `lat`/`lon` was interpreted as
+  `0,0` (skipping onboarding), and an absent `minEl` reset the good-viewing
+  threshold to 0°.
+- The metric value no longer ellipsizes “In visibility window”; the chip button
+  font no longer inherits 16 px.
+
+Verification after the pass: **215/215** unit tests, **26/26** merged Playwright
+tests, **12/12** AR mock tests, **1/1** production offline test, typecheck and
+build clean. The merged suite includes new checks for 320/390 px overflow,
+44 px targets, time-dock scrubbing, first-run geolocation suppression, onboarding
+dismissal/forgetting, AR restore suppression, preference persistence and the
+Share payload.
+
+Build: initial JS **805.06 kB** (218.03 kB gzip), terrain 287.76 kB (81.77 kB
+gzip), AR 79.99 kB (23.35 kB gzip), best-spot worker 13.63 kB; precache 22
+entries, 1,268.90 KiB. Sky frame timing under the existing 4× CPU test remained
+vsync-bound (p95 16.80 ms over 180 frames).
+
+The existing real-phone caveats still apply; this pass was verified in headless
+Chromium at phone and desktop viewports, not on physical iOS/Android hardware.

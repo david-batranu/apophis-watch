@@ -20,6 +20,7 @@ import {
 } from '../offline/snapshot';
 import { ElevationPlot } from './elevationPlot';
 import { EventGuide } from './eventGuide';
+import { buildShareUrl } from './share';
 import { formatLocal, formatLocalLocale, formatUtc, localHhMm } from './timeFormat';
 
 type JumpButton = {
@@ -106,6 +107,10 @@ export class AppUi {
   private lastAboutKey = '';
   private aboutStorageText = t('shell.storageNotChecked');
   private offlineSnapshot: OfflineSnapshot | null = null;
+  private readonly locationDialog: HTMLDialogElement;
+  private locationPromptRequired = false;
+  private dialogMessage: string | null = null;
+  private toastTimer: number | null = null;
 
   constructor(
     private readonly root: HTMLElement,
@@ -115,16 +120,19 @@ export class AppUi {
     this.debug = new URLSearchParams(window.location.search).get('debug') === '1';
     this.root.innerHTML = this.template();
     this.cacheRefs();
+    this.locationDialog = this.ref('location-dialog') as HTMLDialogElement;
     this.plot = new ElevationPlot(this.ref('plot-host'));
     this.skyView = new SkyView(this.ref('sky-panel'), this.ref('sky-canvas') as HTMLCanvasElement);
     this.spaceView = new SpaceView(this.ref('space-host'));
     this.eventGuide = new EventGuide(this.ref('event-guide'), app);
     this.bind();
+    this.bindLocationDialog();
     this.populatePresets();
     this.renderCredits();
     this.renderAbout();
     this.initPwa();
     this.app.onState((state) => this.onState(state));
+    this.maybeOpenLocationDialog();
   }
 
   private ref(id: string): HTMLElement {
@@ -140,6 +148,7 @@ export class AppUi {
         );
       },
       onOfflineReady: () => {
+        if (!this.app.shouldShowOfflineReadyBanner()) return;
         this.showPwaBanner(
           'offline',
           t('shell.pwaOfflineReady'),
@@ -182,6 +191,7 @@ export class AppUi {
   }
 
   private hidePwaBanner(): void {
+    if (this.pwaBannerKind === 'offline') this.app.dismissOfflineReadyBanner();
     this.pwaBannerKind = null;
     this.ref('pwa-banner').classList.add('hidden');
   }
@@ -206,9 +216,25 @@ export class AppUi {
         <header class="topbar">
           <div class="brand">${t('shell.brandName')} <span>${t('shell.brandSubtitle')}</span></div>
           <div class="top-actions">
-            <span class="chip" data-ref="location-chip">${t('shell.locationFallback')}</span>
-            <button class="chip chip-button" data-ref="offline-chip" type="button" aria-label="${t('shell.offlineChipAria')}">${t('shell.offlineChecking')}</button>
-            <button class="btn" data-ref="night-button" type="button" aria-pressed="false">${t('shell.nightModeButton')}</button>
+            <button class="chip chip-button location-chip" data-ref="location-chip" type="button" aria-label="${t('shell.locationChange')}" title="${t('shell.locationChange')}">
+              <span class="chip-icon" aria-hidden="true">◎</span>
+              <span class="chip-label">
+                <span data-ref="location-chip-name">${t('shell.locationFallback')}</span>
+                <span class="chip-coords" data-ref="location-chip-coords"></span>
+              </span>
+            </button>
+            <button class="chip chip-button" data-ref="offline-chip" type="button" title="${t('shell.offlineChipAria')}">
+              <span class="chip-icon" data-ref="offline-chip-icon" aria-hidden="true">…</span>
+              <span class="chip-label" data-ref="offline-chip-label">${t('shell.offlineChecking')}</span>
+            </button>
+            <button class="btn icon-btn" data-ref="share-button" type="button" aria-label="${t('shell.shareAria')}" title="${t('shell.shareAria')}">
+              <span class="btn-icon" aria-hidden="true">↗</span>
+              <span class="btn-label">${t('shell.shareButton')}</span>
+            </button>
+            <button class="btn icon-btn" data-ref="night-button" type="button" aria-pressed="false" aria-label="${t('shell.nightModeOff')}" title="${t('shell.nightModeOff')}">
+              <span class="btn-icon" aria-hidden="true">☾</span>
+              <span class="btn-label" data-ref="night-label">${t('shell.nightModeButton')}</span>
+            </button>
           </div>
         </header>
         <div class="app-banner hidden" data-ref="pwa-banner" role="status" aria-live="polite">
@@ -260,6 +286,17 @@ export class AppUi {
               </div>
               <div class="ar-view-stage hidden" id="panel-ar" role="tabpanel" aria-labelledby="tab-ar" data-ref="ar-panel">
                 <div class="ar-host" data-ref="ar-host"></div>
+              </div>
+              <div class="time-dock" data-ref="time-dock" role="group" aria-label="${t('shell.timeTitle')}">
+                <button class="dock-play" data-ref="dock-play" type="button" aria-label="${t('shell.playAria')}">▶</button>
+                <div class="dock-center">
+                  <div class="dock-clock">
+                    <span data-ref="dock-utc">—</span>
+                    <span class="dock-local" data-ref="dock-local"></span>
+                  </div>
+                  <input class="dock-scrub" type="range" min="0" max="10000" step="1" value="5000" data-ref="dock-scrub" aria-label="${t('shell.scrubAria')}" />
+                </div>
+                <button class="dock-ca" data-ref="dock-ca" type="button" aria-label="${t('shell.dockCaAria')}" title="${t('shell.dockCaAria')}">${t('shell.dockCa')}</button>
               </div>
             </div>
             <aside class="aside-stack">
@@ -314,7 +351,7 @@ export class AppUi {
             </section>
           </section>
           <section class="controls-grid">
-            <section class="panel">
+            <section class="panel" data-ref="observer-panel">
               <h2>${t('shell.observerTitle')}</h2>
               <div class="field">
                 <label for="preset-select">${t('shell.observerPreset')}</label>
@@ -378,6 +415,31 @@ export class AppUi {
             ${t('shell.footerNote')}
           </div>
         </main>
+        <dialog class="location-dialog" data-ref="location-dialog" aria-labelledby="location-dialog-title">
+          <div class="dialog-body">
+            <div class="dialog-head">
+              <h2 id="location-dialog-title" data-ref="location-dialog-title" tabindex="-1">${t('location.dialogTitle')}</h2>
+              <button class="dialog-close" data-ref="location-dialog-close" type="button" aria-label="${t('location.dialogClose')}">×</button>
+            </div>
+            <p class="status-line">${t('location.dialogIntro')}</p>
+            <div class="bar">
+              <button class="btn primary" data-ref="dialog-use-location" type="button">${t('location.dialogUseLocation')}</button>
+              <button class="btn" data-ref="dialog-coordinates" type="button">${t('location.dialogCoordinates')}</button>
+            </div>
+            <div class="field">
+              <label for="dialog-preset">${t('location.dialogPresetLabel')}</label>
+              <select id="dialog-preset" data-ref="dialog-preset">
+                <option value="">${t('location.dialogPresetPlaceholder')}</option>
+              </select>
+            </div>
+            <p class="status-line" data-ref="dialog-status" role="status" aria-live="polite">${t('location.previewStatus')}</p>
+            <div class="bar dialog-actions">
+              <button class="btn ghost" data-ref="dialog-keep" type="button">${t('location.dialogKeep')}</button>
+              <button class="btn ghost" data-ref="dialog-forget" type="button" hidden>${t('location.dialogForget')}</button>
+            </div>
+          </div>
+        </dialog>
+        <div class="toast hidden" data-ref="toast" role="status" aria-live="polite"></div>
         ${this.debug ? '<div class="debug-overlay" data-ref="debug-overlay"></div>' : ''}
       </div>
     `;
@@ -388,7 +450,6 @@ export class AppUi {
   }
 
   private populatePresets(): void {
-    const select = this.ref('preset-select') as HTMLSelectElement;
     const options = [
       ['', t('shell.observerCustom')],
       ...Object.entries({
@@ -398,9 +459,30 @@ export class AppUi {
         longyearbyen: t('shell.presetLongyearbyen'),
       }),
     ];
-    select.innerHTML = options
+    (this.ref('preset-select') as HTMLSelectElement).innerHTML = options
       .map(([value, label]) => `<option value="${value}">${label}</option>`)
       .join('');
+    (this.ref('dialog-preset') as HTMLSelectElement).innerHTML = [
+      ['', t('location.dialogPresetPlaceholder')],
+      ...options.slice(1),
+    ]
+      .map(([value, label]) => `<option value="${value}">${label}</option>`)
+      .join('');
+  }
+
+  private presetLabel(id: string): string | null {
+    switch (id) {
+      case 'brasov':
+        return t('shell.presetBrasov');
+      case 'cape-town':
+        return t('shell.presetCapeTown');
+      case 'tenerife':
+        return t('shell.presetTenerife');
+      case 'longyearbyen':
+        return t('shell.presetLongyearbyen');
+      default:
+        return null;
+    }
   }
 
   private bind(): void {
@@ -422,13 +504,15 @@ export class AppUi {
       if (target === this.ref('space-reset')) {
         this.spaceView.setCameraPreset('flyby');
       }
+      if (target === this.ref('location-chip')) {
+        this.openLocationDialog();
+      }
+      if (target === this.ref('share-button')) {
+        void this.shareView();
+      }
       if (target === this.ref('offline-chip')) {
         this.app.setViewMode('local');
-        window.setTimeout(() => {
-          this.ref('terrain-host')
-            .querySelector<HTMLElement>('[data-ref="offline-card"]')
-            ?.scrollIntoView({ block: 'start', behavior: 'smooth' });
-        }, 150);
+        this.scrollToOfflineCard();
       }
     });
 
@@ -488,13 +572,17 @@ export class AppUi {
       this.app.setSpeed(Number((event.target as HTMLSelectElement).value));
     });
     this.ref('scrub').addEventListener('input', (event) => {
+      this.scrubTo(event.target as HTMLInputElement);
+    });
+    this.ref('dock-scrub').addEventListener('input', (event) => {
+      this.scrubTo(event.target as HTMLInputElement);
+    });
+    this.ref('dock-play').addEventListener('click', () => {
       const state = this.app.getState();
-      if (state.dataWindowStartMs === null || state.dataWindowEndMs === null) return;
-      const fraction = Number((event.target as HTMLInputElement).value) / 10000;
-      this.app.setUtc(
-        state.dataWindowStartMs +
-          fraction * (state.dataWindowEndMs - state.dataWindowStartMs),
-      );
+      this.app.setPlaying(!state.playing);
+    });
+    this.ref('dock-ca').addEventListener('click', () => {
+      this.app.jumpTo('topocentricCa');
     });
     this.ref('preset-select').addEventListener('change', (event) => {
       const value = (event.target as HTMLSelectElement).value;
@@ -507,6 +595,206 @@ export class AppUi {
     this.ref('min-good').addEventListener('input', (event) => {
       this.app.setMinGoodElevation(Number((event.target as HTMLInputElement).value));
     });
+  }
+
+  private scrubTo(input: HTMLInputElement): void {
+    const state = this.app.getState();
+    if (state.dataWindowStartMs === null || state.dataWindowEndMs === null) return;
+    const fraction = Number(input.value) / 10000;
+    this.app.setUtc(
+      state.dataWindowStartMs +
+        fraction * (state.dataWindowEndMs - state.dataWindowStartMs),
+    );
+  }
+
+  /** The terrain tab is lazy-loaded, so retry briefly until its card exists. */
+  private scrollToOfflineCard(attempt = 0): void {
+    const card = this.ref('terrain-host').querySelector<HTMLElement>(
+      '[data-ref="offline-card"]',
+    );
+    if (card) {
+      card.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      return;
+    }
+    if (attempt < 25) {
+      window.setTimeout(() => this.scrollToOfflineCard(attempt + 1), 100);
+    }
+  }
+
+  private bindLocationDialog(): void {
+    const dialog = this.locationDialog;
+    const useLocation = this.ref('dialog-use-location') as HTMLButtonElement;
+    const forget = this.ref('dialog-forget') as HTMLButtonElement;
+
+    this.ref('location-dialog-close').addEventListener('click', () => {
+      this.closeLocationDialog();
+    });
+    this.ref('dialog-keep').addEventListener('click', () => {
+      this.closeLocationDialog();
+    });
+    useLocation.addEventListener('click', () => {
+      this.dialogMessage = null;
+      this.ref('dialog-status').textContent = t('location.requesting');
+      useLocation.disabled = true;
+      this.app.useBrowserLocation((ok) => {
+        useLocation.disabled = false;
+        if (!dialog.open) return;
+        if (ok) this.closeLocationDialog();
+        else {
+          this.ref('dialog-status').textContent =
+            this.app.getState().locationStatus;
+        }
+      });
+    });
+    this.ref('dialog-preset').addEventListener('change', (event) => {
+      const value = (event.target as HTMLSelectElement).value;
+      if (!value) return;
+      this.app.setPreset(value);
+      this.closeLocationDialog();
+    });
+    this.ref('dialog-coordinates').addEventListener('click', () => {
+      this.closeLocationDialog();
+      this.ref('observer-panel').scrollIntoView({
+        block: 'start',
+        behavior: 'smooth',
+      });
+      window.setTimeout(() => {
+        (this.ref('lat') as HTMLInputElement).focus({ preventScroll: true });
+      }, 300);
+    });
+    forget.addEventListener('click', () => {
+      this.app.forgetSavedLocation();
+      this.dialogMessage = t('location.dialogForgotten');
+      this.ref('dialog-status').textContent = this.dialogMessage;
+      forget.hidden = true;
+    });
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog) this.closeLocationDialog();
+    });
+    dialog.addEventListener('close', () => {
+      document.body.classList.remove('dialog-open');
+      useLocation.disabled = false;
+      if (this.locationPromptRequired) {
+        this.locationPromptRequired = false;
+        this.app.dismissLocationPrompt();
+      }
+    });
+  }
+
+  private maybeOpenLocationDialog(): void {
+    if (this.app.shouldPromptForLocation()) this.openLocationDialog();
+  }
+
+  private openLocationDialog(): void {
+    if (this.locationDialog.open) return;
+    this.dialogMessage = null;
+    this.locationPromptRequired =
+      this.locationPromptRequired || this.app.shouldPromptForLocation();
+    this.ref('dialog-status').textContent =
+      this.app.getState().locationStatus;
+    (this.ref('dialog-forget') as HTMLButtonElement).hidden =
+      !this.app.hasSavedLocation();
+    (this.ref('dialog-preset') as HTMLSelectElement).value = '';
+    (this.ref('dialog-use-location') as HTMLButtonElement).disabled = false;
+    this.locationDialog.showModal();
+    document.body.classList.add('dialog-open');
+    this.ref('location-dialog-title').focus({ preventScroll: true });
+  }
+
+  private closeLocationDialog(): void {
+    if (!this.locationDialog.open) return;
+    // Persist before closing: the native `close` event is queued, and a
+    // reload immediately after a tap must still remember the dismissal.
+    if (this.locationPromptRequired) {
+      this.locationPromptRequired = false;
+      this.app.dismissLocationPrompt();
+    }
+    this.locationDialog.close();
+  }
+
+  private locationParts(state: UiState): { name: string; coords: string } {
+    const observer = state.observer;
+    if (!observer) {
+      return { name: t('shell.locationFallback'), coords: '' };
+    }
+    const coords = t('shell.locationCoordinates', {
+      lat: observer.latitudeDeg.toFixed(2),
+      lon: observer.longitudeDeg.toFixed(2),
+    });
+    if (state.locationSource === 'geolocation') {
+      return { name: t('shell.locationBrowser'), coords };
+    }
+    if (state.locationSource === 'fallback') {
+      return { name: t('shell.locationPreview'), coords };
+    }
+    if (state.locationSource === 'offline') {
+      return {
+        name: state.offline.areaLabel ?? t('shell.locationOffline'),
+        coords,
+      };
+    }
+    const presetId = this.presetIdFor(observer);
+    const name = presetId ? this.presetLabel(presetId) : null;
+    return { name: name ?? '', coords };
+  }
+
+  private async shareView(): Promise<void> {
+    const state = this.app.getState();
+    const url = buildShareUrl(window.location.href, state);
+    const time = state.utcMs === null ? '' : formatUtc(state.utcMs);
+    const payload = {
+      title: t('meta.title'),
+      text: t('shell.shareText', { time }),
+      url,
+    };
+    const share = (
+      navigator as Navigator & {
+        share?: (data: { title: string; text: string; url: string }) => Promise<void>;
+      }
+    ).share;
+    if (typeof share === 'function') {
+      try {
+        await share.call(navigator, payload);
+        return;
+      } catch (error) {
+        if ((error as DOMException | undefined)?.name === 'AbortError') return;
+      }
+    }
+    try {
+      await this.copyText(url);
+      this.showToast(t('shell.shareCopied'));
+    } catch {
+      this.showToast(t('shell.shareFailed'), true);
+    }
+  }
+
+  private async copyText(text: string): Promise<void> {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    document.body.append(area);
+    area.select();
+    const copied = document.execCommand('copy');
+    area.remove();
+    if (!copied) throw new Error('copy failed');
+  }
+
+  private showToast(message: string, error = false): void {
+    const toast = this.ref('toast');
+    toast.textContent = message;
+    toast.classList.toggle('error', error);
+    toast.classList.remove('hidden');
+    if (this.toastTimer !== null) window.clearTimeout(this.toastTimer);
+    this.toastTimer = window.setTimeout(() => {
+      toast.classList.add('hidden');
+      this.toastTimer = null;
+    }, 3_200);
   }
 
   private applyManual(): void {
@@ -556,6 +844,21 @@ export class AppUi {
     this.ref('play-button').textContent = state.playing
       ? t('shell.pause')
       : t('shell.play');
+    this.ref('dock-play').textContent = state.playing ? '⏸' : '▶';
+    this.ref('dock-play').setAttribute(
+      'aria-label',
+      state.playing ? t('shell.pauseAria') : t('shell.playAria'),
+    );
+    const dock = this.ref('time-dock');
+    dock.classList.toggle('is-active', state.viewMode === 'sky');
+    if (state.utcMs !== null) {
+      this.ref('dock-utc').textContent = t('shell.dockUtc', {
+        utc: formatUtc(state.utcMs).slice(11, 19),
+      });
+      this.ref('dock-local').textContent = t('shell.dockLocal', {
+        local: localHhMm(state.utcMs, state.timeZone),
+      });
+    }
     const speed = this.ref('speed-select') as HTMLSelectElement;
     if (Number(speed.value) !== state.speed) speed.value = String(state.speed);
     const scrub = this.ref('scrub') as HTMLInputElement;
@@ -568,6 +871,7 @@ export class AppUi {
         (state.utcMs - state.dataWindowStartMs) /
         (state.dataWindowEndMs - state.dataWindowStartMs);
       scrub.value = String(Math.round(Math.max(0, Math.min(1, fraction)) * 10000));
+      (this.ref('dock-scrub') as HTMLInputElement).value = scrub.value;
       this.ref('window-start').textContent = formatUtc(state.dataWindowStartMs).slice(5, 16);
       this.ref('window-end').textContent = formatUtc(state.dataWindowEndMs).slice(5, 16);
       this.ref('window-chip').textContent = t('shell.dataWindowValue', {
@@ -575,21 +879,43 @@ export class AppUi {
         end: formatUtc(state.dataWindowEndMs).slice(0, 16),
       });
     }
-    this.ref('night-button').textContent = state.toggles.nightMode
+    const nightText = state.toggles.nightMode
       ? t('shell.nightModeOn')
       : t('shell.nightModeOff');
+    this.ref('night-label').textContent = nightText;
     this.ref('night-button').setAttribute('aria-pressed', String(state.toggles.nightMode));
+    this.ref('night-button').setAttribute('aria-label', nightText);
+    this.ref('night-button').setAttribute('title', nightText);
     (this.ref('toggle-night') as HTMLInputElement).checked = state.toggles.nightMode;
     (this.ref('toggle-refraction') as HTMLInputElement).checked = state.toggles.refraction;
     (this.ref('toggle-constellations') as HTMLInputElement).checked = state.toggles.constellations;
     (this.ref('toggle-enlarged') as HTMLInputElement).checked = state.toggles.enlargedMarker;
     this.ref('min-good-value').textContent = `${state.minGoodElevationDeg}°`;
     (this.ref('min-good') as HTMLInputElement).value = String(state.minGoodElevationDeg);
-    this.ref('location-chip').textContent = state.observer
-      ? `${state.observer.latitudeDeg.toFixed(2)}°, ${state.observer.longitudeDeg.toFixed(2)}°`
-      : t('shell.locationFallback');
-    this.ref('location-chip').title = state.locationStatus;
+    const location = this.locationParts(state);
+    this.ref('location-chip-name').textContent = location.name;
+    this.ref('location-chip-coords').textContent = location.coords;
+    this.ref('location-chip').classList.toggle(
+      'has-name',
+      location.name !== '',
+    );
+    const locationLabel = location.name
+      ? location.coords
+        ? `${location.name} · ${location.coords}`
+        : location.name
+      : location.coords;
+    this.ref('location-chip').setAttribute(
+      'aria-label',
+      t('shell.locationChipAria', { label: locationLabel }),
+    );
+    this.ref('location-chip').title = `${locationLabel} — ${state.locationStatus}`;
     this.ref('location-status').textContent = state.locationStatus;
+    if (this.locationDialog.open) {
+      this.ref('dialog-status').textContent =
+        this.dialogMessage ?? state.locationStatus;
+      (this.ref('dialog-forget') as HTMLButtonElement).hidden =
+        !this.app.hasSavedLocation();
+    }
     if (state.observer) {
       const observerKey = [
         state.observer.latitudeDeg,
@@ -664,26 +990,40 @@ export class AppUi {
 
   private renderOffline(state: UiState): void {
     const chip = this.ref('offline-chip');
+    const label = this.ref('offline-chip-label');
+    const icon = this.ref('offline-chip-icon');
     const line = this.ref('offline-line');
+    let good = false;
+    let warn = false;
     if (state.offline.active) {
-      chip.textContent = state.offline.mismatch
-        ? t('shell.offlineAreaNotPrepared')
-        : t('shell.offlineReady');
-      chip.classList.toggle('warn', state.offline.mismatch);
-      chip.classList.toggle('good', !state.offline.mismatch);
+      if (state.offline.mismatch) {
+        label.textContent = t('shell.offlineAreaNotPrepared');
+        icon.textContent = '!';
+        warn = true;
+      } else {
+        label.textContent = t('shell.offlineReady');
+        icon.textContent = '✓';
+        good = true;
+      }
       line.textContent = state.offline.message ?? t('shell.offlineMode');
       line.classList.remove('hidden');
       line.classList.toggle('warn', state.offline.mismatch);
       line.classList.toggle('good', !state.offline.mismatch);
     } else {
-      chip.textContent = state.offline.preparedAt
-        ? t('shell.offlinePrepared')
-        : t('shell.offlineNotPrepared');
-      chip.classList.toggle('good', state.offline.preparedAt !== null);
-      chip.classList.toggle('warn', state.offline.preparedAt === null);
+      if (state.offline.preparedAt !== null) {
+        label.textContent = t('shell.offlineReady');
+        icon.textContent = '✓';
+        good = true;
+      } else {
+        label.textContent = t('shell.offlineSaveArea');
+        icon.textContent = '↓';
+      }
       line.textContent = '';
       line.classList.add('hidden');
     }
+    chip.classList.toggle('good', good);
+    chip.classList.toggle('warn', warn);
+    chip.title = t('shell.offlineChipAria');
   }
 
   private presetIdFor(observer: {
@@ -706,8 +1046,10 @@ export class AppUi {
     }
     if (state.utcMs === null) {
       (this.ref('play-button') as HTMLButtonElement).disabled = true;
+      (this.ref('dock-play') as HTMLButtonElement).disabled = true;
     } else {
       (this.ref('play-button') as HTMLButtonElement).disabled = false;
+      (this.ref('dock-play') as HTMLButtonElement).disabled = false;
     }
   }
 

@@ -32,7 +32,26 @@ export const en = {
     brandSubtitle: '(99942) Apophis · 13 April 2029',
     skipToContent: 'Skip to main content',
     locationFallback: 'Location',
+    locationChange: 'Change observing location',
+    locationChipAria: 'Location: {label}. Change location.',
+    locationCoordinates: '{lat}°, {lon}°',
+    locationPresetLabel: '{name} · {lat}°, {lon}°',
+    locationBrowser: 'My location',
+    locationPreview: 'Brasov preview',
+    locationOffline: 'Offline area',
+    shareButton: 'Share',
+    shareAria: 'Share this view',
+    shareText: 'Apophis Watch — 13 April 2029 · {time}',
+    shareCopied: 'Link copied to the clipboard.',
+    shareFailed: 'Could not copy the link.',
+    dockCa: 'Closest',
+    dockCaAria: 'Jump to closest approach',
+    dockUtc: '{utc} UTC',
+    dockLocal: '{local} local',
+    playAria: 'Play',
+    pauseAria: 'Pause',
     offlineChipAria: 'Offline status and preparation',
+    offlineSaveArea: 'Save offline area',
     offlineChecking: 'Offline: checking…',
     nightModeButton: 'Night mode',
     nightModeOn: 'Night mode: on',
@@ -115,7 +134,7 @@ export const en = {
     pwaUpdateReady:
       'A new version is ready. Reload when convenient; the prepared offline area is kept.',
     pwaOfflineReady:
-      'App shell cached for offline use. Open Local 3D and press “Prepare for offline” to store terrain and buildings.',
+      'App shell saved for offline use. You can prepare terrain for a chosen area later in Local 3D.',
     pwaServiceWorkerError: 'Service worker: {error}',
     pwaChecking: 'Checking for a new build…',
     pwaNewBuildReady: 'A new build is ready; use Reload in the banner.',
@@ -1014,6 +1033,10 @@ export const en = {
     requesting: 'Requesting browser location…',
     ephemerisFetchFailed: 'Ephemeris fetch failed: HTTP {status}',
     fromUrl: 'Observer set from URL parameters.',
+    previewStatus:
+      'Brasov preview. Choose your observing location to see the local sky.',
+    restoredStatus:
+      'Restored your last location. Choose a preset or enter coordinates to change it.',
     locatingPreview:
       'Locating you… showing Brasov preview. You can set a location manually.',
     offlineNoPreparedArea: 'Offline mode: no prepared area.',
@@ -1028,11 +1051,23 @@ export const en = {
       'Offline: all sky/AR data and the prepared terrain area are available. Prepared {preparedAt}.',
     offlineOneArea: 'one area',
     geolocationUnavailable:
-      'Geolocation is unavailable. Using the Brasov preview; set coordinates or a preset.',
+      'Geolocation is unavailable. Keeping the current location; set coordinates or choose a preset.',
     usingBrowser:
       'Using browser location. GPS altitude ignored; eye height 1.7 m above unknown ground (no terrain data).',
     denied:
-      'Location permission denied or unavailable. Using the Brasov preview; set coordinates or choose a preset.',
+      'Location permission denied or unavailable. Keeping the current location; set coordinates or choose a preset.',
+    dialogTitle: 'Where are you observing from?',
+    dialogIntro:
+      'Apophis passes on 13 April 2029. Your location sets the sky, event times and local horizon; it is stored only in this browser.',
+    dialogUseLocation: 'Use my location',
+    dialogCoordinates: 'Enter coordinates',
+    dialogPresetLabel: 'Or choose a preset',
+    dialogPresetPlaceholder: 'Choose a location…',
+    dialogKeep: 'Not now',
+    dialogClose: 'Close',
+    dialogForget: 'Forget saved location',
+    dialogForgotten:
+      'Saved location forgotten. This session keeps its current location.',
     presetStatus:
       '{preset} preset. Ground elevation {elevation} m + eye height; no terrain data.',
     validationLat: 'Latitude must be between -90 and 90 degrees.',

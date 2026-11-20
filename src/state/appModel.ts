@@ -24,7 +24,17 @@ import {
   type UiStore,
   type ViewMode,
 } from './store';
+import {
+  defaultPreferences,
+  loadPreferences,
+  savePreferences,
+  type StoredPreferences,
+} from './preferences';
 import { PRESETS, type PresetLocation } from './appTypes';
+
+type InitialLocationSource = 'url' | 'stored' | 'offline' | 'fallback';
+
+const VIEW_MODES: ViewMode[] = ['sky', 'space', 'local', 'ar'];
 
 export interface EphemerisSourceInfo {
   provider: string;
@@ -68,6 +78,10 @@ export class AppModel {
   private geolocationRequested = false;
   private offlineSnapshot: OfflineSnapshot | null = null;
   private usingOfflineData = false;
+  private preferences: StoredPreferences = defaultPreferences();
+  private initializing = true;
+  private initialLocationSource: InitialLocationSource = 'fallback';
+  private persistTimer: number | null = null;
 
   constructor(store: UiStore = uiStore, baseUrl = import.meta.env.BASE_URL) {
     this.store = store;
@@ -86,16 +100,17 @@ export class AppModel {
     return this.store.subscribe(listener);
   }
 
-  useBrowserLocation(): void {
+  useBrowserLocation(onResult?: (ok: boolean) => void): void {
     if (this.usingOfflineData) {
       this.store.update({
         locationStatus: t('location.browserOffline'),
       });
+      onResult?.(false);
       return;
     }
     this.geolocationRequested = false;
     this.store.update({ locationStatus: t('location.requesting') });
-    this.requestGeolocation();
+    this.requestGeolocation(onResult);
   }
 
   getEphemeris(): TableEphemeris | null {
@@ -156,8 +171,16 @@ export class AppModel {
 
     this.dataFile = data;
     this.ephem = new TableEphemeris(data);
+
+    this.preferences = loadPreferences();
+    this.store.updateToggles(this.preferences.toggles);
+    this.store.update({
+      minGoodElevationDeg: this.preferences.minGoodElevationDeg,
+    });
+
     const snapshot = this.offlineSnapshot;
     const urlObserver = this.observerFromUrl();
+    const storedObserver = this.preferences.observer;
     const fallback = this.observerFromPreset(PRESETS[0]);
     const offlineObserver = snapshot
       ? {
@@ -169,18 +192,29 @@ export class AppModel {
       : null;
     const observer = this.usingOfflineData
       ? urlObserver ?? offlineObserver ?? fallback
-      : urlObserver ?? fallback;
+      : urlObserver ?? storedObserver ?? fallback;
     const source: LocationSource = this.usingOfflineData
       ? 'offline'
       : urlObserver
         ? 'url'
-        : 'fallback';
+        : storedObserver
+          ? 'manual'
+          : 'fallback';
+    this.initialLocationSource = this.usingOfflineData
+      ? 'offline'
+      : urlObserver
+        ? 'url'
+        : storedObserver
+          ? 'stored'
+          : 'fallback';
     const status = this.usingOfflineData
       ? this.offlineLocationStatus(observer, urlObserver !== null)
       : urlObserver
         ? t('location.fromUrl')
-        : t('location.locatingPreview');
-    this.applyObserver(observer, source, status, false);
+        : storedObserver
+          ? t('location.restoredStatus')
+          : t('location.previewStatus');
+    this.applyObserver(observer, source, status, false, false);
 
     if (this.usingOfflineData && snapshot?.stars) {
       try {
@@ -196,10 +230,6 @@ export class AppModel {
     this.store.update({ ready: true });
     this.refreshOfflineState();
 
-    if (!urlObserver && !this.usingOfflineData) {
-      this.requestGeolocation();
-    }
-
     const urlUtc = this.urlUtc();
     if (urlUtc !== null) {
       this.setUtc(urlUtc);
@@ -208,17 +238,23 @@ export class AppModel {
     }
 
     const params = new URLSearchParams(window.location.search);
-    const view = params.get('view');
-    if (view === 'space' || view === 'sky' || view === 'local' || view === 'ar') {
-      this.setViewMode(view);
-    }
+    const urlView = params.get('view');
+    const initialView =
+      urlView && VIEW_MODES.includes(urlView as ViewMode)
+        ? (urlView as ViewMode)
+        : this.preferences.viewMode;
+    this.setViewMode(initialView);
     if (params.get('refraction') === '0') this.setToggle('refraction', false);
     if (params.get('night') === '1') this.setToggle('nightMode', true);
     if (params.get('constellations') === '0') this.setToggle('constellations', false);
     if (params.get('enlarged') === '1') this.setToggle('enlargedMarker', true);
-    const minEl = Number(params.get('minEl'));
-    if (Number.isFinite(minEl)) this.setMinGoodElevation(minEl);
+    const minElRaw = params.get('minEl');
+    if (minElRaw !== null && minElRaw.trim() !== '') {
+      const minEl = Number(minElRaw);
+      if (Number.isFinite(minEl)) this.setMinGoodElevation(minEl);
+    }
 
+    this.initializing = false;
     return { catalogue: this.catalogue };
   }
 
@@ -294,8 +330,18 @@ export class AppModel {
       const preset = PRESETS.find((p) => p.id === presetId);
       if (preset) return this.observerFromPreset(preset);
     }
-    const lat = Number(params.get('lat'));
-    const lon = Number(params.get('lon'));
+    const latRaw = params.get('lat');
+    const lonRaw = params.get('lon');
+    if (
+      latRaw === null ||
+      latRaw.trim() === '' ||
+      lonRaw === null ||
+      lonRaw.trim() === ''
+    ) {
+      return null;
+    }
+    const lat = Number(latRaw);
+    const lon = Number(lonRaw);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
     const elevRaw = params.get('elev');
     const eyeRaw = params.get('eye');
@@ -335,6 +381,7 @@ export class AppModel {
     source: LocationSource,
     status: string,
     preserveTime = true,
+    persistObserver = true,
   ): void {
     if (!this.ephem) return;
     const previous = this.store.getState();
@@ -359,15 +406,23 @@ export class AppModel {
       error: null,
     });
     this.refreshOfflineState();
+    if (!this.initializing) {
+      if (persistObserver) {
+        this.preferences.observer = { ...observer };
+        this.preferences.locationPromptDismissed = true;
+      }
+      this.persistPreferences();
+    }
   }
 
-  private requestGeolocation(): void {
+  private requestGeolocation(onResult?: (ok: boolean) => void): void {
     if (this.geolocationRequested) return;
     this.geolocationRequested = true;
     if (!('geolocation' in navigator)) {
       this.store.update({
         locationStatus: t('location.geolocationUnavailable'),
       });
+      onResult?.(false);
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -382,11 +437,13 @@ export class AppModel {
           'geolocation',
           t('location.usingBrowser'),
         );
+        onResult?.(true);
       },
       () => {
         this.store.update({
           locationStatus: t('location.denied'),
         });
+        onResult?.(false);
       },
       { enableHighAccuracy: false, timeout: 8_000, maximumAge: 600_000 },
     );
@@ -481,14 +538,77 @@ export class AppModel {
 
   setViewMode(mode: ViewMode): void {
     this.store.update({ viewMode: mode, auxStatus: null });
+    this.persistPreferences();
   }
 
   setToggle<K extends keyof DisplayToggles>(key: K, value: DisplayToggles[K]): void {
     this.store.updateToggles({ [key]: value } as Partial<DisplayToggles>);
+    this.persistPreferences();
   }
 
   setMinGoodElevation(deg: number): void {
     this.store.update({ minGoodElevationDeg: Math.min(90, Math.max(0, deg)) });
+    this.persistPreferencesSoon();
+  }
+
+  /** True only when no URL, stored or prepared-area location was available. */
+  shouldPromptForLocation(): boolean {
+    return (
+      this.initialLocationSource === 'fallback' &&
+      !this.preferences.locationPromptDismissed
+    );
+  }
+
+  hasSavedLocation(): boolean {
+    return this.preferences.observer !== null;
+  }
+
+  dismissLocationPrompt(): void {
+    this.preferences.locationPromptDismissed = true;
+    this.persistPreferences();
+  }
+
+  /** Forget the stored place but keep the current in-memory observer. */
+  forgetSavedLocation(): void {
+    this.preferences.observer = null;
+    this.preferences.locationPromptDismissed = false;
+    this.persistPreferences();
+  }
+
+  shouldShowOfflineReadyBanner(): boolean {
+    return !this.preferences.offlineBannerDismissed;
+  }
+
+  dismissOfflineReadyBanner(): void {
+    this.preferences.offlineBannerDismissed = true;
+    this.persistPreferences();
+  }
+
+  private persistPreferences(): void {
+    if (this.initializing) return;
+    if (this.persistTimer !== null) {
+      window.clearTimeout(this.persistTimer);
+      this.persistTimer = null;
+    }
+    const state = this.store.getState();
+    this.preferences = {
+      ...this.preferences,
+      // AR needs camera/sensor permission and a user gesture. Restoring it on
+      // launch would prompt before the user asks, so reopen on the sky instead.
+      viewMode: state.viewMode === 'ar' ? 'sky' : state.viewMode,
+      toggles: { ...state.toggles },
+      minGoodElevationDeg: state.minGoodElevationDeg,
+    };
+    savePreferences(this.preferences);
+  }
+
+  /** Sliders fire continuously; avoid one synchronous storage write per pixel. */
+  private persistPreferencesSoon(): void {
+    if (this.initializing || this.persistTimer !== null) return;
+    this.persistTimer = window.setTimeout(() => {
+      this.persistTimer = null;
+      this.persistPreferences();
+    }, 200);
   }
 
   /**
@@ -531,16 +651,19 @@ export class AppModel {
   setGroundElevationM(elevationM: number): void {
     const current = this.store.getState().observer;
     if (!current || !Number.isFinite(elevationM)) return;
+    const source = this.store.getState().locationSource;
     this.applyObserver(
       {
         ...current,
         groundElevationM: Math.min(9000, Math.max(-500, elevationM)),
       },
-      this.store.getState().locationSource,
+      source,
       t('location.groundFromDem', {
         elevation: elevationM.toFixed(1),
         eye: current.eyeHeightM.toFixed(1),
       }),
+      true,
+      this.shouldPersistObserverSource(source),
     );
   }
 
@@ -548,10 +671,19 @@ export class AppModel {
     const current = this.store.getState().observer;
     if (!current || !Number.isFinite(eyeHeightM)) return;
     const clamped = Math.min(100, Math.max(0, eyeHeightM));
+    const source = this.store.getState().locationSource;
     this.applyObserver(
       { ...current, eyeHeightM: clamped },
-      this.store.getState().locationSource,
+      source,
       t('location.eyeHeightStatus', { eye: clamped.toFixed(1) }),
+      true,
+      this.shouldPersistObserverSource(source),
+    );
+  }
+
+  private shouldPersistObserverSource(source: LocationSource): boolean {
+    return (
+      source === 'manual' || source === 'preset' || source === 'geolocation'
     );
   }
 
