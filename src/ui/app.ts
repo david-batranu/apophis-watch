@@ -1085,6 +1085,9 @@ export class AppUi {
           radiusM?: number;
           retrievedAt?: string;
           source?: string;
+          sourceEndpoint?: string;
+          sourceQuery?: string;
+          license?: string;
           buildingCount?: number;
         }>;
       };
@@ -1105,6 +1108,17 @@ export class AppUi {
               retrieved: esc(area.retrievedAt ?? '—'),
               source: area.source
                 ? t('shell.aboutAreaSource', { source: esc(area.source) })
+                : '',
+              endpoint: area.sourceEndpoint
+                ? t('shell.aboutAreaEndpoint', {
+                    endpoint: esc(area.sourceEndpoint),
+                  })
+                : '',
+              query: area.sourceQuery
+                ? t('shell.aboutAreaQuery', { query: esc(area.sourceQuery) })
+                : '',
+              license: area.license
+                ? t('shell.aboutAreaLicense', { license: esc(area.license) })
                 : '',
             }),
         )

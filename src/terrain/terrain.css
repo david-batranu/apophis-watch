@@ -26,7 +26,7 @@
   --tw-panel-2: #120202;
   --tw-panel-3: #1a0303;
   --tw-text: #ff8a7a;
-  --tw-muted: #a33a30;
+  --tw-muted: #d05a4a;
   --tw-accent: #ff3b30;
   --tw-accent-2: #ff6a5e;
   --tw-border: #4a0d08;
@@ -626,4 +626,12 @@
   .tw-field-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.tw-night .tw-heatmap-image {
+  filter: grayscale(1) sepia(1) saturate(6) hue-rotate(-35deg) brightness(0.72);
+}
+
+.tw-night .leaflet-overlay-pane {
+  filter: grayscale(1) sepia(1) saturate(5) hue-rotate(-35deg) brightness(0.85);
 }

@@ -166,9 +166,9 @@ Measured with `npm run measure:perf` on headless Chromium at 390×844 with
 
 | View | Frames / 12 s | Mean | p50 | p95 | Max | >20 ms |
 |---|---:|---:|---:|---:|---:|---:|
-| Sky | 716 | 4.44 ms | 4.1 ms | **5.6 ms** | 25.0 ms | 4 |
-| Local 3D | 364 | 3.86 ms | 3.4 ms | **5.5 ms** | 17.2 ms | 0 |
-| AR | 719 | 2.32 ms | 2.0 ms | **3.4 ms** | 19.3 ms | 0 |
+| Sky | 717 | 4.01 ms | 3.6 ms | **5.4 ms** | 24.7 ms | 2 |
+| Local 3D | 370 | 3.74 ms | 3.2 ms | **5.3 ms** | 17.8 ms | 0 |
+| AR | 720 | 2.23 ms | 1.9 ms | **3.5 ms** | 15.9 ms | 0 |
 
 - The renderer was **SwiftShader** (`ANGLE (Google, Vulkan 1.3.0 (SwiftShader
   Device ...), SwiftShader driver)`), i.e. software rendering. Local 3D is
@@ -180,9 +180,10 @@ Measured with `npm run measure:perf` on headless Chromium at 390×844 with
   SwiftShader.
 - A 10-minute mixed session (sky/local/AR cycled while paused) sampled JS heap
   and listener counts every ~62 s. The first local load creates transient
-  geometry (137 MiB at 62 s), after which the session settled around
-  **20–22 MiB** with listeners ~140–180; the final verifier should compare the
-  start/end samples. This is Chromium heap, not a phone memory measurement.
+  geometry (137 MiB at 62 s), after which the session settled at
+  **20–22 MiB** with listeners 140–180 (samples at 124/185/247/309/370/432/493 s:
+  21.5, 21.8, 21.1, 20.6, 20.2, 21.8, 20.9 MiB). No monotonic growth was
+  observed. This is Chromium heap, not a phone memory measurement.
 - Best-spot search: 317 candidates × 3 height scenarios in **~2.0 s** on this
   desktop after sharing one terrain horizon and using a building spatial index;
   the default 2,821-candidate search is projected at ~18 s and remains a
@@ -195,13 +196,13 @@ drain are on the real-phone checklist.
 
 | Asset | Raw | Gzip |
 |---|---:|---:|
-| initial JS | 788.25 kB | 213.97 kB |
-| terrain chunk | 284.99 kB | 81.35 kB |
+| initial JS | 788.65 kB | 214.08 kB |
+| terrain chunk | 284.99 kB | 81.34 kB |
 | AR chunk | 79.99 kB | 23.35 kB |
 | best-spot worker | 13.63 kB | — |
-| CSS (initial/terrain/AR) | 12.85 / 23.92 / 8.03 kB | 3.33 / 8.61 / 2.29 kB |
+| CSS (initial/terrain/AR) | 12.85 / 24.12 / 8.03 kB | 3.33 / 8.66 / 2.29 kB |
 
-Service-worker precache: 22 entries, 1,245.67 KiB. Terrain and AR remain
+Service-worker precache: 22 entries, 1,246.26 KiB. Terrain and AR remain
 separate lazy chunks; the worker is separate. The worker was 68.7 kB before
 the text/scoring split; moving `describeBestSpot` and compass labels out of the
 worker path brought it back to 13.6 kB.

@@ -13,11 +13,11 @@ that service forbids prefetch/offline use. See [Deployment](DEPLOYMENT.md),
 [Event-day guide](EVENT-DAY.md) and
 [Real-phone checklist](REAL-PHONE-CHECKLIST.md).
 
-Production build: initial JS **788.25 kB** (213.97 kB gzip), terrain
-**284.99 kB** (81.35 kB gzip), AR **79.99 kB** (23.35 kB gzip) and a
+Production build: initial JS **788.65 kB** (214.08 kB gzip), terrain
+**284.99 kB** (81.34 kB gzip), AR **79.99 kB** (23.35 kB gzip) and a
 best-spot worker **13.63 kB**. Terrain and AR remain separate lazy chunks; the
 service worker precaches them for offline use without executing them.
-Precache: 22 entries, 1,245.67 KiB.
+Precache: 22 entries, 1,246.26 KiB.
 
 ## Run
 
@@ -76,6 +76,11 @@ ignored. The shared sky/AR observer uses the preset/manual ground elevation or
 - `src/pwa.ts` — `vite-plugin-pwa` registration, update prompt and periodic
   update checks. The worker is prompt-based and never skips waiting
   automatically; data JSON is excluded from precache.
+- `src/i18n/` — the single English string catalogue and typed `t()` lookup.
+  Romanian `ro-RO` is the default date/number formatting locale; the copy is
+  English in this build.
+- `src/perf.ts` — per-frame `performance.measure` telemetry, p50/p95/max,
+  memory snapshot and WebGL renderer detection.
 - `src/ui/` — panel shell, controls, readout, elevation/magnitude plot,
   event-day guide, About/offline panel, debug overlay, time formatting.
 - `src/core/` — vector and time-scale utilities.

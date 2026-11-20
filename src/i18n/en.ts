@@ -198,8 +198,11 @@ export const en = {
       '<p>No bundled building manifest is available (offline or not built). Live Overpass and manual import remain available.</p>',
     aboutAreaFallback: 'Area',
     aboutAreaItem:
-      '<li><strong>{name}</strong> · {lat}°, {lon}° · r={radius} m · {count} buildings · retrieved {retrieved}{source}</li>',
+      '<li><strong>{name}</strong> · {lat}°, {lon}° · r={radius} m · {count} buildings · retrieved {retrieved}{source}{endpoint}{query}{license}</li>',
     aboutAreaSource: ' · {source}',
+    aboutAreaEndpoint: ' · endpoint {endpoint}',
+    aboutAreaQuery: ' · query <code>{query}</code>',
+    aboutAreaLicense: ' · {license}',
     creditsBlock: `<strong>Ephemeris:</strong> NASA/JPL Horizons, solution JPL#220, retrieved 2026-11-19. H=19.09, G=0.24, radius 0.170 km.
       <br /><strong>Astronomy engine:</strong> astronomy-engine (MIT) for Sun/Moon/planets, sidereal time and precession/nutation.
       {starCredit}{constellationCredit}
