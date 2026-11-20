@@ -422,8 +422,15 @@ test('measured sky frame time at 4x CPU throttle', async ({ page }) => {
         requestAnimationFrame(tick);
       }),
   );
-  console.log(
-    `Frame timing, sky view, 4x CPU throttle: mean ${stats.mean.toFixed(2)} ms, p95 ${stats.p95.toFixed(2)} ms, max ${stats.max.toFixed(2)} ms over ${stats.frames} frames`,
+  const mainThread = await page.evaluate(() =>
+    window.__apophisPerf?.summary(900),
   );
-  expect(stats.p95).toBeLessThan(25);
+  console.log(
+    `Frame timing, sky view, 4x CPU throttle: mean ${stats.mean.toFixed(2)} ms, p95 ${stats.p95.toFixed(2)} ms, max ${stats.max.toFixed(2)} ms over ${stats.frames} frames; main-thread p50/p95/max ${mainThread?.p50Ms.toFixed(2)}/${mainThread?.p95Ms.toFixed(2)}/${mainThread?.maxMs.toFixed(2)} ms`,
+  );
+  // Display cadence is 60 Hz, so a 30 fps floor is ~33.4 ms. The main-thread
+  // number is the stable part; headless CI can be loaded by parallel work.
+  expect(stats.p95).toBeLessThan(34);
+  expect(mainThread).not.toBeNull();
+  expect(mainThread!.p95Ms).toBeLessThan(25);
 });
