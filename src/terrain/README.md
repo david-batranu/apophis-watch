@@ -51,6 +51,12 @@ horizon/3D view uses the local value while the shared sky tab keeps its own.
   `R(1 − cos(d/R))`; at 10 km it is 7.85 m. The geometric horizon of a flat
   plane for a 1.7 m eye is the tangent point at √(2Rh) ≈ 4.65 km, which the
   ray march finds correctly.
+- The shared astronomy ground elevation uses the Mercator pixel sample at the
+  observer. The local 3D mesh anchors at the constant-spacing ENU sample at
+  (0,0), because that is the ground the mesh actually draws. At Cape Town the
+  two differed by **0.92 m** (14.49 m ENU vs 15.41 m Mercator) on the
+  verifier's real DEM. `sceneGroundElevationM()` performs this anchor; the
+  camera eye height is measured from the mesh, not from a 0.9 m pedestal.
 
 ### Buildings
 
@@ -61,8 +67,10 @@ horizon/3D view uses the local value while the shared sky tab keeps its own.
   from `Retry-After`; 502/503/504 are reported as "at capacity". The UI's
   Fetch button is the only retry.
 - Height priority: `building:height` → `height` → `building:levels × 3` →
-  8 m default. Metres and feet are parsed. The UI shows the number and share of
-  default-height buildings; they extrude amber in 3D. The sample Brasov 1 km
+  8 m default. Metres and feet are parsed. `building=no` is skipped
+  case-insensitively so construction-site outlines do not become phantom 8 m
+  obstructions. The UI shows the number and share of default-height
+  buildings; they extrude amber in 3D. The sample Brasov 1 km
   query had 2,828 ways, of which 2,750 (97%) use the 8 m default — a useful
   warning about OSM height completeness.
 - Best-spot searches expand the query to
@@ -75,6 +83,11 @@ horizon/3D view uses the local value while the shared sky tab keeps its own.
 - `computeHorizonSlopes` ray-marches the DEM at 1° azimuth bins (or a caller's
   subset), using slope space so no `atan2` is needed per terrain sample. It
   records source (terrain/building), distance and top elevation.
+- Terrain is sampled at the nearest cell with a step of ~0.9 × DEM spacing.
+  The independent verifier measured **+0.055°** on a synthetic ridge and
+  **0.127°** against an independent real-DEM march. Both are sub-bin for the
+  1° profile; this is a deliberate speed/accuracy trade-off, not exact
+  ray-tracing.
 - Buildings are represented by their footprint edges sampled every 2 m; the
   nearest wall/roof edge determines the obstruction angle. A ground-level point
   inside a footprint scores 0 (not a valid observing spot); a rooftop eye above
@@ -121,7 +134,9 @@ containing the topocentric CA is **2029-04-13 17:32:35 → 22:44:06 UTC**
 
 - Three.js, metric ENU: +x east, +y up, +z south. Terrain mesh is downsampled
   to at most 512² vertices; building footprints are extruded with ear-clipped
-  roofs.
+  roofs. Ring winding is normalised by signed area before clipping, so
+  clockwise concave OSM footprints (common in practice) still produce a
+  complete roof.
 - Camera at eye height, pointer-drag look, wheel/pinch FOV, N/E/S/W shortcuts.
 - The horizon profile and Apophis trail/marker are drawn on a far dome and
   depth-tested against terrain/buildings, so occlusion is visible rather than
@@ -154,6 +169,8 @@ containing the topocentric CA is **2029-04-13 17:32:35 → 22:44:06 UTC**
 - The `visibleIntervalForJump` pass is used, not every dark interval in the
   ±24 h data window. This is intentional: it is the physical window around
   the close approach.
+- Horizon rays use nearest-cell sampling and a 0.9-pixel step; the measured
+  sub-bin error is documented above (≤0.055° synthetic, 0.127° real DEM).
 - Buildings are assumed flat-roofed, no `min_height`/building parts, and roof
   triangulation uses ear clipping without holes.
 - DEM tiles are a snapshot of the AWS service; no refresh is scheduled.

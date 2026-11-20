@@ -35,6 +35,7 @@ import {
   buildingAtPoint,
   loadTerrainGrid,
   prepareBuildings,
+  sceneGroundElevationM,
   tallestBuildingAtPoint,
   type TerrainLoadProgress,
 } from './terrainGrid';
@@ -894,7 +895,7 @@ export class TerrainUi implements TerrainWorkstream {
         this.viewpoint = {
           eastM: 0,
           northM: 0,
-          groundElevationM: grid.observerGroundElevationM,
+          groundElevationM: sceneGroundElevationM(grid),
         };
         this.viewpointLatDeg = observer.latitudeDeg;
         this.viewpointLonDeg = observer.longitudeDeg;

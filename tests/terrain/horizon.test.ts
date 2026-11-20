@@ -113,6 +113,34 @@ describe('horizon profile from synthetic terrain', () => {
     expect(side.elevationDeg).toBeLessThan(0);
   });
 
+  it('matches an independently computed synthetic ridge within 0.06°', () => {
+    const ridgeCentreM = 1_000;
+    const ridgeHalfWidthM = 50;
+    const ridgeHeightM = 50;
+    const grid = makeGrid({
+      halfSizeM: 2_000,
+      spacingM: 5,
+      elevation: (_east, north) =>
+        Math.abs(north - ridgeCentreM) <= ridgeHalfWidthM ? ridgeHeightM : 0,
+    });
+    const profile = computeHorizonProfile(grid, FLAT_POINT, [], {
+      azimuthsDeg: [0],
+      maxDistanceM: 2_000,
+      stepM: 4.5,
+    });
+    const sample = profile.samples[0];
+    // Independent geometry: the nearest top edge of the ridge is at 950 m.
+    const edgeM = ridgeCentreM - ridgeHalfWidthM;
+    const expected =
+      (Math.atan2(ridgeHeightM - FLAT_POINT.eyeHeightM - drop(edgeM), edgeM) *
+        180) /
+      Math.PI;
+    expect(sample.source).toBe('terrain');
+    expect(sample.elevationDeg).toBeGreaterThan(expected - 0.06);
+    expect(sample.elevationDeg).toBeLessThan(expected + 0.06);
+    expect(Math.abs(sample.elevationDeg - expected)).toBeLessThan(0.06);
+  });
+
   it('interpolates the 1-degree profile at intermediate azimuths', () => {
     const grid = makeGrid({ halfSizeM: 1_000, spacingM: 10 });
     const profile = computeHorizonProfile(grid, FLAT_POINT, [], {
