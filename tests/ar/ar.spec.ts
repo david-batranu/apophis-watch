@@ -624,6 +624,30 @@ test('sensor denial keeps its cause and enables touch fallback', async ({ page }
   await expect(page.locator('[data-role="status-sensor"]')).toContainText(/Sensors denied/);
   await expect(page.locator('.ar-message')).toContainText(/denied/i);
   await expect(page.locator('.ar-message')).not.toContainText(/No motion sensor data arrived/i);
+
+  // The denial must survive an unmount/remount rather than degrading to the
+  // generic "no sensor data" fallback.
+  await page.evaluate(() => {
+    (
+      window as unknown as { __arHarness: { workstream: { unmount: () => void } } }
+    ).__arHarness.workstream.unmount();
+  });
+  await page.evaluate(() => {
+    (
+      window as unknown as { __arHarness: { workstream: { mount: () => void } } }
+    ).__arHarness.workstream.mount();
+  });
+  await expect(page.locator('[data-role="debug"]')).toBeVisible();
+  await page.waitForTimeout(500);
+  await expect(page.locator('[data-role="status-sensor"]')).toContainText(/Sensors denied/);
+  await expect(page.locator('.ar-message')).toContainText(/Sensor permission denied/i);
+  await expect(page.locator('.ar-root')).toHaveClass(/ar-touch/);
+  await page.locator('.ar-panel').nth(1).locator('summary').click();
+  await expect(page.locator('[data-role="touch-toggle"]')).toBeChecked();
+  await page.waitForTimeout(3200);
+  await expect(page.locator('[data-role="status-sensor"]')).toContainText(/Sensors denied/);
+  await expect(page.locator('.ar-message')).toContainText(/Sensor permission denied/i);
+  await expect(page.locator('.ar-message')).not.toContainText(/No motion sensor data arrived/i);
 });
 
 test('camera state is explicit and the overlay survives a denied/fake camera', async ({ page }) => {
@@ -679,6 +703,33 @@ test('iOS-style compass heading is used, and negative accuracy is rejected', asy
   expect(Math.abs(num(compass.headingTrue) - 106.715)).toBeLessThan(1);
   await expect(page.locator('[data-role="status-sensor"]')).toContainText(/Compass/);
   await page.screenshot({ path: resolve(SHOTS, 'ar-11-ios-compass.png') });
+
+  // Sub-degree accuracy must not be rounded to ±0° in the detail.
+  await page.evaluate(() => {
+    (
+      window as unknown as {
+        __arHarness: {
+          dispatchOrientation: (options: Record<string, unknown>) => void;
+        };
+      }
+    ).__arHarness.dispatchOrientation({
+      type: 'deviceorientation',
+      alpha: 0,
+      beta: 90,
+      gamma: 0,
+      absolute: false,
+      compassHeading: 100,
+      compassAccuracy: 0.5,
+    });
+  });
+  await page.waitForFunction(
+    () =>
+      document.querySelector<HTMLElement>('[data-role="debug"]')?.dataset.compassAccuracy === '0.5',
+  );
+  await expect(page.locator('[data-role="error-estimate"]')).toContainText(
+    'device compass ±0.5°',
+  );
+  await expect(page.locator('[data-role="status-accuracy"]')).toContainText('±1.0° est.');
 
   // A negative webkitCompassAccuracy means "unusable". Wait out the absolute
   // event guard, then send the same heading with accuracy -1.

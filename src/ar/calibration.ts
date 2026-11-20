@@ -489,7 +489,7 @@ export function estimatePointingError(
   detailParts.push(
     compassAccuracy === null
       ? 'device compass accuracy not reported; 5–15° is typical (a 2026 iPhone field test saw ±14–16°)'
-      : `device compass ±${compassAccuracy.toFixed(0)}°`,
+      : `device compass ±${compassAccuracy.toFixed(1)}°`,
   );
   if (calibrationResidual !== null && calibrationResidual > 0.05) {
     detailParts.push(`alignment residual ±${calibrationResidual.toFixed(1)}°`);
