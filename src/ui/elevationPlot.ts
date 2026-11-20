@@ -55,7 +55,7 @@ export class ElevationPlot {
     this.canvas.className = 'plot-canvas';
     this.canvas.setAttribute(
       'aria-label',
-      'Elevation and magnitude of Apophis versus time. The same values are in the live readout.',
+      t('shell.plotCanvasAria'),
     );
     host.appendChild(this.canvas);
     const ctx = this.canvas.getContext('2d');

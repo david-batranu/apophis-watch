@@ -128,6 +128,7 @@ describe('scoped UI modules', () => {
   const patterns: RegExp[] = [
     /(?:textContent|innerHTML|fillText)\s*=\s*['"`]([^'"`]+)['"`]/g,
     /aria-label\s*=\s*"([^"]+)"/g,
+    /setAttribute\(\s*['"]aria-label['"]\s*,\s*['"`]([^'"`]+)['"`]/g,
     /placeholder\s*=\s*"([^"]+)"/g,
     /title:\s*['"`]([^'"`]+)['"`]/g,
     />(\s*[A-Z][^<>{}]*?)</g,

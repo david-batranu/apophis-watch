@@ -185,6 +185,8 @@ export class TerrainUi implements TerrainWorkstream {
   private offlineAbort: AbortController | null = null;
   private offlinePrepared: OfflineSnapshot | null = null;
   private offlineBuildingsAppliedAt = 0;
+  private offlineSettingsAppliedAt = 0;
+  private lastOfflineMismatchKey = '';
   private lastOfflineRenderKey = '';
   private lastOfflineMapKey = '';
   private lastVerifiedPreparedAt = 0;
@@ -612,9 +614,22 @@ export class TerrainUi implements TerrainWorkstream {
     if (!this.mounted) return;
     this.map?.setNightMode(state.toggles.nightMode);
     this.scene?.setState({ nightMode: state.toggles.nightMode });
+    if (state.offline.active) {
+      this.applyOfflineSettings();
+      if (state.offline.mismatch) {
+        this.clearForOfflineMismatch();
+      } else {
+        this.lastOfflineMismatchKey = '';
+      }
+    } else {
+      this.offlineSettingsAppliedAt = 0;
+      this.lastOfflineMismatchKey = '';
+    }
     this.syncAll(false);
     void this.renderOfflineStatus(false);
-    if (state.offline.active) this.applyOfflineBuildings();
+    if (state.offline.active && !state.offline.mismatch) {
+      this.applyOfflineBuildings();
+    }
     this.maybeApplyOfflineMap();
   }
 
@@ -1142,7 +1157,9 @@ export class TerrainUi implements TerrainWorkstream {
   private scheduleBuildings(): void {
     if (!this.mounted) return;
     if (this.state?.offline.active) {
-      if (this.offlinePrepared?.buildings) {
+      if (this.state.offline.mismatch) {
+        this.clearForOfflineMismatch();
+      } else if (this.offlinePrepared?.buildings) {
         this.applyOfflineBuildings();
       } else {
         this.ref('building-badge').textContent = t('terrain.buildingsOfflineBadge');
@@ -2269,6 +2286,99 @@ export class TerrainUi implements TerrainWorkstream {
     if (clear) clear.disabled = busy;
   }
 
+  /**
+   * Adopt the radii and sampling settings that were actually prepared. Without
+   * this, an offline reload defaults to a 3 km search and asks for DEM tiles
+   * that were never stored.
+   */
+  private applyOfflineSettings(): void {
+    const snapshot = this.offlinePrepared;
+    if (!snapshot || !this.state?.offline.active || this.state.offline.mismatch) {
+      return;
+    }
+    if (this.offlineSettingsAppliedAt === snapshot.preparedAt) return;
+    this.offlineSettingsAppliedAt = snapshot.preparedAt;
+    this.searchRadiusM = clampNumber(
+      snapshot.area.searchRadiusM,
+      500,
+      10_000,
+    );
+    this.buildingRadiusM = clampNumber(
+      snapshot.area.buildingRadiusM,
+      50,
+      5_000,
+    );
+    this.spacingM = clampNumber(snapshot.area.spacingM, 50, 100);
+    this.marginDeg = clampNumber(snapshot.area.marginDeg, 0, 20);
+    this.ref<HTMLInputElement>('search-radius').value = String(
+      this.searchRadiusM,
+    );
+    this.ref<HTMLInputElement>('building-radius').value = String(
+      this.buildingRadiusM,
+    );
+    this.ref<HTMLInputElement>('spacing').value = String(this.spacingM);
+    this.ref<HTMLInputElement>('margin').value = String(this.marginDeg);
+    this.updateSearchArea();
+  }
+
+  private clearForOfflineMismatch(): void {
+    const observer = this.state?.observer;
+    const key = observer
+      ? `${observer.latitudeDeg.toFixed(5)}|${observer.longitudeDeg.toFixed(5)}`
+      : 'none';
+    if (this.lastOfflineMismatchKey === key) return;
+    this.lastOfflineMismatchKey = key;
+
+    this.terrainAbort?.abort();
+    this.buildingAbort?.abort();
+    this.terrainAbort = null;
+    this.buildingAbort = null;
+    this.bestSpotCancelRequested = true;
+    this.bestSpotWorker?.terminate();
+    this.bestSpotWorker = null;
+    this.bestSpotBusy = false;
+    this.setBestBusy(false);
+
+    this.grid = null;
+    this.lastTerrainKey = '';
+    this.buildingsResult = null;
+    this.preparedBuildings = [];
+    this.lastBuildingKey = '';
+    this.profile = null;
+    this.path = null;
+    this.bestSpot = null;
+    this.viewingCandidate = false;
+
+    this.scene?.setState({
+      grid: null,
+      buildings: [],
+      horizon: null,
+      path: null,
+      viewpoint: null,
+    });
+    this.map?.clearBestSpots();
+    this.map?.clearOfflineBaseMap();
+    this.ref('best-list').innerHTML = '';
+    this.ref('best-summary').textContent = t('terrain.bestSummaryNone');
+    this.ref('best-warning').textContent = '';
+    this.ref('best-status').textContent = t('terrain.offlineTerrainNotPrepared');
+    this.ref('field-check').innerHTML = '';
+    this.ref('dem-info').textContent = t('terrain.offlineDemNotPrepared');
+    this.ref('dem-badge').textContent = t('terrain.badgeDemNotPrepared');
+    this.ref('dem-badge').className = 'tw-badge warn';
+    this.ref('building-info').textContent = t(
+      'terrain.offlineBuildingsNotPrepared',
+    );
+    this.ref('building-badge').textContent = t(
+      'terrain.offlineBuildingsBadgeNotPrepared',
+    );
+    this.ref('building-badge').className = 'tw-badge warn';
+    this.ref('building-detail').textContent =
+      t('terrain.offlineMismatchWarning');
+    this.setStatus(t('terrain.offlineMismatchWarning'), 'warn', true);
+    this.scheduleChart();
+  }
+
   private async prepareOffline(): Promise<void> {
     if (this.offlineBusy) return;
     const observer = this.state?.observer;
@@ -2483,7 +2593,9 @@ export class TerrainUi implements TerrainWorkstream {
 
   private applyOfflineBuildings(): void {
     const snapshot = this.offlinePrepared;
-    if (!snapshot || !this.state?.offline.active) return;
+    if (!snapshot || !this.state?.offline.active || this.state.offline.mismatch) {
+      return;
+    }
     if (this.offlineBuildingsAppliedAt === snapshot.preparedAt && this.buildingsResult) {
       return;
     }

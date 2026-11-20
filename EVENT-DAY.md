@@ -46,13 +46,13 @@ At the Brasov preset (45.6427°, 25.5887°, 600 m ground, 1.7 m eye):
 |---|---|
 | Topocentric closest approach | **2029-04-13 21:35:42 UTC** = 2029-04-14 00:35:42 EEST |
 | Geocentric closest approach | 2029-04-13 21:45:03.557 UTC |
-| Look direction at topocentric CA | **azimuth ≈ 214°, elevation ≈ 42.3°** |
+| Look direction at topocentric CA | **azimuth ≈ 268.9°, elevation ≈ 30.3°** |
 | Visible window (Sun < −6°) | ≈ 17:32 → 22:44 UTC |
-| Highest | ≈ 20:45 UTC at 42.29° |
+| Highest | ≈ 20:45 UTC, az ≈ 214°, elevation 42.29° |
 | Path across the sky | az ≈ 124° → 320°, elevation 0° → 42.3° |
-| Range at topocentric CA | ≈ 34,800 km |
+| Range at topocentric CA | ≈ 34,591 km |
 | True angular size | ≈ 2″ (a point, not a disc) |
-| Brightness | roughly second magnitude, an estimate |
+| Brightness | V ≈ 3.6 at closest approach (H–G estimate; brightens as it nears) |
 
 The object crosses the sky quickly. It will look like a **moving point of
 light**, not a resolved asteroid, a movie-style rock or a long-exposure

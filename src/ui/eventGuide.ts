@@ -180,7 +180,14 @@ export class EventGuide {
     const startLocal = startMs === null ? null : formatLocalLocale(startMs, state.timeZone);
     const endLocal = endMs === null ? null : formatLocalLocale(endMs, state.timeZone);
     const trail = session.trail(caMs, 12, false);
-    const visible = trail.filter((sample) => sample.elevationDeg > 0);
+    const visible = trail.filter(
+      (sample) =>
+        sample.elevationDeg > 0 &&
+        sample.inVisibilityWindow &&
+        (startMs === null ||
+          endMs === null ||
+          (sample.utcMs >= startMs && sample.utcMs <= endMs)),
+    );
     const minAz = visible.length
       ? Math.min(...visible.map((sample) => sample.azimuthDeg))
       : null;

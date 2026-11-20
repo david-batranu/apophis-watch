@@ -38,7 +38,7 @@ can be repeated. Verifier findings are appended below.
 | `npm test` | **208/208** tests, 32 files |
 | `npm run typecheck` | clean (`tsc --noEmit`) |
 | `npm run build` | clean; assets below |
-| `npm run test:e2e` | **15/15** merged Playwright tests |
+| `npm run test:e2e` | **16/16** merged Playwright tests |
 | `npm run test:offline` | **1/1** production-build offline test |
 | `npx playwright test -c tests/ar/playwright.ar.config.ts` | **12/12** AR mock tests |
 | `npm run measure:perf` | see Performance |
@@ -192,17 +192,51 @@ Measured with `npm run measure:perf` on headless Chromium at 390×844 with
 These are headless numbers. Thermal throttling, real GPU cost and real battery
 drain are on the real-phone checklist.
 
+## Independent verifier findings and fixes
+
+A fresh read-only verifier checked policy compliance, a clean-clone `npm ci`
+build, the actual offline flow, PWA update, storage, keyboard/i18n, building
+import/scenarios, event day, field checks, deployment and performance. It
+found four defects; all were fixed and re-tested:
+
+1. **Event-day path direction included a daylight pass.**
+   `eventGuide.ts` filtered only `elevationDeg > 0`; it now requires
+   `inVisibilityWindow` and clips to the chosen visibility interval. Brasov now
+   reports the visible sector **124.3° → 319.8°**, elevation **0.1° → 42.3°**;
+   a new e2e test rejects the old 50.9° start.
+2. **Offline reload did not restore the prepared search radius.** With a 1 km
+   prepare, the app requested a 3 km search and 81 tiles; only 49 were cached
+   and 32 failed. The offline update now adopts the snapshot's search/building
+   radius, spacing and margin before loading. The offline test now asserts
+   `search-radius = 1000` and **0 failed** DEM tiles.
+3. **Snapshot buildings leaked into an unprepared offline location.** The
+   terrain tab now clears the grid/3D/horizon/best-spot/building state when the
+   observer is outside the prepared area and shows “not prepared” instead of
+   the Brasov 9,979-building result. The offline test checks that no 9,979
+   building count is shown at an unprepared point.
+4. **Two ARIA labels bypassed `en.ts`.** `spaceView.ts` and `elevationPlot.ts`
+   now use `shell.spaceCanvasAria` / `shell.plotCanvasAria`; the i18n test also
+   scans `setAttribute('aria-label', ...)`.
+
+After the fixes: **208/208** unit tests, **16/16** merged Playwright,
+**1/1** offline, **12/12** AR, typecheck/build clean. The verifier’s other
+checks passed: no OSM raster prefetch (only 5 viewport tile requests during
+prepare), AWS CC-BY caching, Overpass script policy, no fake data, prompt-based
+update with unchanged prepared snapshot, sub-path SW scope, and independent
+4× performance (Sky p95 5.5 ms, Local 3D p95 5.1 ms, AR p95 3.0 ms; SwiftShader
+software renderer).
+
 ## Build (final)
 
 | Asset | Raw | Gzip |
 |---|---:|---:|
-| initial JS | 788.89 kB | 214.13 kB |
-| terrain chunk | 285.11 kB | 81.36 kB |
+| initial JS | 789.25 kB | 214.18 kB |
+| terrain chunk | 287.66 kB | 81.74 kB |
 | AR chunk | 79.99 kB | 23.35 kB |
 | best-spot worker | 13.63 kB | — |
 | CSS (initial/terrain/AR) | 12.91 / 24.12 / 8.03 kB | 3.35 / 8.66 / 2.29 kB |
 
-Service-worker precache: 22 entries, 1,246.67 KiB. Terrain and AR remain
+Service-worker precache: 22 entries, 1,249.52 KiB. Terrain and AR remain
 separate lazy chunks; the worker is separate. The worker was 68.7 kB before
 the text/scoring split; moving `describeBestSpot` and compass labels out of the
 worker path brought it back to 13.6 kB.

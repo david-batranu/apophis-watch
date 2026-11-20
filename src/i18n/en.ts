@@ -47,6 +47,10 @@ export const en = {
     skyAria: 'Stereographic sky dome',
     skyCanvasAria:
       'Sky dome. Drag or use arrow keys to look; plus and minus zoom; zero resets.',
+    spaceCanvasAria:
+      'Space view: Apophis, Earth and Moon to scale. Camera preset buttons are beside the view.',
+    plotCanvasAria:
+      'Elevation and magnitude of Apophis versus time. The same values are in the live readout.',
     skyHint: 'Drag to look · pinch/scroll to zoom · double-click reset',
     badgeRefracted: 'refracted',
     spaceCameraEarth: 'Earth',
@@ -625,6 +629,11 @@ export const en = {
       'not stored; best-spot scores will be marked incomplete',
     offlineMismatchWarning:
       'This observer is outside the prepared area. Sky and AR still work; terrain maps and best-spot searches for this location do not.',
+    offlineBuildingsNotPrepared:
+      'Buildings: not prepared for this offline location.',
+    offlineDemNotPrepared:
+      'DEM: not prepared for this offline location.',
+    offlineBuildingsBadgeNotPrepared: 'Buildings: not prepared',
     offlineIncomplete: 'Offline data is incomplete.',
     offlineStorage:
       '{persistence} · used {used} · quota {quota}.',

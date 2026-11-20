@@ -41,6 +41,18 @@ test('keyboard navigation works for skip link, tabs and sky canvas', async ({
   );
 });
 
+test('event-day path direction uses the visible pass, not daylight', async ({
+  page,
+}) => {
+  await page.goto(
+    '/?lat=45.6427&lon=25.5887&elev=600&eye=1.7&utc=2029-04-13T21:35:42Z&view=sky',
+  );
+  const plan = page.locator('[data-ref="event-plan"]');
+  await expect(plan).toContainText('124.3');
+  await expect(plan).toContainText('319.8');
+  await expect(plan).not.toContainText('50.9');
+});
+
 test('night contrast and labels are usable', async ({ page }) => {
   await page.goto(URL);
   await page.locator('[data-ref="night-button"]').click();

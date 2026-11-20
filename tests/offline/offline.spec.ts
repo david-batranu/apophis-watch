@@ -57,6 +57,10 @@ test('prepare, go offline, and use sky/local/best-spot/AR from the snapshot', as
   await expect(page.locator('[data-ref="dem-info"]')).toContainText(/cached/i, {
     timeout: 60_000,
   });
+  // The prepared 1 km search radius must be restored; otherwise the app asks
+  // for a larger DEM than the snapshot contains.
+  await expect(page.locator('[data-ref="search-radius"]')).toHaveValue('1000');
+  await expect(page.locator('[data-ref="dem-info"]')).toContainText(/0 failed/i);
   await expect(page.locator('.tw-offline-basemap')).toHaveCount(1);
   await expect(page.locator('[data-ref="building-info"]')).toContainText(
     /buildings|ways/i,
@@ -101,5 +105,11 @@ test('prepare, go offline, and use sky/local/best-spot/AR from the snapshot', as
   );
   await expect(page.locator('[data-ref="dem-badge"]')).toContainText(
     /not prepared/i,
+  );
+  await expect(page.locator('[data-ref="building-info"]')).toContainText(
+    /not prepared/i,
+  );
+  await expect(page.locator('[data-ref="building-info"]')).not.toContainText(
+    '9979',
   );
 });
