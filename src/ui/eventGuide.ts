@@ -201,12 +201,12 @@ export class EventGuide {
         ? `${minAz.toFixed(1)}° (${compass16(minAz)}) → ${maxAz.toFixed(1)}° (${compass16(maxAz)})`
         : '—';
 
-    const elevationMin = Math.min(
-      ...visible.map((sample) => sample.elevationDeg),
-    );
-    const elevationMax = Math.max(
-      ...visible.map((sample) => sample.elevationDeg),
-    );
+    const elevationMin = visible.length
+      ? Math.min(...visible.map((sample) => sample.elevationDeg))
+      : 0;
+    const elevationMax = visible.length
+      ? Math.max(...visible.map((sample) => sample.elevationDeg))
+      : 0;
 
     this.planEl.innerHTML = t('event.plan', {
       location: t('event.locationLine', {

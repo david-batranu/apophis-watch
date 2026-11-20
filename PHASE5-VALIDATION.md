@@ -1,7 +1,8 @@
 # Phase 5 validation — offline PWA, robustness, accessibility
 
-Status: implementation complete; final independent verifier pending. This file
-records the measured numbers and the checks that can be repeated.
+Status: implementation complete; the final independent verifier was run against
+commit `3463318`. This file records the measured numbers and the checks that
+can be repeated. Verifier findings are appended below.
 
 ## Research findings that changed the plan
 
@@ -29,6 +30,18 @@ records the measured numbers and the checks that can be repeated.
 5. **Hosting:** Cloudflare Pages is recommended (custom `_headers`, native SPA
    fallback, unlimited static bandwidth). GitHub Pages works at a root or
    sub-path but has no custom headers and a soft 100 GB/month limit.
+
+## Commands (final)
+
+| Command | Result |
+|---|---|
+| `npm test` | **208/208** tests, 32 files |
+| `npm run typecheck` | clean (`tsc --noEmit`) |
+| `npm run build` | clean; assets below |
+| `npm run test:e2e` | **15/15** merged Playwright tests |
+| `npm run test:offline` | **1/1** production-build offline test |
+| `npx playwright test -c tests/ar/playwright.ar.config.ts` | **12/12** AR mock tests |
+| `npm run measure:perf` | see Performance |
 
 ## Implemented
 

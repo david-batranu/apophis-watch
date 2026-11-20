@@ -17,7 +17,7 @@ export interface TerrainMapOptions {
   offline?: boolean;
 }
 
-const OSM_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const OSM_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const OSM_ATTRIBUTION = t('map.attributionOsm');
 const OFFLINE_ATTRIBUTION = t('map.attributionOffline');
 
