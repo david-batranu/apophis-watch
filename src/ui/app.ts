@@ -1,4 +1,5 @@
 import { jdTdbFromDate } from '../core/time';
+import type { ArWorkstream } from '../ar/host';
 import type { SkyPosition } from '../ephemeris/types';
 import type { AppModel } from '../state/appModel';
 import type { SimulationSession } from '../state/session';
@@ -77,6 +78,8 @@ export class AppUi {
   private lastStripKey = '';
   private lastStripHtml = '';
   private lastObserverKey = '';
+  private ar: ArWorkstream | null = null;
+  private arLoading = false;
 
   constructor(
     private readonly root: HTMLElement,
@@ -127,10 +130,12 @@ export class AppUi {
             <div class="tabs" role="tablist" aria-label="View">
               <button class="tab" data-view="sky" aria-pressed="true" type="button">Sky view</button>
               <button class="tab" data-view="space" aria-pressed="false" type="button">Space view</button>
+              <button class="tab" data-view="ar" aria-pressed="false" type="button">AR</button>
             </div>
             <div class="chip" data-ref="window-chip">Data window: —</div>
           </div>
           <div class="status-line error hidden" data-ref="error-line"></div>
+          <div class="status-line hidden" data-ref="aux-status"></div>
           <section class="grid-main">
             <div class="stage-card">
               <div class="sky-stage" data-ref="sky-panel" aria-label="Stereographic sky dome">
@@ -154,6 +159,9 @@ export class AppUi {
                   1 scene unit = 1,000 km · Earth radius 6,378 km · GEO ring 42,164 km · Moon orbit 384,400 km<br />
                   Apophis is a true-scale point; its 340 m disc is invisible at this scale.
                 </div>
+              </div>
+              <div class="ar-view-stage hidden" data-ref="ar-panel">
+                <div class="ar-host" data-ref="ar-host"></div>
               </div>
             </div>
             <aside class="aside-stack">
@@ -434,7 +442,7 @@ export class AppUi {
       const preset = this.presetIdFor(state.observer);
       (this.ref('preset-select') as HTMLSelectElement).value = preset;
     }
-    for (const view of ['sky', 'space'] as const) {
+    for (const view of ['sky', 'space', 'ar'] as const) {
       const active = state.viewMode === view;
       this.root
         .querySelector<HTMLElement>(`[data-view="${view}"]`)
@@ -442,7 +450,21 @@ export class AppUi {
     }
     this.ref('sky-panel').classList.toggle('hidden', state.viewMode !== 'sky');
     this.ref('space-panel').classList.toggle('hidden', state.viewMode !== 'space');
+    this.ref('ar-panel').classList.toggle('hidden', state.viewMode !== 'ar');
+    if (state.viewMode === 'ar') {
+      void this.ensureAr(state);
+    } else if (this.ar) {
+      this.ar.unmount();
+      this.ar = null;
+    }
     this.setError(state.error);
+    const aux = this.ref('aux-status');
+    aux.textContent = state.auxStatus ?? '';
+    aux.classList.toggle('hidden', !state.auxStatus);
+    const debugOverlay = this.refs['debug-overlay'];
+    if (debugOverlay) {
+      debugOverlay.classList.toggle('hidden', state.viewMode !== 'sky');
+    }
     if (this.app.getSession() && this.app.getSession() !== this.lastSession) {
       this.lastSession = this.app.getSession();
       const session = this.lastSession!;
@@ -477,6 +499,36 @@ export class AppUi {
     }
   }
 
+  private async ensureAr(state: UiState): Promise<void> {
+    if (this.ar) {
+      this.ar.update(state);
+      return;
+    }
+    if (this.arLoading) return;
+    this.arLoading = true;
+    try {
+      const module = await import('../ar');
+      if (this.app.getState().viewMode !== 'ar') return;
+      const workstream = module.createArWorkstream(this.ref('ar-host'), {
+        getState: () => this.app.getState(),
+        subscribe: (listener) => this.app.onState(listener),
+        getSession: () => this.app.getSession(),
+        getEphemeris: () => this.app.getEphemeris(),
+        getCatalogue: () => this.app.getCatalogue(),
+        setTimeUtcMs: (ms) => this.app.setUtc(ms),
+        setPlaying: (playing) => this.app.setPlaying(playing),
+        setStatus: (message) => this.app.setStatus(message),
+      });
+      workstream.mount();
+      workstream.update(this.app.getState());
+      this.ar = workstream;
+    } catch (error) {
+      this.app.setStatus(`AR failed to load: ${String(error)}`);
+    } finally {
+      this.arLoading = false;
+    }
+  }
+
   renderViews(state: UiState, sky: SkyPosition, bodies: BodyPosition[]): void {
     const session = this.app.getSession();
     if (!session || state.utcMs === null) return;
@@ -488,7 +540,7 @@ export class AppUi {
         bodies,
         catalogue: this.catalogue,
       });
-    } else {
+    } else if (state.viewMode === 'space') {
       this.spaceView.setInput(state, session, sky);
     }
   }
@@ -649,6 +701,7 @@ export class AppUi {
       <br /><strong>Star data licence:</strong> HYG Database v4.4, David Nash / Astronomy Nexus, <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>; the derived <code>stars.json</code> remains CC BY-SA 4.0. HYG is partly Hipparcos-derived; ESA’s Hipparcos data is CC BY-NC 3.0 IGO — review before any commercial use.
       <br /><strong>Line data licence:</strong> Marc van der Sluys, ConstellationLines v1.4, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a> · <a href="https://doi.org/10.5281/zenodo.23210182">DOI 10.5281/zenodo.23210182</a>.
       <br /><strong>Full notices:</strong> <a href="./data/README.md">public/data/README.md</a> and THIRD_PARTY_NOTICES.md.
+      <br /><strong>AR compass:</strong> WMM2025 from NOAA/NCEI and BGS, via geomagnetism (Apache-2.0). Extrapolated/unsupported dates are labelled in AR.
       <br /><strong>Size figures:</strong> Moon 3,474.8 km (NASA Moon Fact Sheet); ISS 109 m array span (NASA); football pitch 105 m (FIFA/IFAB); Eiffel Tower 330 m (official Eiffel Tower figures); Apophis 340 m (Horizons 2 × 0.170 km).
       <br /><strong>Accuracy:</strong> Phase 1 topocentric az/el max error 0.050 arcmin (3.01″) against Horizons; see PHASE1-VALIDATION.md. This view is a planning simulation, not a live feed.
       <br /><strong>Refraction:</strong> Bennett display-only correction; the validation path is airless.

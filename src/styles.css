@@ -599,6 +599,19 @@ input[type="range"] {
   background: #05070d;
 }
 
+.ar-view-stage {
+  position: relative;
+  width: 100%;
+  height: clamp(560px, 82vh, 980px);
+  min-height: 560px;
+  background: #000;
+}
+
+.ar-host {
+  position: absolute;
+  inset: 0;
+}
+
 body.night .space-stage {
   background: #000;
 }

@@ -34,6 +34,14 @@ time, precession/nutation and rise/set helpers.
   reformatted as JSON. Nine of 840 vertices are absent from HYG; polylines are
   split there rather than bridged.
 
+## World Magnetic Model
+
+WMM2025 coefficients via `geomagnetism@0.2.0`, Apache-2.0. WMM2025 is produced
+by NOAA/NCEI and the British Geological Survey; see
+<https://www.ncei.noaa.gov/products/world-magnetic-model>. The package covers
+2024-11-13 through 2029-11-13; the AR module marks extrapolated or unsupported
+dates explicitly.
+
 ## Size-comparison figures
 
 - Moon mean diameter 3,474.8 km: NASA Moon Fact Sheet,

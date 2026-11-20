@@ -9,7 +9,8 @@ best-spot search and AR are not part of this phase.
 
 ```bash
 npm install
-npm run dev                 # Vite dev server
+npm run dev                 # Vite dev server (HTTP)
+npm run dev:https           # HTTPS for phone camera/orientation testing
 npm run build               # typecheck + production build
 npm test                    # 58 Vitest tests
 npm run test:e2e            # 10 Playwright smoke tests (needs Chromium)
@@ -91,6 +92,26 @@ picker exists.
 - Playwright screenshots: `test-results/phase2/sky-2045.png`,
   `sky-topoca.png`, `sky-near-setting.png`, plus debug-panel versions, night
   sky/space and space presets.
+
+## AR mode (Phase 4)
+
+Open `?view=ar` or the **AR** tab. The camera and motion sensors require a
+secure context. `npm run dev:https` starts Vite with a generated certificate;
+on a phone open `https://<LAN-IP>:5173/`, accept the warning, then tap
+**Enable compass / motion**. iOS sometimes refuses camera/motion on an
+untrusted certificate; for reliable iPhone testing use a locally trusted cert
+(e.g. `mkcert`) and configure `server.https` in `vite.config.ts`.
+
+The AR module reads the shared observer/time/session/catalogue, renders the
+Apophis trail and bright objects, and never recomputes the ephemeris. It
+supports absolute orientation, iOS `webkitCompassHeading`, screen rotation,
+WMM declination, manual/two-point calibration, a virtual touch fallback, and a
+**Tonight practice** mode using the real Sun/Moon/planets. The full real-phone
+checklist and HTTPS caveats are in `src/ar/README.md`.
+
+WMM2025 is bundled via `geomagnetism` (Apache-2.0); it covers the 2029 flyby.
+The package window ends 2029-11-13, after which the module explicitly marks
+extrapolated/unsupported declination rather than silently trusting it.
 
 ## Known limitations
 
