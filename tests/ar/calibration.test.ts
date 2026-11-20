@@ -149,6 +149,11 @@ describe('calibration maths', () => {
     expect(accuracyZero.compassAccuracyDeg).toBeNull();
     expect(accuracyZero.totalDeg).toBeGreaterThanOrEqual(12);
 
+    const subDegree = estimatePointingError(base, 0.5);
+    expect(subDegree.compassAccuracyDeg).toBe(0.5);
+    expect(subDegree.detail).toContain('device compass ±0.5°');
+    expect(subDegree.totalDeg).toBeGreaterThanOrEqual(1);
+
     const calibratedState = recordTwoPointAlignment(
       base,
       input(90, 80),

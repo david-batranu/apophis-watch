@@ -249,6 +249,8 @@ export class ArView implements ArWorkstream {
   private latestSample: OrientationSample | null = null;
   private lastAbsoluteAt = 0;
   private permissionRequested = false;
+  private sensorPermissionDenied = false;
+  private sensorDenialMessage: string | null = null;
   private sensorWatchdog: number | null = null;
   private touchMode = false;
   private virtualHeadingDeg = 0;
@@ -874,6 +876,18 @@ export class ArView implements ArWorkstream {
       source: compassValid ? 'compass' : absolute ? 'absolute' : 'relative',
       at: now,
     };
+    // A real sensor sample means the denial is no longer current. Clear the
+    // sticky denial cause and let the sensor path take over.
+    if (this.sensorPermissionDenied) {
+      this.sensorPermissionDenied = false;
+      this.sensorDenialMessage = null;
+      this.permissionRequested = true;
+      if (this.touchMode) {
+        this.touchMode = false;
+        this.touchToggle.checked = false;
+        this.root.classList.remove('ar-touch');
+      }
+    }
     this.latestSample = sample;
     this.updateSensorState();
   }
@@ -901,7 +915,7 @@ export class ArView implements ArWorkstream {
         this.sensorMessage =
           sample.compassAccuracyDeg === null || sample.compassAccuracyDeg === 0
             ? 'Compass heading (accuracy not reported; 5–15° is typical).'
-            : `Compass heading, device reports ±${sample.compassAccuracyDeg.toFixed(0)}°.`;
+            : `Compass heading, device reports ±${sample.compassAccuracyDeg.toFixed(1)}°.`;
       } else if (sample.source === 'absolute') {
         this.sensorState = 'absolute';
         this.sensorMessage =
@@ -983,6 +997,19 @@ export class ArView implements ArWorkstream {
       this.requestSensorsFromGesture(true);
       return;
     }
+    if (this.sensorPermissionDenied) {
+      this.sensorState = 'denied';
+      this.sensorMessage =
+        this.sensorDenialMessage ??
+        'Sensor permission denied. Use touch-drag virtual AR, or allow Motion & Orientation in settings and reload.';
+      this.touchMode = true;
+      this.touchToggle.checked = true;
+      this.root.classList.add('ar-touch');
+      this.updateSensorState();
+      this.updateSensorStatus();
+      this.renderMessages();
+      return;
+    }
     this.sensorState = 'idle';
     this.sensorMessage =
       'iOS requires a tap to allow compass/motion. Tap “Enable compass / motion”.';
@@ -991,13 +1018,25 @@ export class ArView implements ArWorkstream {
   }
 
   private async requestSensorsFromGesture(fromMount = false): Promise<void> {
-    if (this.permissionRequested) {
+    if (this.permissionRequested && !this.sensorPermissionDenied) {
       this.startOrientationListeners();
       return;
     }
+    if (this.sensorPermissionDenied) {
+      // Explicit retry: clear the sticky denial and put the user back on the
+      // sensor path. If permission is denied again, the cause is restored.
+      this.sensorPermissionDenied = false;
+      this.sensorDenialMessage = null;
+      this.permissionRequested = false;
+      this.touchMode = false;
+      this.touchToggle.checked = false;
+      this.root.classList.remove('ar-touch');
+    }
     this.permissionRequested = true;
     this.sensorState = 'requesting';
+    this.sensorMessage = 'Requesting motion sensor permission…';
     this.updateSensorStatus();
+    this.renderMessages();
     const ctor = (
       window as Window & {
         DeviceOrientationEvent?: {
@@ -1023,6 +1062,8 @@ export class ArView implements ArWorkstream {
         result = await request.call(ctor);
       }
       if (result === 'granted') {
+        this.sensorPermissionDenied = false;
+        this.sensorDenialMessage = null;
         this.startOrientationListeners();
         this.sensorMessage =
           'Sensor permission granted. Move the phone in a figure-eight if the compass drifts.';
@@ -1031,6 +1072,8 @@ export class ArView implements ArWorkstream {
         this.sensorState = 'denied';
         this.sensorMessage =
           'Sensor permission denied. Use touch-drag virtual AR, or allow Motion & Orientation in Safari settings and reload.';
+        this.sensorPermissionDenied = true;
+        this.sensorDenialMessage = this.sensorMessage;
         this.touchMode = true;
         this.touchToggle.checked = true;
         this.root.classList.add('ar-touch');
@@ -1040,6 +1083,8 @@ export class ArView implements ArWorkstream {
       this.sensorMessage = `Sensor permission failed: ${
         error instanceof Error ? error.message : String(error)
       }. Use touch-drag virtual AR.`;
+      this.sensorPermissionDenied = true;
+      this.sensorDenialMessage = this.sensorMessage;
       this.touchMode = true;
       this.touchToggle.checked = true;
       this.root.classList.add('ar-touch');
@@ -1054,9 +1099,11 @@ export class ArView implements ArWorkstream {
   private checkSensorWatchdog(): void {
     if (!this.mounted) return;
     if (this.latestSample) return;
-    if (this.sensorState === 'denied') {
+    if (this.sensorPermissionDenied || this.sensorState === 'denied') {
       // Preserve the denial reason instead of replacing it with the generic
       // "no sensor data" text.
+      this.sensorState = 'denied';
+      if (this.sensorDenialMessage) this.sensorMessage = this.sensorDenialMessage;
       this.touchMode = true;
       this.touchToggle.checked = true;
       this.root.classList.add('ar-touch');
