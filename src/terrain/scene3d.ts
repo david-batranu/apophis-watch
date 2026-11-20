@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import { curvatureDropM, normalizeAzimuth } from './geo';
 import { horizonElevationAtAzimuth } from './horizon';
 import { interpolatePathAt } from './path';
+import { sceneGroundElevationM } from './terrainGrid';
 import { buildBuildingMesh, buildTerrainMesh } from './terrainMesh';
 import type {
   ApophisPathInfo,
@@ -313,7 +314,7 @@ export class LocalScene3D {
       this.terrainKey = key;
       const data = buildTerrainMesh(grid, {
         maxDimension: 512,
-        observerGroundElevationM: grid.observerGroundElevationM,
+        observerGroundElevationM: sceneGroundElevationM(grid),
       });
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute(
@@ -343,7 +344,7 @@ export class LocalScene3D {
       this.buildingMesh = null;
       if (this.state.buildings.length > 0) {
         const data = buildBuildingMesh(this.state.buildings, grid, {
-          observerGroundElevationM: grid.observerGroundElevationM,
+          observerGroundElevationM: sceneGroundElevationM(grid),
         });
         if (data.vertexCount > 0) {
           const geometry = new THREE.BufferGeometry();
@@ -384,19 +385,17 @@ export class LocalScene3D {
   private viewpointEnu(): { eastM: number; northM: number; groundElevationM: number } {
     if (this.state.viewpoint) return this.state.viewpoint;
     const grid = this.state.grid;
-    const ground = grid?.observerGroundElevationM ?? 0;
     return {
       eastM: 0,
       northM: 0,
-      groundElevationM: Number.isFinite(ground) ? ground : 0,
+      groundElevationM: grid ? sceneGroundElevationM(grid) : 0,
     };
   }
 
   private updateCameraPosition(): void {
     const grid = this.state.grid;
     const viewpoint = this.viewpointEnu();
-    const rawReference = grid?.observerGroundElevationM ?? 0;
-    const reference = Number.isFinite(rawReference) ? rawReference : 0;
+    const reference = grid ? sceneGroundElevationM(grid) : 0;
     const ground = Number.isFinite(viewpoint.groundElevationM)
       ? viewpoint.groundElevationM
       : reference;

@@ -213,15 +213,25 @@ export function distanceToBoxM(
 
 /**
  * Triangulate a simple polygon by ear clipping. Returns flat index triples
- * into the supplied ring. Falls back to a fan if the ring is degenerate.
- * Used for building roofs, where OSM footprints are frequently L-shaped.
+ * into the supplied ring, with counter-clockwise winding. OSM rings may be
+ * clockwise; normalise by signed area before clipping. Falls back to a fan
+ * if the ring is degenerate.
  */
 export function triangulatePolygon(
   ring: Array<{ eastM: number; northM: number }>,
 ): number[] {
   const n = ring.length;
   if (n < 3) return [];
-  const indices = Array.from({ length: n }, (_, i) => i);
+  // Shoelace signed area; positive is counter-clockwise.
+  let signedArea2 = 0;
+  for (let i = 0; i < n; i++) {
+    const a = ring[i];
+    const b = ring[(i + 1) % n];
+    signedArea2 += a.eastM * b.northM - b.eastM * a.northM;
+  }
+  const order = Array.from({ length: n }, (_, i) => i);
+  if (signedArea2 < 0) order.reverse();
+  const indices = [...order];
   const triangles: number[] = [];
   const area2 = (a: number, b: number, c: number): number => {
     const A = ring[a];
@@ -271,7 +281,9 @@ export function triangulatePolygon(
   }
   if (indices.length === 3) triangles.push(indices[0], indices[1], indices[2]);
   if (triangles.length === 0) {
-    for (let i = 1; i < n - 1; i++) triangles.push(0, i, i + 1);
+    for (let i = 1; i < order.length - 1; i++) {
+      triangles.push(order[0], order[i], order[i + 1]);
+    }
   }
   return triangles;
 }

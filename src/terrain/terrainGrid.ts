@@ -377,6 +377,23 @@ export function sampleGridEnu(
   return bilinearNaNAware(grid.elevations, grid.width, grid.height, col, row);
 }
 
+/**
+ * Ground elevation at the local origin used to anchor the 3D scene.
+ *
+ * `observerGroundElevationM` is sampled through the Mercator pixel mapping
+ * (best for the astronomy ground elevation). The local mesh, however, uses
+ * the constant-spacing ENU grid; at (0,0) that sample can differ by ~0.9 m
+ * (Cape Town: 14.49 m vs 15.41 m). Anchoring the camera to the ENU sample
+ * keeps the eye height above the actual mesh.
+ */
+export function sceneGroundElevationM(grid: TerrainGrid): number {
+  const sampled = sampleGridEnu(grid, 0, 0);
+  if (sampled !== null && Number.isFinite(sampled)) return sampled;
+  return Number.isFinite(grid.observerGroundElevationM)
+    ? grid.observerGroundElevationM
+    : 0;
+}
+
 /** Geodetic lat/lon of a grid cell centre. */
 export function gridCellLatLon(
   grid: TerrainGrid,

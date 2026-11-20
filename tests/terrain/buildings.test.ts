@@ -128,12 +128,34 @@ describe('Overpass response parsing', () => {
           { lat: 45, lon: 25.0001 },
         ],
       },
+      {
+        type: 'way',
+        id: 106,
+        tags: { building: ' NO ', height: '20' },
+        geometry: [
+          { lat: 45, lon: 25 },
+          { lat: 45, lon: 25.0001 },
+          { lat: 45.0001, lon: 25.0001 },
+        ],
+      },
+      {
+        type: 'way',
+        id: 107,
+        tags: { building: ' House ' },
+        geometry: [
+          { lat: 45, lon: 25 },
+          { lat: 45, lon: 25.0001 },
+          { lat: 45.0001, lon: 25.0001 },
+        ],
+      },
     ],
   };
 
   it('keeps building ways, removes the repeated closing point and counts defaults', () => {
     const result = parseOverpassBuildings(response, 45, 25, 1_000);
-    expect(result.buildings).toHaveLength(4);
+    expect(result.buildings).toHaveLength(5);
+    expect(result.buildings.map((building) => building.id)).not.toContain(106);
+    expect(result.buildings.map((building) => building.id)).toContain(107);
     expect(result.buildings[0].ring).toHaveLength(4);
     expect(result.buildings[0].heightM).toBe(12);
     expect(result.buildings[0].heightSource).toBe('building:height');
@@ -142,9 +164,9 @@ describe('Overpass response parsing', () => {
     expect(result.buildings[2].heightSource).toBe('levels');
     expect(result.buildings[3].heightM).toBe(8);
     expect(result.buildings[3].heightSource).toBe('default');
-    expect(result.defaultHeightCount).toBe(1);
+    expect(result.defaultHeightCount).toBe(2);
     expect(result.taggedHeightCount).toBe(3);
-    expect(defaultHeightShare(result)).toBeCloseTo(0.25, 6);
+    expect(defaultHeightShare(result)).toBeCloseTo(0.4, 6);
     expect(result.osmTimestamp).toBe('2026-11-20T10:00:00Z');
   });
 

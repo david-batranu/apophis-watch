@@ -44,7 +44,12 @@ export {
   latLonToEnu,
   parallaxArcsec,
 } from './geo';
-export { loadTerrainGrid, sampleGridEnu, sampleGridLatLon } from './terrainGrid';
+export {
+  loadTerrainGrid,
+  sampleGridEnu,
+  sampleGridLatLon,
+  sceneGroundElevationM,
+} from './terrainGrid';
 export {
   TERRARIUM_ATTRIBUTION,
   decodeTerrarium,

@@ -139,6 +139,32 @@ describe('polygon helpers', () => {
     expect(pointInPolygon(15, 5, ring)).toBe(false);
   });
 
+  it('normalises a clockwise concave L-ring before ear clipping', () => {
+    // Same 8 x 8 L-shape as below, but wound clockwise.
+    const clockwise = [
+      { eastM: 0, northM: 0 },
+      { eastM: 0, northM: 10 },
+      { eastM: 4, northM: 10 },
+      { eastM: 4, northM: 4 },
+      { eastM: 10, northM: 4 },
+      { eastM: 10, northM: 0 },
+    ];
+    const triangles = triangulatePolygon(clockwise);
+    expect(triangles.length / 3).toBe(4);
+    let area = 0;
+    for (let i = 0; i < triangles.length; i += 3) {
+      const a = clockwise[triangles[i]];
+      const b = clockwise[triangles[i + 1]];
+      const c = clockwise[triangles[i + 2]];
+      const signed =
+        (b.eastM - a.eastM) * (c.northM - a.northM) -
+        (c.eastM - a.eastM) * (b.northM - a.northM);
+      expect(signed).toBeGreaterThan(0);
+      area += signed / 2;
+    }
+    expect(area).toBeCloseTo(64, 6);
+  });
+
   it('triangulates a concave footprint without losing area', () => {
     const lShape = [
       { eastM: 0, northM: 0 },

@@ -152,7 +152,10 @@ export function parseOverpassBuildings(
   for (const element of response.elements) {
     if (element.type !== 'way') continue;
     const tags = element.tags ?? {};
-    if (!tags.building) continue;
+    const buildingTag = tags.building?.trim().toLowerCase();
+    // `building=no` is explicitly used on OSM to mark non-buildings (e.g.
+    // construction site outlines). Do not turn it into an 8 m obstruction.
+    if (!buildingTag || buildingTag === 'no') continue;
     const geometry = element.geometry ?? [];
     if (geometry.length < 3) continue;
     const ring = geometry
