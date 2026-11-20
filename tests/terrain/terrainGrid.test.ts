@@ -10,6 +10,7 @@ import {
   tallestBuildingAtPoint,
 } from '../../src/terrain/terrainGrid';
 import { latLonToEnu } from '../../src/terrain/geo';
+import { computeHorizonProfile } from '../../src/terrain/horizon';
 import {
   lonLatToWorldPixel,
   pixelSpacingM,
@@ -158,6 +159,27 @@ describe('terrain grid sampling', () => {
     expect(Math.abs(sceneGroundElevationM(grid) - grid.observerGroundElevationM)).toBeGreaterThan(
       0.5,
     );
+  });
+
+  it('uses the same ENU ground for the observer horizon profile and the scene anchor', () => {
+    const grid = makeCapeTownSlopedGrid();
+    const localGround = sceneGroundElevationM(grid);
+    const sharedGround = grid.observerGroundElevationM;
+    expect(Math.abs(localGround - sharedGround)).toBeGreaterThan(0.5);
+    const profile = computeHorizonProfile(
+      grid,
+      {
+        latitudeDeg: grid.originLatDeg,
+        longitudeDeg: grid.originLonDeg,
+        groundElevationM: localGround,
+        eyeHeightM: 1.7,
+      },
+      [],
+      { stepDeg: 1, maxDistanceM: 1_500 },
+    );
+    expect(profile.groundElevationM).toBe(localGround);
+    expect(profile.eyeElevationM).toBeCloseTo(localGround + 1.7, 9);
+    expect(Math.abs(profile.groundElevationM - sharedGround)).toBeGreaterThan(0.5);
   });
 
   it('prepares building rings in ENU with a conservative base elevation', () => {

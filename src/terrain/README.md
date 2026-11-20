@@ -52,11 +52,15 @@ horizon/3D view uses the local value while the shared sky tab keeps its own.
   plane for a 1.7 m eye is the tangent point at √(2Rh) ≈ 4.65 km, which the
   ray march finds correctly.
 - The shared astronomy ground elevation uses the Mercator pixel sample at the
-  observer. The local 3D mesh anchors at the constant-spacing ENU sample at
-  (0,0), because that is the ground the mesh actually draws. At Cape Town the
-  two differed by **0.92 m** (14.49 m ENU vs 15.41 m Mercator) on the
-  verifier's real DEM. `sceneGroundElevationM()` performs this anchor; the
-  camera eye height is measured from the mesh, not from a 0.9 m pedestal.
+  observer. The local 3D mesh, eye-height anchor and **observer horizon
+  profile/chart** use the constant-spacing ENU sample at (0,0), because that
+  is the ground the mesh actually draws. At Cape Town the two differed by
+  **0.92 m** (14.49 m ENU vs 15.41 m Mercator) on the verifier's real DEM.
+  Mixing the anchors produced up to **3.56°** horizon error at az 270 there
+  (Brasov: <0.054°); both now use `sceneGroundElevationM()`, so the horizon
+  chart, 3D horizon line, marker occlusion and camera agree. The ground note
+  explains both numbers when they differ by >0.1 m; the shared ephemeris still
+  uses the Mercator ground.
 
 ### Buildings
 
