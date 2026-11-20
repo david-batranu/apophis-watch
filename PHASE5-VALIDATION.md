@@ -223,7 +223,15 @@ worker path brought it back to 13.6 kB.
   mitigation, not a survey.
 - Offline street tiles are not available by design (OSM policy).
 - Headless Chromium performance is not a real-phone result; GPU, thermal and
-  battery behaviour need the real-phone checklist.
+  battery behaviour need the real-phone checklist. Local 3D ran at ~31 fps
+  under SwiftShader (software GPU); it was ~10 fps before disabling
+  antialiasing and reducing the terrain mesh to 256². The phone GPU could be
+  faster or slower.
+- The default 2,821-candidate best-spot search is projected at ~18 s on this
+  desktop (317 candidates measured at ~2.0 s). It is a cancellable worker with
+  progress, not a frame-loop operation; a phone will be slower.
+- The 10-minute memory session was paused to keep tab switching reliable; it
+  still exercises mount/unmount, DEM/terrain retention and AR camera teardown.
 
 ## Real-phone checks
 
