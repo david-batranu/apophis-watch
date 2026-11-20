@@ -1,5 +1,6 @@
 import { TableEphemeris } from '../ephemeris/hermite';
 import type { ApophisDataFile } from '../ephemeris/types';
+import { t } from '../i18n';
 import {
   loadStarCatalogue,
   validateStarCatalogue,
@@ -36,9 +37,7 @@ export interface EphemerisSourceInfo {
 
 export class OfflineUnavailableError extends Error {
   constructor() {
-    super(
-      'No offline area is prepared. Connect to the internet, open Local 3D and use “Prepare for offline”, then try again.',
-    );
+    super(t('location.offlineUnavailable'));
     this.name = 'OfflineUnavailableError';
   }
 }
@@ -90,13 +89,12 @@ export class AppModel {
   useBrowserLocation(): void {
     if (this.usingOfflineData) {
       this.store.update({
-        locationStatus:
-          'Browser location is not used offline. Set coordinates manually or reconnect.',
+        locationStatus: t('location.browserOffline'),
       });
       return;
     }
     this.geolocationRequested = false;
-    this.store.update({ locationStatus: 'Requesting browser location…' });
+    this.store.update({ locationStatus: t('location.requesting') });
     this.requestGeolocation();
   }
 
@@ -140,7 +138,9 @@ export class AppModel {
           credentials: 'omit',
         });
         if (!response.ok) {
-          throw new Error(`Ephemeris fetch failed: HTTP ${response.status}`);
+          throw new Error(
+            t('location.ephemerisFetchFailed', { status: response.status }),
+          );
         }
         data = (await response.json()) as ApophisDataFile;
       } catch (error) {
@@ -178,8 +178,8 @@ export class AppModel {
     const status = this.usingOfflineData
       ? this.offlineLocationStatus(observer, urlObserver !== null)
       : urlObserver
-        ? 'Observer set from URL parameters.'
-        : 'Locating you… showing Brasov preview. You can set a location manually.';
+        ? t('location.fromUrl')
+        : t('location.locatingPreview');
     this.applyObserver(observer, source, status, false);
 
     if (this.usingOfflineData && snapshot?.stars) {
@@ -227,18 +227,22 @@ export class AppModel {
     fromUrl: boolean,
   ): string {
     const snapshot = this.offlineSnapshot;
-    if (!snapshot) return 'Offline mode: no prepared area.';
+    if (!snapshot) return t('location.offlineNoPreparedArea');
     const inside = isInsidePreparedArea(
       snapshot,
       observer.latitudeDeg,
       observer.longitudeDeg,
     );
     if (!inside) {
-      return `Offline: this location is not prepared. Terrain, buildings and the offline base map are only available near ${snapshot.area.label}. Sky and AR still work for the selected coordinates.`;
+      return t('location.offlineNotPrepared', {
+        area: snapshot.area.label,
+      });
     }
-    return `Offline: using the prepared area ${snapshot.area.label}${
-      fromUrl ? ' (URL coordinates)' : ''
-    }. Prepared ${new Date(snapshot.preparedAt).toISOString()}.`;
+    return t('location.offlineUsingPrepared', {
+      area: snapshot.area.label,
+      urlSuffix: fromUrl ? t('location.offlineUrlSuffix') : '',
+      preparedAt: new Date(snapshot.preparedAt).toISOString(),
+    });
   }
 
   /** Called by the terrain tab after Prepare/Clear. */
@@ -270,10 +274,14 @@ export class AppModel {
       mismatch,
       message: this.usingOfflineData
         ? mismatch
-          ? `Offline: terrain and buildings are only prepared for ${snapshot?.area.label ?? 'one area'}. Sky and AR still work here.`
-          : `Offline: all sky/AR data and the prepared terrain area are available. Prepared ${new Date(
-              snapshot?.preparedAt ?? Date.now(),
-            ).toISOString()}.`
+          ? t('location.offlineMismatch', {
+              area: snapshot?.area.label ?? t('location.offlineOneArea'),
+            })
+          : t('location.offlineAllAvailable', {
+              preparedAt: new Date(
+                snapshot?.preparedAt ?? Date.now(),
+              ).toISOString(),
+            })
         : null,
     };
     this.store.update({ offline });
@@ -358,8 +366,7 @@ export class AppModel {
     this.geolocationRequested = true;
     if (!('geolocation' in navigator)) {
       this.store.update({
-        locationStatus:
-          'Geolocation is unavailable. Using the Brasov preview; set coordinates or a preset.',
+        locationStatus: t('location.geolocationUnavailable'),
       });
       return;
     }
@@ -373,13 +380,12 @@ export class AppModel {
             eyeHeightM: 1.7,
           },
           'geolocation',
-          'Using browser location. GPS altitude ignored; eye height 1.7 m above unknown ground (no terrain data).',
+          t('location.usingBrowser'),
         );
       },
       () => {
         this.store.update({
-          locationStatus:
-            'Location permission denied or unavailable. Using the Brasov preview; set coordinates or choose a preset.',
+          locationStatus: t('location.denied'),
         });
       },
       { enableHighAccuracy: false, timeout: 8_000, maximumAge: 600_000 },
@@ -392,26 +398,29 @@ export class AppModel {
     this.applyObserver(
       this.observerFromPreset(preset),
       'preset',
-      `${preset.name} preset. Ground elevation ${preset.groundElevationM} m + eye height; no terrain data.`,
+      t('location.presetStatus', {
+        preset: preset.name,
+        elevation: preset.groundElevationM,
+      }),
     );
   }
 
   /** Returns a validation error, or null on success. */
   setManualObserver(input: ManualObserverInput): string | null {
     if (!Number.isFinite(input.latitudeDeg) || input.latitudeDeg < -90 || input.latitudeDeg > 90) {
-      return 'Latitude must be between -90 and 90 degrees.';
+      return t('location.validationLat');
     }
     if (!Number.isFinite(input.longitudeDeg) || input.longitudeDeg < -180 || input.longitudeDeg > 180) {
-      return 'Longitude must be between -180 and 180 degrees.';
+      return t('location.validationLon');
     }
     if (!Number.isFinite(input.eyeHeightM) || input.eyeHeightM < 0 || input.eyeHeightM > 100) {
-      return 'Eye height must be between 0 and 100 m.';
+      return t('location.validationEyeHeight');
     }
     if (
       input.groundElevationM !== null &&
       (!Number.isFinite(input.groundElevationM) || input.groundElevationM < -500 || input.groundElevationM > 9000)
     ) {
-      return 'Ground elevation must be between -500 and 9000 m, or left blank.';
+      return t('location.validationGroundOptional');
     }
     this.applyObserver(
       {
@@ -421,9 +430,15 @@ export class AppModel {
         eyeHeightM: input.eyeHeightM,
       },
       'manual',
-      `Manual location. Ground elevation ${
-        input.groundElevationM === null ? 'unknown (0 m assumed)' : `${input.groundElevationM} m`
-      } + ${input.eyeHeightM.toFixed(1)} m eye height; no terrain data.`,
+      t('location.manualStatus', {
+        ground:
+          input.groundElevationM === null
+            ? t('location.groundUnknownAssumed')
+            : t('location.groundValue', {
+                elevation: input.groundElevationM,
+              }),
+        eye: input.eyeHeightM.toFixed(1),
+      }),
     );
     return null;
   }
@@ -437,9 +452,9 @@ export class AppModel {
     this.store.update({
       utcMs: clamped,
       error: outside
-        ? 'Requested time is outside the committed ±24 h data window; clamped.'
+        ? t('location.timeOutsideWindow')
         : atEnd && this.store.getState().playing
-          ? 'Reached the end of the data window.'
+          ? t('location.endOfWindow')
           : null,
       playing: atEnd ? false : this.store.getState().playing,
     });
@@ -486,10 +501,10 @@ export class AppModel {
     groundElevationM: number | null = null,
   ): string | null {
     if (!Number.isFinite(latitudeDeg) || latitudeDeg < -90 || latitudeDeg > 90) {
-      return 'Latitude must be between -90 and 90 degrees.';
+      return t('location.validationLat');
     }
     if (!Number.isFinite(longitudeDeg) || longitudeDeg < -180 || longitudeDeg > 180) {
-      return 'Longitude must be between -180 and 180 degrees.';
+      return t('location.validationLon');
     }
     if (
       groundElevationM !== null &&
@@ -497,7 +512,7 @@ export class AppModel {
         groundElevationM < -500 ||
         groundElevationM > 9000)
     ) {
-      return 'Ground elevation must be between -500 and 9000 m.';
+      return t('location.validationGround');
     }
     const current = this.store.getState().observer;
     this.applyObserver(
@@ -508,7 +523,7 @@ export class AppModel {
         eyeHeightM: current?.eyeHeightM ?? 1.7,
       },
       'manual',
-      'Observer moved from the terrain/map panel.',
+      t('location.fromTerrain'),
     );
     return null;
   }
@@ -522,7 +537,10 @@ export class AppModel {
         groundElevationM: Math.min(9000, Math.max(-500, elevationM)),
       },
       this.store.getState().locationSource,
-      `Ground elevation ${elevationM.toFixed(1)} m from the terrain DEM; eye height ${current.eyeHeightM.toFixed(1)} m.`,
+      t('location.groundFromDem', {
+        elevation: elevationM.toFixed(1),
+        eye: current.eyeHeightM.toFixed(1),
+      }),
     );
   }
 
@@ -533,7 +551,7 @@ export class AppModel {
     this.applyObserver(
       { ...current, eyeHeightM: clamped },
       this.store.getState().locationSource,
-      `Eye height ${clamped.toFixed(1)} m above ground; no terrain occlusion in the shared sky readout.`,
+      t('location.eyeHeightStatus', { eye: clamped.toFixed(1) }),
     );
   }
 
@@ -546,7 +564,11 @@ export class AppModel {
     if (!session) return;
     const ms = session.jumpTarget(target);
     if (ms === null) {
-      this.store.update({ error: `No ${target} available for this observer in the data window.` });
+      this.store.update({
+        error: t('location.noJump', {
+          target: t(JUMP_LABELS[target]),
+        }),
+      });
       return;
     }
     this.setUtc(ms);
@@ -555,7 +577,21 @@ export class AppModel {
   /** Four-decimal location summary for the UI. */
   observerSummary(): string {
     const observer = this.store.getState().observer;
-    if (!observer) return 'No observer set';
-    return `${observer.latitudeDeg.toFixed(4)}°, ${observer.longitudeDeg.toFixed(4)}°, ${effectiveElevationM(observer).toFixed(1)} m effective`;
+    if (!observer) return t('location.noObserver');
+    return t('location.observerSummary', {
+      lat: observer.latitudeDeg.toFixed(4),
+      lon: observer.longitudeDeg.toFixed(4),
+      elevation: effectiveElevationM(observer).toFixed(1),
+    });
   }
 }
+
+const JUMP_LABELS = {
+  topocentricCa: 'jump.topocentricCa',
+  geocentricCa: 'jump.geocentricCa',
+  rise: 'jump.rise',
+  set: 'jump.set',
+  maxElevation: 'jump.maxElevation',
+  visibilityStart: 'jump.visibilityStart',
+  visibilityEnd: 'jump.visibilityEnd',
+} as const;

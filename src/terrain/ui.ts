@@ -6,6 +6,7 @@
  */
 
 import { formatLocal, formatUtc } from '../ui/timeFormat';
+import { t } from '../i18n';
 import type { UiState } from '../state/store';
 import {
   buildingsFromSnapshot,
@@ -218,137 +219,137 @@ export class TerrainUi implements TerrainWorkstream {
     return `
       <div class="tw-head">
         <div class="tw-head-title">
-          <h2>Terrain, buildings &amp; best spot</h2>
-          <p>Local horizon from the AWS Terrarium DEM and OpenStreetMap buildings, with the Phase 1 Apophis path.</p>
+          <h2>${t('terrain.headerTitle')}</h2>
+          <p>${t('terrain.headerIntro')}</p>
         </div>
         <div class="tw-head-badges">
-          <span class="tw-badge" data-ref="dem-badge">DEM: —</span>
-          <span class="tw-badge" data-ref="building-badge">Buildings: —</span>
+          <span class="tw-badge" data-ref="dem-badge">${t('terrain.badgeDem')}</span>
+          <span class="tw-badge" data-ref="building-badge">${t('terrain.badgeBuildings')}</span>
         </div>
       </div>
-      <div class="tw-status" data-ref="status" role="status" aria-live="polite">Ready. Pick a point on the map or enter coordinates.</div>
+      <div class="tw-status" data-ref="status" role="status" aria-live="polite">${t('terrain.statusReady')}</div>
 
       <div class="tw-grid tw-grid-2">
         <section class="tw-card">
-          <h3>Observer &amp; map</h3>
-          <div class="tw-map" data-ref="map" aria-label="OpenStreetMap location picker"></div>
+          <h3>${t('terrain.observerTitle')}</h3>
+          <div class="tw-map" data-ref="map" aria-label="${t('terrain.observerMapAria')}"></div>
           <div class="tw-row tw-row-wrap">
-            <label class="tw-field">Latitude °
+            <label class="tw-field">${t('terrain.observerLat')}
               <input data-ref="lat" inputmode="decimal" placeholder="45.6427" />
             </label>
-            <label class="tw-field">Longitude °
+            <label class="tw-field">${t('terrain.observerLon')}
               <input data-ref="lon" inputmode="decimal" placeholder="25.5887" />
             </label>
-            <button class="tw-btn" data-action="apply-observer" type="button">Apply</button>
-            <button class="tw-btn ghost" data-action="use-browser-location" type="button">Re-center on map</button>
+            <button class="tw-btn" data-action="apply-observer" type="button">${t('terrain.observerApply')}</button>
+            <button class="tw-btn ghost" data-action="use-browser-location" type="button">${t('terrain.observerRecenter')}</button>
           </div>
           <div class="tw-row tw-row-wrap">
-            <label class="tw-field">Eye height (m)
+            <label class="tw-field">${t('terrain.eyeHeight')}
               <input data-ref="eye" type="number" min="0" max="200" step="0.1" value="1.7" />
             </label>
-            <label class="tw-field">Viewpoint
+            <label class="tw-field">${t('terrain.eyeMode')}
               <select data-ref="eye-mode">
-                <option value="ground">Ground / custom eye height</option>
-                <option value="floor">Floor N</option>
-                <option value="rooftop">Rooftop (tallest OSM building)</option>
+                <option value="ground">${t('terrain.eyeModeGround')}</option>
+                <option value="floor">${t('terrain.eyeModeFloor')}</option>
+                <option value="rooftop">${t('terrain.eyeModeRooftop')}</option>
               </select>
             </label>
-            <label class="tw-field tw-floor-field">Floor N
+            <label class="tw-field tw-floor-field">${t('terrain.eyeFloor')}
               <input data-ref="floor" type="number" min="1" max="100" step="1" value="3" />
             </label>
           </div>
-          <p class="tw-note" data-ref="eye-note">Eye height 1.7 m above DEM ground. Floor N uses (N−1)×3 m + 1.7 m; rooftop uses the tallest OSM building at the point + 1.7 m.</p>
-          <p class="tw-note tw-ground-note" data-ref="ground-note">Ground elevation: waiting for DEM.</p>
-          <p class="tw-note">Ground elevation is taken from the DEM. Browser GPS altitude is only a cross-check and is never used. Eye height is added above the DEM ground for the shared sky/AR observer.</p>
+          <p class="tw-note" data-ref="eye-note">${t('terrain.eyeNoteInitial')}</p>
+          <p class="tw-note tw-ground-note" data-ref="ground-note">${t('terrain.groundWaiting')}</p>
+          <p class="tw-note">${t('terrain.groundNote')}</p>
         </section>
 
         <section class="tw-card">
-          <h3>Terrain &amp; buildings</h3>
+          <h3>${t('terrain.demTitle')}</h3>
           <div class="tw-split">
             <div>
-              <p class="tw-note tw-strong" data-ref="dem-info">DEM: not loaded.</p>
+              <p class="tw-note tw-strong" data-ref="dem-info">${t('terrain.demNotLoaded')}</p>
               <div class="tw-progress" aria-hidden="true"><div data-ref="terrain-progress"></div></div>
               <div class="tw-row tw-row-wrap">
-                <button class="tw-btn" data-action="reload-terrain" type="button">Reload DEM</button>
-                <button class="tw-btn ghost" data-action="clear-terrain-cache" type="button">Clear tile cache</button>
+                <button class="tw-btn" data-action="reload-terrain" type="button">${t('terrain.demReload')}</button>
+                <button class="tw-btn ghost" data-action="clear-terrain-cache" type="button">${t('terrain.demClearCache')}</button>
               </div>
-              <p class="tw-note" data-ref="terrain-detail">AWS Terrarium z15 max; tiles cached in IndexedDB.</p>
+              <p class="tw-note" data-ref="terrain-detail">${t('terrain.demDetailIdle')}</p>
             </div>
             <div>
-              <p class="tw-note tw-strong" data-ref="building-info">Buildings: not loaded.</p>
+              <p class="tw-note tw-strong" data-ref="building-info">${t('terrain.buildingsNotLoaded')}</p>
               <div class="tw-row tw-row-wrap">
-                <button class="tw-btn" data-action="load-buildings" type="button">Fetch buildings</button>
-                <button class="tw-btn ghost" data-action="clear-building-cache" type="button">Clear cache</button>
+                <button class="tw-btn" data-action="load-buildings" type="button">${t('terrain.buildingsFetch')}</button>
+                <button class="tw-btn ghost" data-action="clear-building-cache" type="button">${t('terrain.buildingsClearCache')}</button>
               </div>
-              <label class="tw-field">Building radius (m)
+              <label class="tw-field">${t('terrain.buildingsRadius')}
                 <input data-ref="building-radius" type="number" min="50" max="5000" step="50" value="1000" />
               </label>
-              <label class="tw-field">Import GeoJSON / Overpass JSON
+              <label class="tw-field">${t('terrain.buildingsImportLabel')}
                 <input data-ref="import-file" type="file" accept=".geojson,.json,application/geo+json,application/json" />
               </label>
-              <p class="tw-note" data-ref="import-status">Optional fallback: import a building file exported from Overpass or another tool. ODbL attribution applies.</p>
-              <p class="tw-note" data-ref="building-detail">Bundled area first, then one debounced live query per settled view; no polling.</p>
+              <p class="tw-note" data-ref="import-status">${t('terrain.buildingsImportIdle')}</p>
+              <p class="tw-note" data-ref="building-detail">${t('terrain.buildingsDetailIdle')}</p>
             </div>
           </div>
           <div class="tw-credits">
-            <strong>Terrain:</strong> Terrain Tiles by Mapzen / AWS Open Data. Sources include Copernicus EU-DEM, USGS 3DEP/NED, GMTED2010 and SRTM, NOAA ETOPO1, ArcticDEM (DigitalGlobe/NSF), Geoscience Australia, Austria DGM, Canada OGL, INEGI Mexico, LINZ New Zealand, Kartverket Norway and the UK Environment Agency. <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noreferrer">Full attribution</a>.
-            <br /><strong>Buildings:</strong> © OpenStreetMap contributors, ODbL. Overpass API.
-            <br /><strong>Height priority:</strong> <code>building:height</code> → <code>height</code> → <code>building:levels</code>×3 → 8 m default.
+            ${t('terrain.creditsTerrain')}
+            <br />${t('terrain.creditsBuildings')}
+            <br />${t('terrain.creditsHeightPriority')}
           </div>
         </section>
       </div>
 
       <div class="tw-grid tw-grid-2">
         <section class="tw-card">
-          <h3>Local 3D view <span class="tw-subtitle">eye-height view</span></h3>
-          <div class="tw-scene" data-ref="scene" aria-label="Local 3D terrain and building view"></div>
+          <h3>${t('terrain.sceneTitle')} <span class="tw-subtitle">${t('terrain.sceneSubtitle')}</span></h3>
+          <div class="tw-scene" data-ref="scene" aria-label="${t('terrain.sceneAria')}"></div>
           <div class="tw-row tw-row-wrap">
-            <button class="tw-btn" data-action="look-apophis" type="button">Look at Apophis</button>
-            <button class="tw-btn ghost" data-nav="0" type="button">N</button>
-            <button class="tw-btn ghost" data-nav="90" type="button">E</button>
-            <button class="tw-btn ghost" data-nav="180" type="button">S</button>
-            <button class="tw-btn ghost" data-nav="270" type="button">W</button>
-            <span class="tw-chip">FOV <span data-ref="fov">62°</span></span>
+            <button class="tw-btn" data-action="look-apophis" type="button">${t('terrain.sceneLook')}</button>
+            <button class="tw-btn ghost" data-nav="0" type="button">${t('terrain.sceneNavN')}</button>
+            <button class="tw-btn ghost" data-nav="90" type="button">${t('terrain.sceneNavE')}</button>
+            <button class="tw-btn ghost" data-nav="180" type="button">${t('terrain.sceneNavS')}</button>
+            <button class="tw-btn ghost" data-nav="270" type="button">${t('terrain.sceneNavW')}</button>
+            <span class="tw-chip">${t('terrain.sceneFov')} <span data-ref="fov">62°</span></span>
           </div>
           <div class="tw-row">
-            <label class="tw-grow">Time
-              <input data-ref="time" type="range" min="0" max="10000" step="1" value="5000" aria-label="Time scrub" />
+            <label class="tw-grow">${t('terrain.sceneTime')}
+              <input data-ref="time" type="range" min="0" max="10000" step="1" value="5000" aria-label="${t('terrain.sceneTimeAria')}" />
             </label>
             <span class="tw-chip" data-ref="time-label">—</span>
           </div>
-          <p class="tw-note" data-ref="scene-readout">Drag to look, scroll/pinch to zoom. The horizon and Apophis trail are depth-tested against the terrain and buildings.</p>
-          <p class="tw-note">The trail uses the once-per-area path. Light pollution is <strong>not</strong> modelled; visibility here is geometric skyline clearance only.</p>
+          <p class="tw-note" data-ref="scene-readout">${t('terrain.sceneHint')}</p>
+          <p class="tw-note">${t('terrain.sceneNote')}</p>
         </section>
 
         <section class="tw-card">
-          <h3>Horizon profile <span class="tw-subtitle">1° bins</span></h3>
-          <canvas class="tw-chart" data-ref="horizon-chart" aria-label="Horizon elevation angle by azimuth"></canvas>
-          <p class="tw-note" data-ref="horizon-info">Load a DEM to compute the local horizon.</p>
-          <p class="tw-note tw-strong" data-ref="path-info">Apophis path: waiting for the simulation session.</p>
-          <p class="tw-note" data-ref="parallax-info">Parallax check: —</p>
+          <h3>${t('terrain.horizonTitle')} <span class="tw-subtitle">${t('terrain.horizonSubtitle')}</span></h3>
+          <canvas class="tw-chart" data-ref="horizon-chart" aria-label="${t('terrain.horizonAria')}"></canvas>
+          <p class="tw-note" data-ref="horizon-info">${t('terrain.horizonEmpty')}</p>
+          <p class="tw-note tw-strong" data-ref="path-info">${t('terrain.pathWaiting')}</p>
+          <p class="tw-note" data-ref="parallax-info">${t('terrain.parallaxWaiting')}</p>
         </section>
       </div>
 
       <section class="tw-card">
-        <h3>Best spot <span class="tw-subtitle">Apophis path computed once per area</span></h3>
+        <h3>${t('terrain.bestTitle')} <span class="tw-subtitle">${t('terrain.bestSubtitle')}</span></h3>
         <div class="tw-row tw-row-wrap">
-          <label class="tw-field">Search radius (m)
+          <label class="tw-field">${t('terrain.bestSearchRadius')}
             <input data-ref="search-radius" type="number" min="500" max="10000" step="100" value="3000" />
           </label>
-          <label class="tw-field">Grid spacing (m)
+          <label class="tw-field">${t('terrain.bestSpacing')}
             <input data-ref="spacing" type="number" min="50" max="100" step="10" value="100" />
           </label>
-          <label class="tw-field">Minimum elevation margin (°)
+          <label class="tw-field">${t('terrain.bestMargin')}
             <input data-ref="margin" type="number" min="0" max="20" step="0.5" value="2" />
           </label>
-          <button class="tw-btn primary" data-action="run-best" type="button">Run search</button>
-          <button class="tw-btn danger" data-action="cancel-best" type="button" disabled>Cancel</button>
+          <button class="tw-btn primary" data-action="run-best" type="button">${t('terrain.bestRun')}</button>
+          <button class="tw-btn danger" data-action="cancel-best" type="button" disabled>${t('terrain.bestCancel')}</button>
         </div>
         <div class="tw-progress" aria-hidden="true"><div data-ref="best-progress"></div></div>
-        <p class="tw-note tw-strong" data-ref="best-status">No search yet. The score is the fraction of the physical Phase 1 visibility window above the local horizon plus the margin.</p>
+        <p class="tw-note tw-strong" data-ref="best-status">${t('terrain.bestStatusIdle')}</p>
         <div class="tw-split tw-best-split">
           <div>
-            <p class="tw-note">Heatmap: red = 0% clear, green = 100% clear. Tap a numbered result to teleport the local 3D camera and map. The app-wide observer is not changed unless you use “Make this the observer”.</p>
+            <p class="tw-note">${t('terrain.bestHeatmapNote')}</p>
             <p class="tw-note" data-ref="best-summary">—</p>
             <p class="tw-note" data-ref="best-warning"></p>
           </div>
@@ -356,28 +357,28 @@ export class TerrainUi implements TerrainWorkstream {
         </div>
         <div class="tw-note" data-ref="best-detail"></div>
         <div class="tw-field-check" data-ref="field-check"></div>
-        <p class="tw-note">Light pollution, sky brightness, weather and trees are not modelled. Buildings come from OSM and may be missing or stale; default-height buildings are marked amber in 3D. Score is geometric skyline clearance only.</p>
+        <p class="tw-note">${t('terrain.bestDisclaimer')}</p>
       </section>
 
       <section class="tw-card tw-offline-card" data-ref="offline-card">
-        <h3>Offline <span class="tw-subtitle">prepare the selected area</span></h3>
-        <p class="tw-note tw-strong" data-ref="offline-status">No offline area prepared.</p>
+        <h3>${t('terrain.offlineTitle')} <span class="tw-subtitle">${t('terrain.offlineSubtitle')}</span></h3>
+        <p class="tw-note tw-strong" data-ref="offline-status">${t('terrain.offlineStatusNone')}</p>
         <div class="tw-row tw-row-wrap">
-          <button class="tw-btn primary" data-action="prepare-offline" type="button">Prepare for offline</button>
-          <button class="tw-btn danger" data-action="cancel-offline" type="button" disabled>Cancel</button>
-          <button class="tw-btn ghost" data-action="clear-offline" type="button">Clear prepared area</button>
+          <button class="tw-btn primary" data-action="prepare-offline" type="button">${t('terrain.offlinePrepare')}</button>
+          <button class="tw-btn danger" data-action="cancel-offline" type="button" disabled>${t('terrain.offlineCancel')}</button>
+          <button class="tw-btn ghost" data-action="clear-offline" type="button">${t('terrain.offlineClear')}</button>
         </div>
         <div class="tw-progress" aria-hidden="true"><div data-ref="offline-progress"></div></div>
-        <p class="tw-note" data-ref="offline-storage">Storage status not checked yet.</p>
+        <p class="tw-note" data-ref="offline-storage">${t('terrain.offlineStoragePending')}</p>
         <ul class="tw-offline-list" data-ref="offline-contents"></ul>
         <p class="tw-note tw-warn" data-ref="offline-warning"></p>
-        <p class="tw-note"><strong>Stored:</strong> ephemeris, star catalogue, AWS Terrarium DEM tiles and OSM building footprints for this area. <strong>Not stored:</strong> OpenStreetMap raster tiles — tile.openstreetmap.org forbids bulk/offline use. The offline base map is a local hillshade plus building footprints. On iOS, Add to Home Screen and open the app weekly; Safari may evict site data after 7 days without a tap.</p>
+        <p class="tw-note">${t('terrain.offlineStoredNote')}</p>
       </section>
 
       <footer class="tw-footer">
-        <p><strong>Method:</strong> AWS Terrarium DEM (Mapzen/joerd) → local ENU mesh with Earth curvature; Overpass <code>way["building"](around:…);out geom;</code>; horizon ray march at 1° azimuth; Phase 1 topocentric Apophis path computed once at the search centre. The 5 km parallax is tens of arcseconds, far below the 1° horizon bin. <strong>Light pollution is not modelled.</strong></p>
-        <p><strong>Licences:</strong> Terrain Tiles by Mapzen / AWS Open Data · © OpenStreetMap contributors (ODbL) · Overpass API. Map tiles © OpenStreetMap contributors. See the project notices for full source attribution.</p>
-        <p class="tw-mono" data-ref="build-info">Terrain workstream · phases: DEM, buildings, horizon, best spot, local 3D</p>
+        <p>${t('terrain.footerMethod')}</p>
+        <p>${t('terrain.footerLicences')}</p>
+        <p class="tw-mono" data-ref="build-info">${t('terrain.footerBuildInfo')}</p>
       </footer>
     `;
   }
@@ -479,7 +480,7 @@ export class TerrainUi implements TerrainWorkstream {
           if (value !== this.buildingRadiusM) {
             this.buildingRadiusM = value;
             this.updateSearchArea();
-            this.invalidateBestSpot('Building radius changed; run the search again.');
+            this.invalidateBestSpot(t('terrain.invalidateBuildingRadius'));
             this.scheduleBuildings();
           }
           break;
@@ -493,7 +494,7 @@ export class TerrainUi implements TerrainWorkstream {
           if (value !== this.searchRadiusM) {
             this.searchRadiusM = value;
             this.updateSearchArea();
-            this.invalidateBestSpot('Search radius changed; run the search again.');
+            this.invalidateBestSpot(t('terrain.invalidateSearchRadius'));
             this.scheduleTerrainLoad();
           }
           break;
@@ -506,7 +507,7 @@ export class TerrainUi implements TerrainWorkstream {
           );
           if (value !== this.spacingM) {
             this.spacingM = value;
-            this.invalidateBestSpot('Grid spacing changed; run the search again.');
+            this.invalidateBestSpot(t('terrain.invalidateSpacing'));
           }
           break;
         }
@@ -518,7 +519,7 @@ export class TerrainUi implements TerrainWorkstream {
           );
           if (value !== this.marginDeg) {
             this.marginDeg = value;
-            this.invalidateBestSpot('Elevation margin changed; run the search again.');
+            this.invalidateBestSpot(t('terrain.invalidateMargin'));
             this.scheduleChart();
           }
           break;
@@ -632,7 +633,7 @@ export class TerrainUi implements TerrainWorkstream {
     const state = this.state;
     const observer = state?.observer;
     if (!observer) {
-      this.setStatus('No observer is set. Enter coordinates or pick a point on the map.', 'warn');
+      this.setStatus(t('terrain.observerMissing'), 'warn');
       return;
     }
     const key = `${observer.latitudeDeg.toFixed(6)}|${observer.longitudeDeg.toFixed(6)}`;
@@ -662,7 +663,7 @@ export class TerrainUi implements TerrainWorkstream {
       };
       this.viewpointLatDeg = observer.latitudeDeg;
       this.viewpointLonDeg = observer.longitudeDeg;
-      this.invalidateBestSpot('Observer changed; run the search again.');
+      this.invalidateBestSpot(t('terrain.invalidateObserver'));
       this.profile = null;
       this.path = null;
       this.terrainAbort?.abort();
@@ -678,9 +679,9 @@ export class TerrainUi implements TerrainWorkstream {
       this.lastBuildingKey = '';
       this.setProgress('terrain-progress', 0);
       this.setProgress('best-progress', 0);
-      this.ref('dem-badge').textContent = 'DEM: loading…';
+      this.ref('dem-badge').textContent = t('terrain.badgeDemLoading');
       this.ref('dem-badge').className = 'tw-badge';
-      this.ref('building-badge').textContent = 'Buildings: —';
+      this.ref('building-badge').textContent = t('terrain.badgeBuildings');
       this.ref('building-badge').className = 'tw-badge';
       this.scene?.setState({
         grid: null,
@@ -757,7 +758,10 @@ export class TerrainUi implements TerrainWorkstream {
       local = '';
     }
     this.ref('time-label').textContent = local
-      ? `${utc.slice(0, 16)}Z · ${local.slice(11, 16)} local`
+      ? t('terrain.timeLabelLocal', {
+          utc: utc.slice(0, 16),
+          local: local.slice(11, 16),
+        })
       : utc;
     this.scene?.setState({ utcMs: state.utcMs });
   }
@@ -782,11 +786,11 @@ export class TerrainUi implements TerrainWorkstream {
     const lat = Number(this.ref<HTMLInputElement>('lat').value);
     const lon = Number(this.ref<HTMLInputElement>('lon').value);
     if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
-      this.setStatus('Latitude must be between −90° and +90°.', 'bad');
+      this.setStatus(t('terrain.observerErrorLat'), 'bad');
       return;
     }
     if (!Number.isFinite(lon) || lon < -180 || lon > 180) {
-      this.setStatus('Longitude must be between −180° and +180°.', 'bad');
+      this.setStatus(t('terrain.observerErrorLon'), 'bad');
       return;
     }
     this.recenterOnNextUpdate = true;
@@ -835,7 +839,7 @@ export class TerrainUi implements TerrainWorkstream {
     const prepared = this.preparedBuildings;
     if (!this.grid || prepared.length === 0) {
       this.setStatus(
-        'Rooftop needs building data at the observer. Fetch buildings first.',
+        t('terrain.eyeErrorRooftopNoBuildings'),
         'warn',
       );
       this.eyeMode = 'ground';
@@ -851,7 +855,7 @@ export class TerrainUi implements TerrainWorkstream {
     const building = tallestBuildingAtPoint(prepared, enu.eastM, enu.northM);
     if (!building) {
       this.setStatus(
-        'No OSM building footprint at this point; rooftop unavailable. Using the ground eye height.',
+        t('terrain.eyeErrorRooftopNoFootprint'),
         'warn',
       );
       this.eyeMode = 'ground';
@@ -864,9 +868,14 @@ export class TerrainUi implements TerrainWorkstream {
     this.api.setEyeHeightM?.(this.eyeHeightM);
     this.applyEyeHeightToScene();
     this.renderEyeNote(
-      `Rooftop of OSM way ${building.id}: ${building.heightM.toFixed(
-        1,
-      )} m (${building.heightSource === 'default' ? 'default 8 m height' : building.heightSource}) + 1.7 m eye.`,
+      t('terrain.eyeRooftopDetail', {
+        id: building.id,
+        height: building.heightM.toFixed(1),
+        source:
+          building.heightSource === 'default'
+            ? t('terrain.eyeDefaultHeight')
+            : building.heightSource,
+      }),
     );
   }
 
@@ -882,21 +891,29 @@ export class TerrainUi implements TerrainWorkstream {
     if (this.grid) {
       this.recomputeProfileAtViewpoint();
     }
-    this.invalidateBestSpot('Eye height changed; run the search again.');
+    this.invalidateBestSpot(t('terrain.invalidateEyeHeight'));
     this.scheduleChart();
   }
 
   private renderEyeNote(extra?: string): void {
     const base =
       this.eyeMode === 'floor'
-        ? `Floor ${this.floor}: ${fmtM(this.eyeHeightM)} above DEM ground ((N−1)×3 m + 1.7 m).`
+        ? t('terrain.eyeNoteFloor', {
+            floor: this.floor,
+            height: fmtM(this.eyeHeightM),
+          })
         : this.eyeMode === 'rooftop'
-          ? `Rooftop: ${fmtM(this.eyeHeightM)} above DEM ground.`
-          : `Eye height ${fmtM(this.eyeHeightM)} above DEM ground.`;
+          ? t('terrain.eyeNoteRooftop', { height: fmtM(this.eyeHeightM) })
+          : t('terrain.eyeNoteGround', { height: fmtM(this.eyeHeightM) });
     const hostNote = this.api.setEyeHeightM
-      ? 'The shared session eye height is updated through the optional host setter.'
-      : 'The shared session has no eye-height setter in the required API, so this value is local to the terrain tab; the sky tab keeps its own eye height.';
-    this.ref('eye-note').textContent = `${base} ${extra ?? ''} Floor N uses (N−1)×3 m + 1.7 m; rooftop uses the tallest OSM building + 1.7 m. ${hostNote}`;
+      ? t('terrain.eyeHostAvailable')
+      : t('terrain.eyeHostUnavailable');
+    this.ref('eye-note').textContent = t('terrain.eyeNoteCombined', {
+      base,
+      extra: extra ?? '',
+      suffix: t('terrain.eyeNoteSuffix'),
+      host: hostNote,
+    });
   }
 
   private terrainRadius(): number {
@@ -921,16 +938,15 @@ export class TerrainUi implements TerrainWorkstream {
     const observer = state?.observer;
     if (!observer || !this.mounted) return;
     if (state?.offline.active && state.offline.mismatch) {
-      this.ref('dem-badge').textContent = 'DEM: not prepared';
+      this.ref('dem-badge').textContent = t('terrain.badgeDemNotPrepared');
       this.ref('dem-badge').className = 'tw-badge warn';
       this.setStatus(
-        'Offline: terrain is not prepared for this location. Sky and AR still work. Reconnect or move to the prepared area.',
+        t('terrain.offlineTerrainNotPrepared'),
         'warn',
         true,
       );
       return;
-    }
-    const requestKey = `${observer.latitudeDeg.toFixed(6)}|${observer.longitudeDeg.toFixed(
+    }    const requestKey = `${observer.latitudeDeg.toFixed(6)}|${observer.longitudeDeg.toFixed(
       6,
     )}|${this.terrainRadius()}`;
     if (requestKey === this.lastTerrainKey && this.grid && !this.terrainLoading) {
@@ -942,9 +958,10 @@ export class TerrainUi implements TerrainWorkstream {
     this.terrainLoading = true;
     this.setProgress('terrain-progress', 0.04);
     this.setStatus(
-      `Loading DEM tiles around ${observer.latitudeDeg.toFixed(
-        4,
-      )}°, ${observer.longitudeDeg.toFixed(4)}°…`,
+      t('terrain.statusDemLoading', {
+        lat: observer.latitudeDeg.toFixed(4),
+        lon: observer.longitudeDeg.toFixed(4),
+      }),
       'info',
     );
     try {
@@ -998,17 +1015,22 @@ export class TerrainUi implements TerrainWorkstream {
       this.recomputeProfileAtViewpoint();
       this.maybeApplyOfflineMap();
       this.setStatus(
-        `DEM ready: z${grid.zoom}, ${grid.spacingM.toFixed(
-          1,
-        )} m/px, ${grid.requestedTiles} tiles (${
-          grid.failedTiles
-        } failed). Ground elevation ${Number.isFinite(
-          grid.observerGroundElevationM,
-        ) ? fmtM(grid.observerGroundElevationM) : 'unknown'}.`,
+        t('terrain.statusDemReady', {
+          zoom: grid.zoom,
+          spacing: grid.spacingM.toFixed(1),
+          tiles: grid.requestedTiles,
+          failed: grid.failedTiles,
+          ground: Number.isFinite(grid.observerGroundElevationM)
+            ? fmtM(grid.observerGroundElevationM)
+            : t('terrain.unknown'),
+        }),
         grid.failedTiles > 0 ? 'warn' : 'good',
       );
       this.api.setStatus(
-        `Terrain DEM z${grid.zoom} at ${grid.spacingM.toFixed(1)} m/px loaded.`,
+        t('terrain.statusHostDemReady', {
+          zoom: grid.zoom,
+          spacing: grid.spacingM.toFixed(1),
+        }),
       );
       void this.updateCacheCounts();
     } catch (error) {
@@ -1016,8 +1038,12 @@ export class TerrainUi implements TerrainWorkstream {
       this.terrainLoading = false;
       this.setProgress('terrain-progress', 0);
       const message = error instanceof Error ? error.message : String(error);
-      this.setStatus(`DEM load failed: ${message}. Check the tile service and retry.`, 'bad', true);
-      this.ref('dem-badge').textContent = 'DEM: failed';
+      this.setStatus(
+        t('terrain.statusDemFailed', { message }),
+        'bad',
+        true,
+      );
+      this.ref('dem-badge').textContent = t('terrain.badgeDemFailed');
       this.ref('dem-badge').className = 'tw-badge bad';
     } finally {
       if (this.terrainAbort === controller) this.terrainAbort = null;
@@ -1036,7 +1062,10 @@ export class TerrainUi implements TerrainWorkstream {
     this.setProgress('terrain-progress', fraction);
     this.ref('terrain-detail').textContent = progress.message;
     if (progress.loaded > 0 && progress.phase === 'tiles') {
-      this.ref('dem-badge').textContent = `DEM: ${progress.loaded}/${progress.total}`;
+      this.ref('dem-badge').textContent = t('terrain.badgeDemProgress', {
+        loaded: progress.loaded,
+        total: progress.total,
+      });
       this.ref('dem-badge').className = 'tw-badge';
     }
   }
@@ -1062,52 +1091,52 @@ export class TerrainUi implements TerrainWorkstream {
       sharedGround === undefined ||
       !Number.isFinite(sharedGround)
     ) {
-      this.ref('ground-note').textContent =
-        'Ground elevation: unknown until the DEM loads. GPS altitude is not used.';
+      this.ref('ground-note').textContent = t('terrain.groundUnknown');
       return;
     }
     const localGround = grid ? sceneGroundElevationM(grid) : sharedGround;
     const difference = localGround - sharedGround;
     if (Number.isFinite(localGround) && Math.abs(difference) > 0.1) {
-      this.ref('ground-note').textContent = `Local scene ground (ENU anchor): ${fmtM(
-        localGround,
-      )}; shared astronomy ground (Mercator sample): ${fmtM(
-        sharedGround,
-      )}. Difference ${fmtM(
-        Math.abs(difference),
-      )}: the horizon profile, 3D mesh and eye height use the local anchor, while the shared ephemeris/session uses the Mercator ground. GPS altitude is ignored. Local eye altitude: ${fmtM(
-        localGround + this.eyeHeightM,
-      )}.`;
+      this.ref('ground-note').textContent = t('terrain.groundMismatch', {
+        local: fmtM(localGround),
+        shared: fmtM(sharedGround),
+        difference: fmtM(Math.abs(difference)),
+        altitude: fmtM(localGround + this.eyeHeightM),
+      });
       return;
     }
-    this.ref('ground-note').textContent = `Ground elevation from DEM: ${fmtM(
-      sharedGround,
-    )} above sea level. Local scene anchor and shared astronomy ground agree within 0.1 m. Browser GPS altitude is ignored; it is only a cross-check. Effective eye altitude: ${fmtM(
-      localGround + this.eyeHeightM,
-    )}.`;
+    this.ref('ground-note').textContent = t('terrain.groundOk', {
+      ground: fmtM(sharedGround),
+      altitude: fmtM(localGround + this.eyeHeightM),
+    });
   }
 
   private renderDemInfo(grid: TerrainGrid): void {
     const widthKm = (grid.width * grid.spacingEastM) / 1000;
     const heightKm = (grid.height * grid.spacingNorthM) / 1000;
-    this.ref('dem-info').textContent = `DEM: z${grid.zoom} · ${grid.spacingM.toFixed(
-      1,
-    )} m/px · ${widthKm.toFixed(1)} × ${heightKm.toFixed(
-      1,
-    )} km · ${grid.requestedTiles} tiles (${grid.cachedTiles} cached, ${
-      grid.networkTiles
-    } network, ${grid.failedTiles} failed) · Mercator ground ${Number.isFinite(
-      grid.observerGroundElevationM,
-    ) ? fmtM(grid.observerGroundElevationM) : 'unknown'}.`;
-    this.ref('dem-badge').textContent = `DEM: z${grid.zoom} ${grid.spacingM.toFixed(
-      1,
-    )} m/px`;
+    this.ref('dem-info').textContent = t('terrain.demInfo', {
+      zoom: grid.zoom,
+      spacing: grid.spacingM.toFixed(1),
+      width: widthKm.toFixed(1),
+      height: heightKm.toFixed(1),
+      tiles: grid.requestedTiles,
+      cached: grid.cachedTiles,
+      network: grid.networkTiles,
+      failed: grid.failedTiles,
+      ground: Number.isFinite(grid.observerGroundElevationM)
+        ? fmtM(grid.observerGroundElevationM)
+        : t('terrain.unknown'),
+    });
+    this.ref('dem-badge').textContent = t('terrain.badgeDemValue', {
+      zoom: grid.zoom,
+      spacing: grid.spacingM.toFixed(1),
+    });
     this.ref('dem-badge').className =
       grid.failedTiles > 0 ? 'tw-badge warn' : 'tw-badge good';
     this.ref('terrain-detail').textContent =
       grid.failedTiles > 0
-        ? `${grid.failedTiles} tiles failed; gaps are transparent in 3D and skipped in the horizon. Use Reload DEM to retry.`
-        : `Tile-aligned Web Mercator grid resampled to a local ENU frame; Earth curvature applied for distances > 5 km.`;
+        ? t('terrain.demDetailFailed', { count: grid.failedTiles })
+        : t('terrain.demDetailOk');
   }
 
   private scheduleBuildings(): void {
@@ -1116,10 +1145,9 @@ export class TerrainUi implements TerrainWorkstream {
       if (this.offlinePrepared?.buildings) {
         this.applyOfflineBuildings();
       } else {
-        this.ref('building-badge').textContent = 'Buildings: offline';
+        this.ref('building-badge').textContent = t('terrain.buildingsOfflineBadge');
         this.ref('building-badge').className = 'tw-badge warn';
-        this.ref('building-detail').textContent =
-          'Offline: no building snapshot was stored for this area. The horizon uses terrain only; import a file or re-prepare online.';
+        this.ref('building-detail').textContent = t('terrain.buildingsOfflineDetail');
       }
       return;
     }
@@ -1139,14 +1167,12 @@ export class TerrainUi implements TerrainWorkstream {
     if (!file) return;
     const observer = this.state?.observer;
     if (!observer) {
-      this.ref('import-status').textContent =
-        'Set an observer before importing building data.';
+      this.ref('import-status').textContent = t('terrain.importNoObserver');
       return;
     }
     const grid = this.grid;
     if (!grid) {
-      this.ref('import-status').textContent =
-        'Wait for the DEM to load, then import the building file.';
+      this.ref('import-status').textContent = t('terrain.importWaitDem');
       return;
     }
     try {
@@ -1165,8 +1191,7 @@ export class TerrainUi implements TerrainWorkstream {
         },
       );
       if (result.buildings.length === 0) {
-        this.ref('import-status').textContent =
-          'The file contains no usable building polygons. Nothing was replaced.';
+        this.ref('import-status').textContent = t('terrain.importNoPolygons');
         return;
       }
       this.buildingsResult = result;
@@ -1188,10 +1213,20 @@ export class TerrainUi implements TerrainWorkstream {
         this.buildingRadiusM,
         result,
       );
-      this.invalidateBestSpot('Buildings imported; run the search again.');
-      this.ref('import-status').textContent = `Imported ${result.buildings.length} buildings from ${file.name}; ${result.defaultHeightCount} use the 8 m default. ODbL attribution applies.`;
+      this.invalidateBestSpot(t('terrain.invalidateBuildingsImported'));
+      this.ref('import-status').textContent = t(
+        'terrain.importSuccessStatus',
+        {
+          count: result.buildings.length,
+          file: file.name,
+          defaultCount: result.defaultHeightCount,
+        },
+      );
       this.setStatus(
-        `Imported ${result.buildings.length} building ways from ${file.name}.`,
+        t('terrain.importSuccessHost', {
+          count: result.buildings.length,
+          file: file.name,
+        }),
         'good',
         true,
       );
@@ -1199,8 +1234,14 @@ export class TerrainUi implements TerrainWorkstream {
       void this.updateCacheCounts();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.ref('import-status').textContent = `Import failed: ${message}`;
-      this.setStatus(`Building import failed: ${message}`, 'bad', true);
+      this.ref('import-status').textContent = t('terrain.importFailedStatus', {
+        message,
+      });
+      this.setStatus(
+        t('terrain.importFailedHost', { message }),
+        'bad',
+        true,
+      );
     }
   }
 
@@ -1216,11 +1257,11 @@ export class TerrainUi implements TerrainWorkstream {
         if (this.buildingsResult) return this.buildingsResult;
       }
       this.setStatus(
-        'Offline: no cached or bundled buildings cover this view. Best-spot scores will be marked incomplete. Reconnect or import a building file.',
+        t('terrain.buildingsOfflineStatus'),
         'warn',
         true,
       );
-      this.ref('building-badge').textContent = 'Buildings: offline';
+      this.ref('building-badge').textContent = t('terrain.buildingsOfflineBadge');
       this.ref('building-badge').className = 'tw-badge warn';
       return null;
     }
@@ -1243,7 +1284,9 @@ export class TerrainUi implements TerrainWorkstream {
     if (this.buildingsResult && key === this.lastBuildingKey) {
       if (!options.quiet) {
         this.setStatus(
-          `Buildings already loaded for this view (${this.buildingsResult.buildings.length} ways).`,
+          t('terrain.buildingsAlreadyLoaded', {
+            count: this.buildingsResult.buildings.length,
+          }),
           'info',
         );
       }
@@ -1253,7 +1296,7 @@ export class TerrainUi implements TerrainWorkstream {
     const controller = new AbortController();
     this.buildingAbort = controller;
     this.buildingLoading = true;
-    this.ref('building-badge').textContent = 'Buildings: loading…';
+    this.ref('building-badge').textContent = t('terrain.badgeBuildingsLoading');
     this.ref('building-badge').className = 'tw-badge';
     try {
       const result = await fetchBuildings({
@@ -1282,17 +1325,21 @@ export class TerrainUi implements TerrainWorkstream {
       });
       this.recomputeProfileAtViewpoint();
       if (!options.quiet) {
-        this.invalidateBestSpot('Buildings updated; run the search again.');
+        this.invalidateBestSpot(t('terrain.invalidateBuildingsUpdated'));
       }
       this.setStatus(
-        `Buildings: ${result.buildings.length} ways within ${fmtKm(
-          result.queryRadiusM,
-          1,
-        )}; ${result.defaultHeightCount} use the ${DEFAULT_BUILDING_HEIGHT_M} m default.`,
+        t('terrain.buildingsLoadedStatus', {
+          count: result.buildings.length,
+          radius: fmtKm(result.queryRadiusM, 1),
+          defaultCount: result.defaultHeightCount,
+          defaultHeight: DEFAULT_BUILDING_HEIGHT_M,
+        }),
         result.buildings.length === 0 ? 'warn' : 'good',
       );
       this.api.setStatus(
-        `Terrain buildings loaded: ${result.buildings.length} OSM ways.`,
+        t('terrain.buildingsLoadedHost', {
+          count: result.buildings.length,
+        }),
       );
       void this.updateCacheCounts();
       return result;
@@ -1303,28 +1350,38 @@ export class TerrainUi implements TerrainWorkstream {
         this.buildingCooldownUntil = Date.now() + error.retryAfterMs;
         this.startCooldownTimer();
         this.setStatus(error.message, 'bad', true);
-        this.ref('building-badge').textContent = 'Buildings: cooldown';
+        this.ref('building-badge').textContent = t('terrain.badgeBuildingsCooldown');
         this.ref('building-badge').className = 'tw-badge bad';
-        this.ref('building-detail').textContent =
-          'Overpass returned HTTP 429. No automatic retry will be made; wait for the cooldown, then press Fetch buildings.';
+        this.ref('building-detail').textContent = t(
+          'terrain.buildingsRateLimitDetail',
+        );
       } else if (error instanceof OverpassTimeoutError) {
         this.setStatus(
-          `${error.message} No automatic retry; press Fetch buildings to try again.`,
+          t('terrain.buildingsTimeoutStatus', { message: error.message }),
           'bad',
           true,
         );
-        this.ref('building-badge').textContent = 'Buildings: timeout';
+        this.ref('building-badge').textContent = t('terrain.badgeBuildingsTimeout');
         this.ref('building-badge').className = 'tw-badge bad';
-        this.ref('building-detail').textContent =
-          'Overpass timed out or was slow. Data may be incomplete; the best-spot search can still run with existing buildings.';
+        this.ref('building-detail').textContent = t(
+          'terrain.buildingsTimeoutDetail',
+        );
       } else if (error instanceof OverpassRequestError) {
-        this.setStatus(`Overpass error: ${error.message}`, 'bad', true);
-        this.ref('building-badge').textContent = 'Buildings: error';
+        this.setStatus(
+          t('terrain.overpassError', { message: error.message }),
+          'bad',
+          true,
+        );
+        this.ref('building-badge').textContent = t('terrain.badgeBuildingsError');
         this.ref('building-badge').className = 'tw-badge bad';
       } else {
         const message = error instanceof Error ? error.message : String(error);
-        this.setStatus(`Building fetch failed: ${message}`, 'bad', true);
-        this.ref('building-badge').textContent = 'Buildings: error';
+        this.setStatus(
+          t('terrain.buildingFetchFailed', { message }),
+          'bad',
+          true,
+        );
+        this.ref('building-badge').textContent = t('terrain.badgeBuildingsError');
         this.ref('building-badge').className = 'tw-badge bad';
       }
       return null;
@@ -1335,22 +1392,37 @@ export class TerrainUi implements TerrainWorkstream {
 
   private renderBuildingsInfo(result: BuildingsResult): void {
     const share = defaultHeightShare(result);
-    this.ref('building-info').textContent = `Buildings: ${result.buildings.length} ways · ${result.taggedHeightCount} tagged · ${result.defaultHeightCount} default (${(share * 100).toFixed(
-      0,
-    )}%) · query ${fmtKm(result.queryRadiusM, 1)} · ${result.source}${
-      result.sourceLabel ? ` (${result.sourceLabel})` : ''
-    }${result.retrievedAt ? ` · retrieved ${result.retrievedAt}` : ''}${
-      result.osmTimestamp ? ` · OSM ${result.osmTimestamp}` : ''
-    }.`;
-    this.ref('building-badge').textContent = `Buildings: ${result.buildings.length} (${(share * 100).toFixed(0)}% default)`;
+    this.ref('building-info').textContent = t('terrain.buildingsInfo', {
+      count: result.buildings.length,
+      tagged: result.taggedHeightCount,
+      defaultCount: result.defaultHeightCount,
+      percent: (share * 100).toFixed(0),
+      radius: fmtKm(result.queryRadiusM, 1),
+      source: result.source,
+      sourceLabel: result.sourceLabel
+        ? t('terrain.buildingsSourceLabel', { label: result.sourceLabel })
+        : '',
+      retrieved: result.retrievedAt
+        ? t('terrain.buildingsRetrieved', { time: result.retrievedAt })
+        : '',
+      osm: result.osmTimestamp
+        ? t('terrain.buildingsOsm', { time: result.osmTimestamp })
+        : '',
+    });
+    this.ref('building-badge').textContent = t('terrain.badgeBuildingsValue', {
+      count: result.buildings.length,
+      percent: (share * 100).toFixed(0),
+    });
     this.ref('building-badge').className =
       result.buildings.length === 0 ? 'tw-badge warn' : 'tw-badge good';
     this.ref('building-detail').textContent =
       result.buildings.length === 0
-        ? 'No building ways found in this radius. The horizon will use terrain only.'
-        : `${result.defaultHeightCount} of ${result.buildings.length} ways (${(share * 100).toFixed(
-            0,
-          )}%) use the 8 m fallback height; these extrude amber in 3D. Height priority: building:height → height → building:levels×3 → 8 m. ODbL © OpenStreetMap contributors.`;
+        ? t('terrain.buildingsNoneDetail')
+        : t('terrain.buildingsDefaultDetail', {
+            defaultCount: result.defaultHeightCount,
+            total: result.buildings.length,
+            percent: (share * 100).toFixed(0),
+          });
   }
 
   private startCooldownTimer(): void {
@@ -1359,9 +1431,10 @@ export class TerrainUi implements TerrainWorkstream {
     this.cooldownTimer = window.setInterval(() => {
       if (Date.now() >= this.buildingCooldownUntil) {
         this.stopCooldownTimer();
-        this.ref('building-detail').textContent =
-          'Overpass cooldown finished. Press Fetch buildings to query once.';
-        this.ref('building-badge').textContent = 'Buildings: ready';
+        this.ref('building-detail').textContent = t(
+          'terrain.buildingsCooldownFinished',
+        );
+        this.ref('building-badge').textContent = t('terrain.badgeBuildingsReady');
         this.ref('building-badge').className = 'tw-badge';
       } else {
         this.showCooldown();
@@ -1375,8 +1448,13 @@ export class TerrainUi implements TerrainWorkstream {
       Math.ceil((this.buildingCooldownUntil - Date.now()) / 1000),
     );
     if (remaining <= 0) return;
-    this.ref('building-detail').textContent = `Overpass cooldown: ${remaining} s remaining. No automatic retry.`;
-    this.ref('building-badge').textContent = `Buildings: ${remaining}s`;
+    this.ref('building-detail').textContent = t('terrain.buildingsCooldown', {
+      seconds: remaining,
+    });
+    this.ref('building-badge').textContent = t(
+      'terrain.badgeBuildingsCountdown',
+      { seconds: remaining },
+    );
     this.ref('building-badge').className = 'tw-badge bad';
   }
 
@@ -1390,14 +1468,14 @@ export class TerrainUi implements TerrainWorkstream {
   private async clearTerrainCache(): Promise<void> {
     await clearTerrainCache();
     this.lastTerrainKey = '';
-    this.setStatus('Terrain tile cache cleared.', 'info');
+    this.setStatus(t('terrain.cacheTerrainCleared'), 'info');
     void this.updateCacheCounts();
   }
 
   private async clearBuildingCacheNow(): Promise<void> {
     await clearBuildingCache();
     this.lastBuildingKey = '';
-    this.setStatus('Building cache cleared.', 'info');
+    this.setStatus(t('terrain.cacheBuildingCleared'), 'info');
     void this.updateCacheCounts();
   }
 
@@ -1406,7 +1484,10 @@ export class TerrainUi implements TerrainWorkstream {
       cacheKeyCount('terrarium/'),
       cacheKeyCount('overpass/'),
     ]);
-    this.ref('build-info').textContent = `Terrain workstream · cached DEM tiles: ${tiles} · cached Overpass queries: ${buildingQueries}`;
+    this.ref('build-info').textContent = t('terrain.buildInfoValue', {
+      tiles,
+      queries: buildingQueries,
+    });
   }
 
   private updateSearchArea(): void {
@@ -1423,8 +1504,7 @@ export class TerrainUi implements TerrainWorkstream {
   private ensurePath(): ApophisPathInfo | null {
     const session = this.api.getSession();
     if (!session) {
-      this.ref('path-info').textContent =
-        'Apophis path: the simulation session is not ready.';
+      this.ref('path-info').textContent = t('terrain.pathNoSession');
       return null;
     }
     const key = observerKey(session.observer);
@@ -1444,8 +1524,7 @@ export class TerrainUi implements TerrainWorkstream {
     const path = this.path;
     const session = this.api.getSession();
     if (!path || !session) {
-      this.ref('path-info').textContent =
-        'Apophis path: no simulation session yet.';
+      this.ref('path-info').textContent = t('terrain.pathNoSessionYet');
       return;
     }
     const maxSample = path.samples.reduce(
@@ -1456,24 +1535,26 @@ export class TerrainUi implements TerrainWorkstream {
     const interval = session.visibleIntervalForJump();
     const start = interval ? formatUtc(interval.startUtc.getTime()) : '—';
     const end = interval ? formatUtc(interval.endUtc.getTime()) : '—';
-    this.ref('path-info').innerHTML = `Apophis path (Phase 1, airless): <strong>${escapeHtml(
-      formatSector(path.sector),
-    )}</strong>; elevation ${path.sector.minElevationDeg.toFixed(
-      1,
-    )}°–${path.sector.maxElevationDeg.toFixed(1)}°, max at ${escapeHtml(
-      formatUtc(maxSample.utcMs),
-    )}. Physical visibility ${escapeHtml(start)} → ${escapeHtml(
-      end,
-    )}; ${path.samples.length} samples at 30 s. The path is computed <strong>once</strong> for this search area, not per candidate.`;
-    this.ref('parallax-info').textContent = `Parallax over a 5 km baseline: ${path.parallax.arcsec.toFixed(
-      2,
-    )}″ at ${path.parallax.rangeKm.toLocaleString('en-US', {
-      maximumFractionDigits: 0,
-    })} km (worst on the visible path); ${path.parallaxAtGeocentricCa.arcsec.toFixed(
-      2,
-    )}″ at ${path.parallaxAtGeocentricCa.rangeKm.toLocaleString('en-US', {
-      maximumFractionDigits: 0,
-    })} km (geocentric CA). This is <1° horizon-bin width and shifts edge-of-ridge timing by seconds, not the ranking.`;
+    this.ref('path-info').innerHTML = t('terrain.pathInfo', {
+      sector: escapeHtml(formatSector(path.sector)),
+      min: path.sector.minElevationDeg.toFixed(1),
+      max: path.sector.maxElevationDeg.toFixed(1),
+      maxUtc: escapeHtml(formatUtc(maxSample.utcMs)),
+      start: escapeHtml(start),
+      end: escapeHtml(end),
+      samples: path.samples.length,
+    });
+    this.ref('parallax-info').textContent = t('terrain.parallaxInfo', {
+      arcsec: path.parallax.arcsec.toFixed(2),
+      range: path.parallax.rangeKm.toLocaleString('en-US', {
+        maximumFractionDigits: 0,
+      }),
+      geocentricArcsec: path.parallaxAtGeocentricCa.arcsec.toFixed(2),
+      geocentricRange: path.parallaxAtGeocentricCa.rangeKm.toLocaleString(
+        'en-US',
+        { maximumFractionDigits: 0 },
+      ),
+    });
     this.scheduleChart();
   }
 
@@ -1539,8 +1620,7 @@ export class TerrainUi implements TerrainWorkstream {
   private renderHorizonInfo(): void {
     const profile = this.profile;
     if (!profile) {
-      this.ref('horizon-info').textContent =
-        'Load a DEM to compute the local horizon.';
+      this.ref('horizon-info').textContent = t('terrain.horizonEmpty');
       return;
     }
     let maxSample = profile.samples[0];
@@ -1549,15 +1629,21 @@ export class TerrainUi implements TerrainWorkstream {
     }
     const source =
       maxSample.source === 'building'
-        ? `building way ${maxSample.sourceId ?? '?'}`
+        ? t('terrain.horizonBuildingSource', {
+            id: maxSample.sourceId ?? '?',
+          })
         : maxSample.source;
     const location = this.viewingCandidate
-      ? `candidate ${profile.pointLatDeg.toFixed(5)}°, ${profile.pointLonDeg.toFixed(5)}°`
-      : 'observer';
+      ? t('terrain.horizonCandidate', {
+          lat: profile.pointLatDeg.toFixed(5),
+          lon: profile.pointLonDeg.toFixed(5),
+        })
+      : t('terrain.horizonObserver');
     const insideWarning = this.viewpointInsideBuilding
-      ? ` The viewpoint is inside OSM building way ${this.viewpointInsideBuilding.id} (${fmtM(
-          this.viewpointInsideBuilding.heightM,
-        )} high); the ground 3D view is inside its walls. Choose Rooftop or move the point.`
+      ? t('terrain.horizonInside', {
+          id: this.viewpointInsideBuilding.id,
+          height: fmtM(this.viewpointInsideBuilding.heightM),
+        })
       : '';
     const anchorNote =
       !this.viewingCandidate &&
@@ -1566,24 +1652,29 @@ export class TerrainUi implements TerrainWorkstream {
       Math.abs(
         profile.groundElevationM - this.grid.observerGroundElevationM,
       ) > 0.1
-        ? ` Local ENU anchor; shared astronomy ground is ${fmtM(
-            this.grid.observerGroundElevationM,
-          )} (Mercator).`
+        ? t('terrain.horizonAnchor', {
+            ground: fmtM(this.grid.observerGroundElevationM),
+          })
         : '';
-    this.ref('horizon-info').textContent = `Horizon at ${location}: ground ${fmtM(
-      profile.groundElevationM,
-    )} + eye ${fmtM(profile.eyeHeightM)} = ${fmtM(
-      profile.eyeElevationM,
-    )}; 360 bins at 1°; highest obstruction ${maxSample.elevationDeg.toFixed(
-      1,
-    )}° at az ${maxSample.azimuthDeg.toFixed(0)}° (${source}${
-      maxSample.distanceM !== null
-        ? `, ${fmtKm(maxSample.distanceM, 1)} away`
-        : ''
-    }); ${profile.buildingCount} buildings considered (within ${fmtKm(
-      this.buildingRadiusM,
-      1,
-    )}). Terrain ray distance is limited by the DEM patch.${anchorNote}${insideWarning}`;
+    this.ref('horizon-info').textContent = t('terrain.horizonInfo', {
+      location,
+      ground: fmtM(profile.groundElevationM),
+      eye: fmtM(profile.eyeHeightM),
+      total: fmtM(profile.eyeElevationM),
+      elevation: maxSample.elevationDeg.toFixed(1),
+      azimuth: maxSample.azimuthDeg.toFixed(0),
+      source,
+      distance:
+        maxSample.distanceM !== null
+          ? t('terrain.horizonDistance', {
+              distance: fmtKm(maxSample.distanceM, 1),
+            })
+          : '',
+      buildings: profile.buildingCount,
+      radius: fmtKm(this.buildingRadiusM, 1),
+      anchor: anchorNote,
+      inside: insideWarning,
+    });
   }
 
   private scheduleChart(): void {
@@ -1609,23 +1700,23 @@ export class TerrainUi implements TerrainWorkstream {
   private renderSceneReadout(readout: SceneReadout): void {
     const marker =
       readout.markerAzimuthDeg === null || readout.markerElevationDeg === null
-        ? 'Apophis marker unavailable.'
-        : `Apophis az ${readout.markerAzimuthDeg.toFixed(
-            2,
-          )}° el ${readout.markerElevationDeg.toFixed(
-            2,
-          )}°; horizon ${readout.horizonAtMarkerDeg?.toFixed(1) ?? '—'}° → ${
-            readout.markerBelowHorizon
-              ? 'below horizon'
+        ? t('terrain.sceneMarkerUnavailable')
+        : t('terrain.sceneMarker', {
+            az: readout.markerAzimuthDeg.toFixed(2),
+            el: readout.markerElevationDeg.toFixed(2),
+            horizon: readout.horizonAtMarkerDeg?.toFixed(1) ?? '—',
+            state: readout.markerBelowHorizon
+              ? t('terrain.sceneStateBelow')
               : readout.markerOccluded
-                ? 'occluded by terrain/buildings'
-                : 'visible'
-          }.`;
-    this.ref('scene-readout').textContent = `Camera az ${readout.cameraAzimuthDeg.toFixed(
-      1,
-    )}° el ${readout.cameraElevationDeg.toFixed(1)}° · FOV ${readout.fovDeg.toFixed(
-      0,
-    )}°. ${marker}`;
+                ? t('terrain.sceneStateOccluded')
+                : t('terrain.sceneStateVisible'),
+          });
+    this.ref('scene-readout').textContent = t('terrain.sceneCamera', {
+      az: readout.cameraAzimuthDeg.toFixed(1),
+      el: readout.cameraElevationDeg.toFixed(1),
+      fov: readout.fovDeg.toFixed(0),
+      marker,
+    });
     this.ref('fov').textContent = `${readout.fovDeg.toFixed(0)}°`;
   }
 
@@ -1635,14 +1726,14 @@ export class TerrainUi implements TerrainWorkstream {
     const grid = this.grid;
     if (!session || !grid) {
       this.setStatus(
-        'Best spot needs a loaded DEM and a simulation session. Wait for the DEM, then retry.',
+        t('terrain.bestErrorNeedsDem'),
         'warn',
       );
       return;
     }
     if (session.visibility.intervals.length === 0) {
       const reason =
-        session.visibility.reason || 'No physical visibility window at this observer.';
+        session.visibility.reason || t('terrain.bestErrorNoWindow');
       this.ref('best-status').textContent = reason;
       this.setStatus(reason, 'warn', true);
       return;
@@ -1653,8 +1744,7 @@ export class TerrainUi implements TerrainWorkstream {
     this.bestSpotCancelRequested = false;
     this.setBestBusy(true);
     this.setProgress('best-progress', 0.02);
-    this.ref('best-status').textContent =
-      'Preparing the search area and building coverage…';
+    this.ref('best-status').textContent = t('terrain.bestStatusPreparing');
 
     const requiredBuildingRadius = clampNumber(
       this.searchRadiusM + this.buildingRadiusM,
@@ -1675,10 +1765,9 @@ export class TerrainUi implements TerrainWorkstream {
       ) > 1e-4
     ) {
       this.setStatus(
-        `Fetching buildings covering the search area (${fmtKm(
-          requiredBuildingRadius,
-          1,
-        )})…`,
+        t('terrain.bestStatusFetchingBuildings', {
+          radius: fmtKm(requiredBuildingRadius, 1),
+        }),
         'info',
       );
       const result = await this.fetchBuildingsNow(requiredBuildingRadius, {
@@ -1687,7 +1776,7 @@ export class TerrainUi implements TerrainWorkstream {
       if (!result) {
         buildingsIncomplete = true;
         this.setStatus(
-          'Building data could not be expanded to cover the whole search area. Scores may be optimistic; buildings from the previous query are still used where available.',
+          t('terrain.bestWarningBuildingsIncomplete'),
           'warn',
           true,
         );
@@ -1704,7 +1793,7 @@ export class TerrainUi implements TerrainWorkstream {
     if (this.grid !== grid) {
       this.finishBestSpot();
       this.setStatus(
-        'Observer or DEM changed during the building fetch; search cancelled. Run it again.',
+        t('terrain.bestWarningCancelled'),
         'warn',
       );
       return;
@@ -1718,7 +1807,7 @@ export class TerrainUi implements TerrainWorkstream {
     if (candidates.length === 0) {
       this.finishBestSpot();
       this.setStatus(
-        'No candidate grid points fall inside the DEM. Reload the DEM or choose a smaller radius.',
+        t('terrain.bestErrorNoCandidates'),
         'bad',
         true,
       );
@@ -1742,23 +1831,24 @@ export class TerrainUi implements TerrainWorkstream {
       noVisibilityWindow: session.visibility.intervals.length === 0,
       buildingsIncomplete,
     };
-    this.ref('best-status').textContent = `Scoring ${candidates.length.toLocaleString(
-      'en-US',
-    )} candidates in a Web Worker…`;
+    this.ref('best-status').textContent = t('terrain.bestStatusScoringStart', {
+      count: candidates.length.toLocaleString('en-US'),
+    });
     const requestId = ++this.bestSpotRequestId;
     const onProgress = (processed: number, total: number): void => {
       if (requestId !== this.bestSpotRequestId) return;
       const fraction = total > 0 ? processed / total : 0;
       this.setProgress('best-progress', fraction);
-      this.ref('best-status').textContent = `Scoring ${processed.toLocaleString(
-        'en-US',
-      )} / ${total.toLocaleString('en-US')} candidates…`;
+      this.ref('best-status').textContent = t('terrain.bestStatusScoring', {
+        processed: processed.toLocaleString('en-US'),
+        total: total.toLocaleString('en-US'),
+      });
     };
     const onDone = (summary: BestSpotSummary): void => {
       if (requestId !== this.bestSpotRequestId) return;
       if (summary.cancelled) {
         this.finishBestSpot();
-        this.setStatus('Best-spot search cancelled.', 'info');
+        this.setStatus(t('terrain.bestStatusCancelled'), 'info');
         return;
       }
       this.bestSpot = summary;
@@ -1766,28 +1856,40 @@ export class TerrainUi implements TerrainWorkstream {
       this.setProgress('best-progress', 1);
       this.renderBestSpot(summary);
       this.map?.setBestSpots(summary, grid);
-      const summaryText = `Search complete: ${
-        summary.top[0]
-          ? `${formatClearPercent(summary.top[0].scorePessimistic)}% clear (pessimistic) at ${summary.top[0].latitudeDeg.toFixed(5)}°, ${summary.top[0].longitudeDeg.toFixed(5)}°`
-          : 'no clear candidates'
-      } · ${summary.processed.toLocaleString('en-US')} candidates in ${(
-        summary.elapsedMs / 1000
-      ).toFixed(1)} s.`;
-      this.ref('best-status').textContent = summaryText;
+      const detail = summary.top[0]
+        ? t('terrain.bestStatusCompleteClear', {
+            percent: formatClearPercent(summary.top[0].scorePessimistic),
+            lat: summary.top[0].latitudeDeg.toFixed(5),
+            lon: summary.top[0].longitudeDeg.toFixed(5),
+          })
+        : t('terrain.bestStatusCompleteNoClear');
+      const suffix = t('terrain.bestStatusCompleteSuffix', {
+        count: summary.processed.toLocaleString('en-US'),
+        seconds: (summary.elapsedMs / 1000).toFixed(1),
+      });
+      this.ref('best-status').textContent = `${t(
+        'terrain.bestStatusCompletePrefix',
+      )}${detail}${suffix}`;
       this.setStatus(
-        `Best spot: ${summaryText.replace('Search complete: ', '')}`,
+        t('terrain.bestHostStatus', { summary: `${detail}${suffix}` }),
         'good',
         true,
       );
       this.api.setStatus(
-        `Terrain best-spot search found ${summary.top.length} top candidates.`,
+        t('terrain.bestHostTop', { count: summary.top.length }),
       );
     };
     const onError = (message: string): void => {
       if (requestId !== this.bestSpotRequestId) return;
       this.finishBestSpot();
-      this.ref('best-status').textContent = `Search failed: ${message}`;
-      this.setStatus(`Best-spot search failed: ${message}`, 'bad', true);
+      this.ref('best-status').textContent = t('terrain.bestStatusFailed', {
+        message,
+      });
+      this.setStatus(
+        t('terrain.bestStatusHostFailed', { message }),
+        'bad',
+        true,
+      );
     };
 
     if (typeof Worker !== 'undefined') {
@@ -1818,7 +1920,7 @@ export class TerrainUi implements TerrainWorkstream {
         worker.onerror = (event) => {
           worker.terminate();
           if (this.bestSpotWorker === worker) this.bestSpotWorker = null;
-          onError(event.message || 'worker error');
+          onError(event.message || t('terrain.bestWorkerError'));
         };
         worker.postMessage({ type: 'run', requestId, input });
         return;
@@ -1863,8 +1965,8 @@ export class TerrainUi implements TerrainWorkstream {
     }
     this.finishBestSpot();
     this.setProgress('best-progress', 0);
-    this.ref('best-status').textContent = 'Search cancelled.';
-    this.setStatus('Best-spot search cancelled.', 'info');
+    this.ref('best-status').textContent = t('terrain.bestStatusCancelledShort');
+    this.setStatus(t('terrain.bestStatusCancelled'), 'info');
   }
 
   private finishBestSpot(): void {
@@ -1877,24 +1979,23 @@ export class TerrainUi implements TerrainWorkstream {
 
   private renderBestSpot(summary: BestSpotSummary): void {
     const state = this.state;
-    this.ref('best-summary').textContent = `${summary.processed.toLocaleString(
-      'en-US',
-    )} candidates · ${fmtKm(summary.radiusM, 1)} radius · ${summary.spacingM.toFixed(
-      0,
-    )} m spacing · ${summary.marginDeg.toFixed(
-      1,
-    )}° margin · ${summary.pathSamples} path samples · ${(
-      summary.elapsedMs / 1000
-    ).toFixed(1)} s. Ranked by the pessimistic score (default building heights ×1.5); range shows ×0.7 to ×1.5. Score = fraction of the physical Phase 1 visibility window above the local horizon + margin.`;
+    this.ref('best-summary').textContent = t('terrain.bestSummary', {
+      count: summary.processed.toLocaleString('en-US'),
+      radius: fmtKm(summary.radiusM, 1),
+      spacing: summary.spacingM.toFixed(0),
+      margin: summary.marginDeg.toFixed(1),
+      pathSamples: summary.pathSamples,
+      seconds: (summary.elapsedMs / 1000).toFixed(1),
+    });
     this.ref('best-warning').textContent = summary.buildingsIncomplete
-      ? 'Warning: the Overpass query did not cover the full search area, so some buildings may be missing. Treat open-looking spots as provisional.'
+      ? t('terrain.bestWarningIncomplete')
       : '';
     const list = this.ref<HTMLOListElement>('best-list');
     list.innerHTML = '';
     if (summary.noVisibilityWindow) {
       list.innerHTML = `<li class="tw-result-empty">${escapeHtml(
         this.api.getSession()?.visibility.reason ||
-          'No physical visibility window at this observer.',
+          t('terrain.bestErrorNoWindow'),
       )}</li>`;
       this.ref('best-detail').textContent = '';
       return;
@@ -1909,26 +2010,45 @@ export class TerrainUi implements TerrainWorkstream {
       });
       const blockerParts: string[] = [];
       if (result.blockedByDefaultHeightBuildingSamples > 0) {
-        blockerParts.push(`${result.blockedByDefaultHeightBuildingSamples} default-height`);
+        blockerParts.push(
+          t('terrain.blockersDefault', {
+            count: result.blockedByDefaultHeightBuildingSamples,
+          }),
+        );
       }
       if (result.blockedByRealHeightBuildingSamples > 0) {
-        blockerParts.push(`${result.blockedByRealHeightBuildingSamples} real-height`);
+        blockerParts.push(
+          t('terrain.blockersReal', {
+            count: result.blockedByRealHeightBuildingSamples,
+          }),
+        );
       }
       if (result.blockedByTerrainSamples > 0) {
-        blockerParts.push(`${result.blockedByTerrainSamples} terrain`);
+        blockerParts.push(t('terrain.blockersTerrain'));
       }
-      const blockers = blockerParts.length > 0 ? blockerParts.join(' · ') : 'none';
+      const blockers =
+        blockerParts.length > 0
+          ? blockerParts.join(' · ')
+          : t('terrain.blockersNone');
       const openSpace =
         result.nearestBuildingM === null
-          ? 'no mapped buildings'
+          ? t('terrain.openNoBuildings')
           : result.nearestBuildingM < 1
-            ? 'inside a building footprint'
-            : `${result.nearestBuildingM.toFixed(0)} m to nearest building`;
+            ? t('terrain.openInside')
+            : t('terrain.openNearest', {
+                distance: result.nearestBuildingM.toFixed(0),
+              });
       const rankFlag =
         result.rankSpread >= 5
-          ? `<span class="tw-badge warn" title="Rank changes with the height assumption">rank ±${result.rankSpread}</span>`
+          ? `<span class="tw-badge warn" title="${t(
+              'terrain.rankFlagTitle',
+            )}">${t('terrain.rankFlag', {
+              spread: result.rankSpread,
+            })}</span>`
           : '';
-      li.innerHTML = `<span class="tw-rank">#${index + 1}</span>
+      li.innerHTML = `<span class="tw-rank">${t('terrain.rank', {
+        rank: index + 1,
+      })}</span>
         <span class="tw-score" style="--tw-score:${(result.scorePessimistic * 100).toFixed(0)}%">${escapeHtml(
           formatClearPercent(result.scorePessimistic),
         )}%</span>
@@ -1936,21 +2056,27 @@ export class TerrainUi implements TerrainWorkstream {
           5,
         )}°, ${result.longitudeDeg.toFixed(5)}°</strong> ${rankFlag}<br />
           <span class="tw-score-range">${escapeHtml(
-            formatClearPercent(result.scoreOptimistic),
-          )}–${escapeHtml(formatClearPercent(result.scorePessimistic))}% across height assumptions</span><br />
+            t('terrain.scoreRange', {
+              optimistic: formatClearPercent(result.scoreOptimistic),
+              pessimistic: formatClearPercent(result.scorePessimistic),
+            }),
+          )}</span><br />
           ${escapeHtml(reason)}<br />
-          <span class="tw-small">Blockers: ${escapeHtml(blockers)} · ${escapeHtml(
-            openSpace,
+          <span class="tw-small">${escapeHtml(
+            t('terrain.blockers', {
+              blockers,
+              openSpace,
+            }),
           )}</span>
         </span>`;
       list.appendChild(li);
     }
     if (summary.top.length === 0) {
-      list.innerHTML =
-        '<li class="tw-result-empty">No scored candidates. Check the DEM coverage.</li>';
+      list.innerHTML = `<li class="tw-result-empty">${t(
+        'terrain.bestDetailEmpty',
+      )}</li>`;
     }
-    this.ref('best-detail').textContent =
-      'Tap a result to move the local 3D camera and map. “Rank ±N” means the spot moves N places between optimistic and pessimistic default heights. The app-wide observer and the shared Phase 1 path are unchanged.';
+    this.ref('best-detail').textContent = t('terrain.bestDetailHint');
     this.renderFieldChecks(summary);
   }
 
@@ -1973,24 +2099,27 @@ export class TerrainUi implements TerrainWorkstream {
     this.recomputeProfileAtViewpoint();
     this.scene?.setState({ viewpoint: this.viewpoint });
     this.scene?.lookAtApophis();
-    this.ref('best-detail').innerHTML = `<strong>Local viewpoint #${
-      summary.top.findIndex((item) => item.index === index) + 1
-    }</strong> at ${result.latitudeDeg.toFixed(5)}°, ${result.longitudeDeg.toFixed(
-      5,
-    )}° · ground ${fmtM(result.groundElevationM)} · pessimistic score ${(
-      result.scorePessimistic * 100
-    ).toFixed(0)}% (optimistic ${(result.scoreOptimistic * 100).toFixed(
-      0,
-    )}%) · rank ${result.rankPessimistic} (optimistic rank ${
-      result.rankOptimistic
-    }, spread ${result.rankSpread}) · min clearance ${result.minClearanceDegPessimistic.toFixed(
-      1,
-    )}°. ${escapeHtml(describeBestSpot(result, {
-      timeZone: this.state?.timeZone ?? 'UTC',
-      marginDeg: this.marginDeg,
-    }))} <button class="tw-btn ghost" data-action="use-observer" data-index="${
+    this.ref('best-detail').innerHTML = `${t('terrain.bestViewpoint', {
+      rank:
+        summary.top.findIndex((item) => item.index === index) + 1,
+      lat: result.latitudeDeg.toFixed(5),
+      lon: result.longitudeDeg.toFixed(5),
+      ground: fmtM(result.groundElevationM),
+      score: (result.scorePessimistic * 100).toFixed(0),
+      optimistic: (result.scoreOptimistic * 100).toFixed(0),
+      rankPessimistic: result.rankPessimistic,
+      rankOptimistic: result.rankOptimistic,
+      spread: result.rankSpread,
+      clearance: result.minClearanceDegPessimistic.toFixed(1),
+      reason: escapeHtml(
+        describeBestSpot(result, {
+          timeZone: this.state?.timeZone ?? 'UTC',
+          marginDeg: this.marginDeg,
+        }),
+      ),
+    })} <button class="tw-btn ghost" data-action="use-observer" data-index="${
       result.index
-    }" type="button">Make this the observer</button>`;
+    }" type="button">${t('terrain.bestMakeObserver')}</button>`;
   }
 
   private renderFieldChecks(summary: BestSpotSummary): void {
@@ -2004,26 +2133,43 @@ export class TerrainUi implements TerrainWorkstream {
       const record = this.fieldChecks[key];
       const status = record?.status ?? 'unknown';
       return `<div class="tw-field-item">
-        <div class="tw-field-title">#${index + 1} · ${result.latitudeDeg.toFixed(
-          5,
-        )}°, ${result.longitudeDeg.toFixed(5)}°</div>
-        <div class="tw-row tw-row-wrap" role="group" aria-label="Field check result for spot ${index + 1}">
+        <div class="tw-field-title">${t('terrain.fieldCheckItemTitle', {
+          rank: index + 1,
+          lat: result.latitudeDeg.toFixed(5),
+          lon: result.longitudeDeg.toFixed(5),
+        })}</div>
+        <div class="tw-row tw-row-wrap" role="group" aria-label="${t(
+          'terrain.fieldCheckGroupAria',
+          { rank: index + 1 },
+        )}">
           <button class="tw-btn small ${status === 'pass' ? 'primary' : 'ghost'}" data-action="field-pass" data-index="${
             result.index
-          }" aria-pressed="${status === 'pass'}" type="button">Pass</button>
+          }" aria-pressed="${status === 'pass'}" type="button">${t(
+            'terrain.fieldCheckPass',
+          )}</button>
           <button class="tw-btn small ${status === 'fail' ? 'danger' : 'ghost'}" data-action="field-fail" data-index="${
             result.index
-          }" aria-pressed="${status === 'fail'}" type="button">Fail</button>
-          <span class="tw-chip">${status === 'unknown' ? 'not checked' : status}</span>
+          }" aria-pressed="${status === 'fail'}" type="button">${t(
+            'terrain.fieldCheckFail',
+          )}</button>
+          <span class="tw-chip">${
+            status === 'unknown'
+              ? t('terrain.fieldCheckNotChecked')
+              : status
+          }</span>
         </div>
-        <label class="tw-field">Note
+        <label class="tw-field">${t('terrain.fieldCheckNoteLabel')}
           <input data-field-note data-index="${result.index}" value="${escapeHtml(
             record?.note ?? '',
-          )}" placeholder="e.g. ridge confirmed, trees blocked the view" />
+          )}" placeholder="${t('terrain.fieldCheckNotePlaceholder')}" />
         </label>
       </div>`;
     });
-    node.innerHTML = `<div class="tw-field-head"><strong>Field check — top 3 spots</strong><span class="tw-note">Record what you actually see on site. Stored only in this browser.</span></div>
+    node.innerHTML = `<div class="tw-field-head"><strong>${t(
+      'terrain.fieldCheckTitle',
+    )}</strong><span class="tw-note">${t(
+      'terrain.fieldCheckNote',
+    )}</span></div>
       <div class="tw-field-grid">${rows.join('')}</div>`;
   }
 
@@ -2075,7 +2221,7 @@ export class TerrainUi implements TerrainWorkstream {
     this.setProgress('best-progress', 0);
     this.map?.clearBestSpots();
     this.ref<HTMLOListElement>('best-list').innerHTML = '';
-    this.ref('best-summary').textContent = 'No current search result.';
+    this.ref('best-summary').textContent = t('terrain.bestSummaryNone');
     this.ref('best-warning').textContent = '';
     this.ref('best-status').textContent = message;
     this.ref('best-detail').textContent = '';
@@ -2118,12 +2264,12 @@ export class TerrainUi implements TerrainWorkstream {
     if (this.offlineBusy) return;
     const observer = this.state?.observer;
     if (!observer) {
-      this.setStatus('Set an observer before preparing an offline area.', 'warn');
+      this.setStatus(t('terrain.offlineErrorNoObserver'), 'warn');
       return;
     }
     if (navigator.onLine === false) {
       this.setStatus(
-        'Cannot prepare offline data while offline. Reconnect, then press Prepare for offline.',
+        t('terrain.offlineErrorOffline'),
         'bad',
         true,
       );
@@ -2133,7 +2279,7 @@ export class TerrainUi implements TerrainWorkstream {
     this.offlineAbort = controller;
     this.setOfflineBusy(true);
     this.setProgress('offline-progress', 0.01);
-    this.ref('offline-status').textContent = 'Preparing offline area…';
+    this.ref('offline-status').textContent = t('terrain.offlineStatusPreparing');
     this.ref('offline-warning').textContent = '';
     try {
       const result = await prepareOfflineArea({
@@ -2153,23 +2299,36 @@ export class TerrainUi implements TerrainWorkstream {
       this.lastVerifiedPreparedAt = result.snapshot.preparedAt;
       this.api.setOfflineSnapshot?.(result.snapshot);
       this.setProgress('offline-progress', 1);
-      this.ref('offline-status').textContent = `Offline area ready · ${formatBytes(
-        result.snapshot.totalBytes,
-      )} · prepared ${formatPreparedDate(result.snapshot.preparedAt)}.`;
+      this.ref('offline-status').textContent = t(
+        'terrain.offlinePreparedStatus',
+        {
+          bytes: formatBytes(result.snapshot.totalBytes),
+          date: formatPreparedDate(result.snapshot.preparedAt),
+        },
+      );
       this.ref('offline-warning').textContent = result.warnings.join(' ');
-      this.setStatus('Offline area prepared for this location.', 'good', true);
+      this.setStatus(t('terrain.offlinePreparedHost'), 'good', true);
       this.renderOfflineStatus(true);
       this.applyOfflineBuildings();
       this.maybeApplyOfflineMap();
     } catch (error) {
       if (controller.signal.aborted) {
-        this.ref('offline-status').textContent = 'Offline preparation cancelled.';
-        this.setStatus('Offline preparation cancelled.', 'info');
+        this.ref('offline-status').textContent = t(
+          'terrain.offlineStatusCancelled',
+        );
+        this.setStatus(t('terrain.offlineStatusCancelled'), 'info');
       } else {
         const message = error instanceof Error ? error.message : String(error);
-        this.ref('offline-status').textContent = `Offline preparation failed: ${message}`;
+        this.ref('offline-status').textContent = t(
+          'terrain.offlineStatusFailed',
+          { message },
+        );
         this.ref('offline-warning').textContent = message;
-        this.setStatus(`Offline preparation failed: ${message}`, 'bad', true);
+        this.setStatus(
+          t('terrain.offlineStatusFailed', { message }),
+          'bad',
+          true,
+        );
       }
     } finally {
       this.offlineAbort = null;
@@ -2181,17 +2340,13 @@ export class TerrainUi implements TerrainWorkstream {
     this.offlineAbort?.abort();
     this.offlineAbort = null;
     this.setProgress('offline-progress', 0);
-    this.ref('offline-status').textContent = 'Offline preparation cancelled.';
+    this.ref('offline-status').textContent = t('terrain.offlineStatusCancelled');
     this.setOfflineBusy(false);
   }
 
   private async clearOffline(): Promise<void> {
     if (this.offlineBusy) return;
-    if (
-      !window.confirm(
-        'Clear the prepared offline area, cached DEM tiles and cached building data? The app shell itself stays installed.',
-      )
-    ) {
+    if (!window.confirm(t('terrain.offlineClearConfirm'))) {
       return;
     }
     await clearOfflineData();
@@ -2201,10 +2356,10 @@ export class TerrainUi implements TerrainWorkstream {
     this.map?.clearOfflineBaseMap();
     this.map?.setOfflineMode(navigator.onLine === false);
     this.setProgress('offline-progress', 0);
-    this.ref('offline-status').textContent = 'No offline area prepared.';
+    this.ref('offline-status').textContent = t('terrain.offlineStatusNone');
     this.ref('offline-contents').innerHTML = '';
     this.ref('offline-warning').textContent = '';
-    this.setStatus('Offline data cleared.', 'info', true);
+    this.setStatus(t('terrain.offlineCleared'), 'info', true);
     void this.renderOfflineStatus(true);
   }
 
@@ -2230,44 +2385,59 @@ export class TerrainUi implements TerrainWorkstream {
     const warning = this.ref('offline-warning');
     if (!snapshot) {
       status.textContent = state?.offline.active
-        ? 'Offline mode, but no prepared snapshot was found. Reconnect and prepare an area.'
-        : 'No offline area prepared.';
+        ? t('terrain.offlineStatusOfflineNoSnapshot')
+        : t('terrain.offlineStatusNone');
       contents.innerHTML = '';
     } else {
       const b = snapshot.buildings;
-      const active = state?.offline.active ? ' · running offline from this snapshot' : '';
-      status.textContent = `Prepared ${formatPreparedDate(
-        snapshot.preparedAt,
-      )} · ${formatBytes(snapshot.totalBytes)}${active}.`;
+      const active = state?.offline.active
+        ? t('terrain.offlineRunning')
+        : '';
+      status.textContent = t('terrain.offlineStatusPrepared', {
+        date: formatPreparedDate(snapshot.preparedAt),
+        bytes: formatBytes(snapshot.totalBytes),
+        active,
+      });
       contents.innerHTML = `
-        <li><strong>Ephemeris:</strong> ${escapeHtml(snapshot.ephemeris.provider)} · solution ${escapeHtml(
-          snapshot.ephemeris.solution,
-        )} · retrieved ${escapeHtml(snapshot.ephemeris.retrievedAt)} · ${formatBytes(
-          snapshot.ephemeris.bytes,
-        )}</li>
-        <li><strong>Stars:</strong> ${
-          snapshot.stars
-            ? `${escapeHtml(snapshot.stars.source)} · ${formatBytes(snapshot.stars.bytes)}`
-            : 'not stored'
-        }</li>
-        <li><strong>Terrain:</strong> ${snapshot.terrain.tileCount} DEM tiles at z${
-          snapshot.area.terrainZoom
-        } · ${formatBytes(snapshot.terrain.bytes)} · ${escapeHtml(
-          snapshot.terrain.attribution,
-        )}</li>
-        <li><strong>Buildings:</strong> ${
-          b
-            ? `${b.count} OSM ways · ${b.defaultHeightCount} default height · ${formatBytes(
-                b.bytes,
-              )} · ${escapeHtml(b.source)}${b.sourceLabel ? ` (${escapeHtml(b.sourceLabel)})` : ''}`
-            : 'not stored; best-spot scores will be marked incomplete'
-        }</li>
-        <li><strong>Base map:</strong> locally rendered hillshade from cached DEM + building footprints; OSM raster tiles are not stored.</li>
+        ${t('terrain.offlineContentsEphemeris', {
+          provider: escapeHtml(snapshot.ephemeris.provider),
+          solution: escapeHtml(snapshot.ephemeris.solution),
+          retrieved: escapeHtml(snapshot.ephemeris.retrievedAt),
+          bytes: formatBytes(snapshot.ephemeris.bytes),
+        })}
+        ${t('terrain.offlineContentsStars', {
+          stars: snapshot.stars
+            ? `${escapeHtml(snapshot.stars.source)} · ${formatBytes(
+                snapshot.stars.bytes,
+              )}`
+            : t('terrain.offlineNotStored'),
+        })}
+        ${t('terrain.offlineContentsTerrain', {
+          tiles: snapshot.terrain.tileCount,
+          zoom: snapshot.area.terrainZoom,
+          bytes: formatBytes(snapshot.terrain.bytes),
+          attribution: escapeHtml(snapshot.terrain.attribution),
+        })}
+        ${t('terrain.offlineContentsBuildings', {
+          buildings: b
+            ? t('terrain.offlineBuildingsValue', {
+                count: b.count,
+                defaultCount: b.defaultHeightCount,
+                bytes: formatBytes(b.bytes),
+                source: escapeHtml(b.source),
+                sourceLabel: b.sourceLabel
+                  ? t('terrain.buildingsSourceLabel', {
+                      label: escapeHtml(b.sourceLabel),
+                    })
+                  : '',
+              })
+            : t('terrain.offlineBuildingsMissing'),
+        })}
+        ${t('terrain.offlineContentsBaseMap')}
       `;
     }
     if (state?.offline.mismatch) {
-      warning.textContent =
-        'This observer is outside the prepared area. Sky and AR still work; terrain maps and best-spot searches for this location do not.';
+      warning.textContent = t('terrain.offlineMismatchWarning');
     } else if (snapshot?.warnings.length) {
       warning.textContent = snapshot.warnings.join(' ');
     } else {
@@ -2278,16 +2448,27 @@ export class TerrainUi implements TerrainWorkstream {
       this.lastVerifiedPreparedAt = snapshot.preparedAt;
       const integrity = await verifyPreparedSnapshot();
       if (integrity && !integrity.ok) {
-        warning.textContent = integrity.message ?? 'Offline data is incomplete.';
+        warning.textContent =
+          integrity.message ?? t('terrain.offlineIncomplete');
       }
     }
 
     const storage = await storageInfo();
     this.ref('offline-storage').textContent = storage.supported
-      ? `${storage.persisted ? 'Persistent storage granted' : 'Best-effort storage (may be evicted)'} · used ${
-          storage.usageBytes === null ? 'unknown' : formatBytes(storage.usageBytes)
-        } · quota ${storage.quotaBytes === null ? 'unknown' : formatBytes(storage.quotaBytes)}.`
-      : 'Storage API unavailable.';
+      ? t('terrain.offlineStorage', {
+          persistence: storage.persisted
+            ? t('terrain.offlinePersistent')
+            : t('terrain.offlineBestEffort'),
+          used:
+            storage.usageBytes === null
+              ? t('terrain.unknown')
+              : formatBytes(storage.usageBytes),
+          quota:
+            storage.quotaBytes === null
+              ? t('terrain.unknown')
+              : formatBytes(storage.quotaBytes),
+        })
+      : t('terrain.offlineStorageUnavailable');
     this.maybeApplyOfflineMap();
   }
 
@@ -2315,7 +2496,10 @@ export class TerrainUi implements TerrainWorkstream {
     });
     this.recomputeProfileAtViewpoint();
     this.setStatus(
-      `Loaded ${result.buildings.length} buildings from the offline snapshot (retrieved ${result.retrievedAt ?? 'unknown'}).`,
+      t('terrain.offlineLoadedFromSnapshot', {
+        count: result.buildings.length,
+        retrieved: result.retrievedAt ?? t('terrain.unknown'),
+      }),
       'info',
     );
   }
@@ -2352,13 +2536,13 @@ export class TerrainUi implements TerrainWorkstream {
     this.renderEyeNote();
     this.renderGroundNote();
     this.ref('best-list').innerHTML = '';
-    this.ref('best-summary').textContent = 'No search yet.';
+    this.ref('best-summary').textContent = t('terrain.bestSummaryInitial');
     this.ref('fov').textContent = '62°';
-    this.ref('build-info').textContent =
-      'Terrain workstream · cached DEM tiles: — · cached Overpass queries: —';
-    this.ref('offline-status').textContent = 'No offline area prepared.';
+    this.ref('build-info').textContent = t('terrain.footerBuildInfoInitial');
+    this.ref('offline-status').textContent = t('terrain.offlineStatusNone');
     this.ref('offline-contents').innerHTML = '';
-    this.ref('field-check').innerHTML =
-      '<p class="tw-note">Run a best-spot search to field-check the top 3 spots.</p>';
+    this.ref('field-check').innerHTML = `<p class="tw-note">${t(
+      'terrain.fieldCheckEmpty',
+    )}</p>`;
   }
 }

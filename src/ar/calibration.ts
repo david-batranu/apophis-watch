@@ -1,4 +1,5 @@
 import { clamp } from '../core/vec3';
+import { t } from '../i18n';
 import { normalizeDeg, shortestAngleDeg } from './math';
 
 export const CALIBRATION_STORAGE_KEY = 'apophis-ar-calibration-v1';
@@ -122,25 +123,30 @@ export function solveFovFromAngularSeparation(
   separationDeg: number,
 ): FovSolveResult {
   if (!(width > 0) || !(height > 0)) {
-    return { ok: false, error: 'The camera viewport has no size yet.' };
+    return { ok: false, error: t('ar.fovErrorViewport') };
   }
   if (![a.x, a.y, b.x, b.y].every((value) => Number.isFinite(value))) {
-    return { ok: false, error: 'The tap coordinates are invalid.' };
+    return { ok: false, error: t('ar.fovErrorTapCoordinates') };
   }
   if (!(separationDeg > 0) || separationDeg >= 179) {
-    return { ok: false, error: 'The two targets do not have a usable angular separation.' };
+    return { ok: false, error: t('ar.fovErrorAngularSeparation') };
   }
   if (separationDeg < MIN_FOV_TARGET_SEPARATION_DEG) {
     return {
       ok: false,
-      error: `Choose targets at least ${MIN_FOV_TARGET_SEPARATION_DEG}° apart; these are only ${separationDeg.toFixed(1)}° apart.`,
+      error: t('ar.fovErrorTargetsTooClose', {
+        minimum: MIN_FOV_TARGET_SEPARATION_DEG,
+        actual: separationDeg.toFixed(1),
+      }),
     };
   }
   const tapSeparationPx = Math.hypot(b.x - a.x, b.y - a.y);
   if (tapSeparationPx < MIN_FOV_TAP_SEPARATION_PX) {
     return {
       ok: false,
-      error: `The two taps are only ${tapSeparationPx.toFixed(0)} px apart; tap each object more precisely.`,
+      error: t('ar.fovErrorTapsTooClose', {
+        actual: tapSeparationPx.toFixed(0),
+      }),
     };
   }
   const cx = width / 2;
@@ -164,7 +170,7 @@ export function solveFovFromAngularSeparation(
   if (angleLow < separationDeg || angleHigh > separationDeg) {
     return {
       ok: false,
-      error: 'The taps do not fit any pinhole FOV in the supported range. Re-centre the objects and tap again.',
+      error: t('ar.fovErrorNoPinhole'),
     };
   }
   for (let i = 0; i < 90; i++) {
@@ -181,7 +187,11 @@ export function solveFovFromAngularSeparation(
   ) {
     return {
       ok: false,
-      error: `Solved FOV ${horizontalFovDeg.toFixed(1)}° is outside the ${MIN_HORIZONTAL_FOV_DEG}–${MAX_HORIZONTAL_FOV_DEG}° supported range. Check the targets and taps.`,
+      error: t('ar.fovErrorOutOfRange', {
+        fov: horizontalFovDeg.toFixed(1),
+        min: MIN_HORIZONTAL_FOV_DEG,
+        max: MAX_HORIZONTAL_FOV_DEG,
+      }),
     };
   }
   return {
@@ -488,11 +498,17 @@ export function estimatePointingError(
   const detailParts: string[] = [];
   detailParts.push(
     compassAccuracy === null
-      ? 'device compass accuracy not reported; 5–15° is typical (a 2026 iPhone field test saw ±14–16°)'
-      : `device compass ±${compassAccuracy.toFixed(1)}°`,
+      ? t('ar.calibrationErrorDetailCompassUnknown')
+      : t('ar.calibrationErrorDetailCompass', {
+          accuracy: compassAccuracy.toFixed(1),
+        }),
   );
   if (calibrationResidual !== null && calibrationResidual > 0.05) {
-    detailParts.push(`alignment residual ±${calibrationResidual.toFixed(1)}°`);
+    detailParts.push(
+      t('ar.calibrationErrorDetailResidual', {
+        residual: calibrationResidual.toFixed(1),
+      }),
+    );
   }
   return {
     totalDeg: total,
@@ -500,7 +516,9 @@ export function estimatePointingError(
     highDeg: high,
     compassAccuracyDeg: compassAccuracy,
     calibrationResidualDeg: calibrationResidual,
-    label: `±${total.toFixed(total < 10 ? 1 : 0)}° estimated pointing error`,
-    detail: `${detailParts.join(' · ')}. A phone compass is not an arcsecond instrument; treat the overlay as a finder, not a measurement.`,
+    label: t('ar.calibrationErrorLabel', {
+      value: total.toFixed(total < 10 ? 1 : 0),
+    }),
+    detail: `${detailParts.join(' · ')}. ${t('ar.calibrationErrorSuffix')}`,
   };
 }

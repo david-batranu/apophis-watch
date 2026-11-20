@@ -1,5 +1,6 @@
 import { model } from 'geomagnetism';
 import type { ObserverLocation } from '../ephemeris/types';
+import { t } from '../i18n';
 
 /**
  * The installed geomagnetism@0.2.0 ships WMM2025 with a package window of
@@ -35,7 +36,7 @@ function pointDeclination(
     (location.elevationM ?? 0) / 1000,
   ]);
   if (!Number.isFinite(point.decl)) {
-    throw new Error('WMM returned a non-finite declination');
+    throw new Error(t('ar.declinationInvalidResult'));
   }
   return { declinationDeg: point.decl, modelName: wmm.name || 'WMM-2025' };
 }
@@ -54,7 +55,7 @@ export function computeDeclination(
       declinationDeg: null,
       status: 'unsupported',
       modelName: null,
-      warning: 'Invalid date: magnetic declination is unavailable.',
+      warning: t('ar.declinationInvalidDate'),
     };
   }
   if (ms < WMM_PACKAGE_START_MS) {
@@ -62,8 +63,7 @@ export function computeDeclination(
       declinationDeg: null,
       status: 'unsupported',
       modelName: null,
-      warning:
-        'WMM2025 starts 2024-11-13. This date is outside the bundled model; declination is not applied.',
+      warning: t('ar.declinationBeforeModel'),
     };
   }
   if (ms > WMM_OFFICIAL_END_MS) {
@@ -71,8 +71,7 @@ export function computeDeclination(
       declinationDeg: null,
       status: 'unsupported',
       modelName: null,
-      warning:
-        'WMM2025 is officially valid to 2029-12-31. This date is beyond it; declination is not applied. WMM2030 is expected in December 2029.',
+      warning: t('ar.declinationAfterModel'),
     };
   }
   try {
@@ -90,17 +89,16 @@ export function computeDeclination(
         declinationDeg: extrapolated.declinationDeg,
         status: 'extrapolated',
         modelName: extrapolated.modelName,
-        warning:
-          'Extrapolated WMM2025: the installed package window ends 2029-11-13, although the model is nominally valid to 2029-12-31. Declination uncertainty grows outside the package window.',
+        warning: t('ar.declinationExtrapolated'),
       };
     } catch (error) {
       return {
         declinationDeg: null,
         status: 'unsupported',
         modelName: null,
-        warning: `Magnetic declination is unavailable for this date: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        warning: t('ar.declinationUnavailable', {
+          message: error instanceof Error ? error.message : String(error),
+        }),
       };
     }
   }

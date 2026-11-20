@@ -6,6 +6,7 @@
  * user-visible cooldown; the UI must not retry until it expires.
  */
 
+import { t } from '../i18n';
 import {
   getCachedBuildings,
   putCachedBuildings,
@@ -64,7 +65,7 @@ export class OverpassRateLimitError extends Error {
 }
 
 export class OverpassTimeoutError extends Error {
-  constructor(message = 'Overpass request timed out') {
+  constructor(message = t('terrain.buildingsTimeoutDefault')) {
     super(message);
     this.name = 'OverpassTimeoutError';
   }
@@ -179,7 +180,7 @@ export function parseOverpassBuildings(
   source: BuildingsSource = 'network',
 ): BuildingsResult {
   if (!Array.isArray(response.elements)) {
-    throw new OverpassRequestError('Overpass response has no elements array');
+    throw new OverpassRequestError(t('terrain.buildingsNoElements'));
   }
   const buildings: BuildingFeature[] = [];
   let defaultHeightCount = 0;
@@ -283,6 +284,7 @@ export interface FetchBuildingsOptions {
 }
 
 function abortError(): Error {
+  // Internal abort payload; the UI discards aborted requests instead of showing it.
   const aborted = new Error('Building query cancelled');
   aborted.name = 'AbortError';
   return aborted;
@@ -375,9 +377,9 @@ async function requestBuildingsFromEndpoint(
         response.headers.get('Retry-After'),
       );
       throw new OverpassRateLimitError(
-        `Overpass rate limit reached (HTTP 429). Wait ${Math.ceil(
-          retryAfterMs / 1000,
-        )} s before trying again.`,
+        t('terrain.buildingsRateLimit', {
+          seconds: Math.ceil(retryAfterMs / 1000),
+        }),
         retryAfterMs,
       );
     }
@@ -391,9 +393,15 @@ async function requestBuildingsFromEndpoint(
       return {
         result: null,
         error: new OverpassRequestError(
-          `Overpass endpoint ${endpointLabel(endpoint)} responded HTTP ${
-            response.status
-          }${body ? `: ${body.slice(0, 160)}` : ''}`,
+          t('terrain.buildingsEndpointError', {
+            endpoint: endpointLabel(endpoint),
+            status: response.status,
+            body: body
+              ? t('terrain.buildingsHttpBody', {
+                  body: body.slice(0, 160),
+                })
+              : '',
+          }),
           response.status,
         ),
         retryable: true,
@@ -405,9 +413,14 @@ async function requestBuildingsFromEndpoint(
     if (!response.ok) {
       const body = cleanErrorBody(await response.text().catch(() => ''));
       throw new OverpassRequestError(
-        `Overpass responded HTTP ${response.status}${
-          body ? `: ${body.slice(0, 160)}` : ''
-        }`,
+        t('terrain.buildingsResponseError', {
+          status: response.status,
+          body: body
+            ? t('terrain.buildingsHttpBody', {
+                body: body.slice(0, 160),
+              })
+            : '',
+        }),
         response.status,
       );
     }
@@ -416,7 +429,7 @@ async function requestBuildingsFromEndpoint(
       json = (await response.json()) as OverpassResponse;
     } catch {
       throw new OverpassRequestError(
-        'Overpass returned a response that is not valid JSON.',
+        t('terrain.buildingsInvalidJson'),
         response.status,
       );
     }
@@ -424,7 +437,10 @@ async function requestBuildingsFromEndpoint(
       json.remark &&
       /timed out|runtime error|out of memory/i.test(json.remark)
     ) {
-      throw new OverpassRequestError(`Overpass: ${json.remark}`, null);
+      throw new OverpassRequestError(
+        t('terrain.buildingsRemark', { remark: json.remark }),
+        null,
+      );
     }
     const result = parseOverpassBuildings(
       json,
@@ -444,7 +460,9 @@ async function requestBuildingsFromEndpoint(
       return {
         result: null,
         error: new OverpassTimeoutError(
-          `Overpass did not answer within ${Math.round(timeoutMs / 1000)} s.`,
+          t('terrain.buildingsTimeout', {
+            seconds: Math.round(timeoutMs / 1000),
+          }),
         ),
         retryable: false,
         moveToNextEndpoint: false,
@@ -483,7 +501,7 @@ async function loadBundledIfCovered(
 ): Promise<BuildingsResult | null> {
   if (!allowBundled) return null;
   try {
-    onProgress?.('Checking for a bundled building area…');
+    onProgress?.(t('terrain.buildingsProgressCheckingBundled'));
     const manifest = await loadBundledAreaManifest(baseUrl, { signal });
     const area = findBundledArea(
       manifest,
@@ -494,21 +512,25 @@ async function loadBundledIfCovered(
     if (!area) {
       if (manifest.areas.length > 0) {
         onProgress?.(
-          'No bundled area covers this view; querying Overpass…',
+          t('terrain.buildingsProgressNoBundledCoverage'),
         );
       }
       return null;
     }
     if (signal?.aborted) throw abortError();
     onProgress?.(
-      `Loading bundled area "${area.name}" for buildings within ${(
-        radius / 1000
-      ).toFixed(1)} km…`,
+      t('terrain.buildingsProgressLoadingBundled', {
+        area: area.name,
+        radius: (radius / 1000).toFixed(1),
+      }),
     );
     const bundled = await loadBundledBuildings(baseUrl, area, { signal });
     if (signal?.aborted) throw abortError();
     onProgress?.(
-      `Loaded ${bundled.buildings.length} buildings from the bundled area "${area.name}".`,
+      t('terrain.buildingsProgressLoadedBundled', {
+        count: bundled.buildings.length,
+        area: area.name,
+      }),
     );
     // The caller asked about this centre/radius; the file covers at least it.
     return {
@@ -519,7 +541,7 @@ async function loadBundledIfCovered(
     };
   } catch (error) {
     if (signal?.aborted || isAbortError(error)) throw abortError();
-    onProgress?.('Bundled building area unavailable; querying Overpass…');
+    onProgress?.(t('terrain.buildingsProgressBundledUnavailable'));
     return null;
   }
 }
@@ -550,7 +572,7 @@ export async function fetchBuildings(
   );
   if (signal?.aborted) throw abortError();
   if (useCache) {
-    onProgress?.('Checking the local building cache…');
+    onProgress?.(t('terrain.buildingsProgressCheckingCache'));
     const cached = await getCachedBuildings(
       latitudeDeg,
       longitudeDeg,
@@ -559,7 +581,10 @@ export async function fetchBuildings(
     );
     if (cached) {
       onProgress?.(
-        `Loaded ${cached.buildings.length} buildings from cache (${cached.source}).`,
+        t('terrain.buildingsProgressCacheHit', {
+          count: cached.buildings.length,
+          source: cached.source,
+        }),
       );
       return { ...cached, source: 'cache' };
     }
@@ -594,18 +619,24 @@ export async function fetchBuildings(
           ] ?? 60_000;
         backoffIndex++;
         onProgress?.(
-          `${
-            attempt > 0 ? 'Retrying' : 'Trying the fallback endpoint'
-          } ${endpointLabel(endpoint)} in ${Math.round(wait / 1000)} s…`,
+          t('terrain.buildingsProgressRetry', {
+            action:
+              attempt > 0
+                ? t('terrain.buildingsProgressRetryAction')
+                : t('terrain.buildingsProgressFallbackAction'),
+            endpoint: endpointLabel(endpoint),
+            seconds: Math.round(wait / 1000),
+          }),
         );
         await sleepAbortable(wait, signal);
       }
       skipBackoff = false;
       if (signal?.aborted) throw abortError();
       onProgress?.(
-        `Querying ${endpointLabel(endpoint)} for buildings within ${(
-          radius / 1000
-        ).toFixed(1)} km…`,
+        t('terrain.buildingsProgressQuerying', {
+          endpoint: endpointLabel(endpoint),
+          radius: (radius / 1000).toFixed(1),
+        }),
       );
       const outcome = await requestBuildingsFromEndpoint(
         endpoint,
@@ -632,9 +663,11 @@ export async function fetchBuildings(
           result,
         );
         onProgress?.(
-          `Loaded ${result.buildings.length} buildings; ${
-            result.defaultHeightCount
-          } use the ${DEFAULT_BUILDING_HEIGHT_M} m default.`,
+          t('terrain.buildingsProgressLoaded', {
+            count: result.buildings.length,
+            defaultCount: result.defaultHeightCount,
+            defaultHeight: DEFAULT_BUILDING_HEIGHT_M,
+          }),
         );
         return result;
       }
@@ -644,12 +677,12 @@ export async function fetchBuildings(
         if (endpointIndex < endpoints.length - 1) {
           onProgress?.(
             outcome.nextEndpointReason === 'network'
-              ? `${endpointLabel(
-                  endpoint,
-                )} could not be reached; trying the fallback endpoint once.`
-              : `${endpointLabel(
-                  endpoint,
-                )} blocked the request (HTTP 406); switching endpoints without retrying it.`,
+              ? t('terrain.buildingsProgressUnreachable', {
+                  endpoint: endpointLabel(endpoint),
+                })
+              : t('terrain.buildingsProgressHttp406', {
+                  endpoint: endpointLabel(endpoint),
+                }),
           );
         }
         skipBackoff = true;
@@ -660,9 +693,7 @@ export async function fetchBuildings(
   }
 
   if (lastError instanceof Error) throw lastError;
-  throw new OverpassRequestError(
-    'All Overpass endpoints failed. No building data was written or cached.',
-  );
+  throw new OverpassRequestError(t('terrain.buildingsAllFailed'));
 }
 
 /** Default-height share, 0..1. */

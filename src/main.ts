@@ -1,13 +1,15 @@
 import './styles.css';
 import { jdTdbFromDate } from './core/time';
+import { t } from './i18n';
 import { createPerfApi } from './perf';
 import { AppModel } from './state/appModel';
 import { solarSystemBodies, type BodyPosition } from './sky/bodies';
 import { AppUi } from './ui/app';
 
 async function boot(): Promise<void> {
+  document.title = t('meta.title');
   const root = document.getElementById('app');
-  if (!root) throw new Error('missing #app');
+  if (!root) throw new Error('missing #app'); // developer error
   const app = new AppModel();
   await app.init();
   const ui = new AppUi(root, app, app.getCatalogue());
@@ -79,7 +81,9 @@ boot().catch((error) => {
   const root = document.getElementById('app');
   if (root) {
     const message = error instanceof Error ? error.message : String(error);
-    root.innerHTML = `<main class="main"><section class="panel"><h2>Apophis Watch could not start</h2><p class="status-line error">${message.replace(
+    root.innerHTML = `<main class="main"><section class="panel"><h2>${t(
+      'startup.title',
+    )}</h2><p class="status-line error">${message.replace(
       /[&<>"']/g,
       (c) =>
         ({
@@ -89,7 +93,7 @@ boot().catch((error) => {
           '"': '&quot;',
           "'": '&#39;',
         })[c]!,
-    )}</p><p class="status-line">If you are offline, prepare an area while online first: open <strong>Local 3D</strong> → <strong>Prepare for offline</strong>. Then reload.</p></section></main>`;
+    )}</p><p class="status-line">${t('startup.offlineHint')}</p></section></main>`;
   }
   console.error(error);
 });

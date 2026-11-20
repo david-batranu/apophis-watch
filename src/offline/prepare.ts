@@ -14,6 +14,7 @@
 
 import type { ApophisDataFile } from '../ephemeris/types';
 import { TableEphemeris } from '../ephemeris/hermite';
+import { t } from '../i18n';
 import { validateStarCatalogue } from '../sky/catalog';
 import { clearBuildingCache, clearTerrainCache, getCachedTile } from '../terrain/cache';
 import {
@@ -88,7 +89,7 @@ export class OfflineQuotaError extends OfflinePrepareError {
 }
 
 function abortError(): Error {
-  const error = new Error('Offline preparation cancelled');
+  const error = new Error(t('offline.cancelled'));
   error.name = 'AbortError';
   return error;
 }
@@ -158,16 +159,24 @@ async function fetchJson(
     response = await fetch(url, { signal, cache: 'no-store', credentials: 'omit' });
   } catch (error) {
     if (signal?.aborted) throw abortError();
-    throw new OfflinePrepareError(`${label} could not be downloaded: ${String(error)}`, error);
+    throw new OfflinePrepareError(
+      t('offline.downloadFailed', { label, error: String(error) }),
+      error,
+    );
   }
   if (!response.ok) {
-    throw new OfflinePrepareError(`${label} download failed: HTTP ${response.status}`);
+    throw new OfflinePrepareError(
+      t('offline.downloadHttp', { label, status: response.status }),
+    );
   }
   const text = await response.text();
   try {
     return { text, json: JSON.parse(text) };
   } catch (error) {
-    throw new OfflinePrepareError(`${label} is not valid JSON`, error);
+    throw new OfflinePrepareError(
+      t('offline.invalidJson', { label }),
+      error,
+    );
   }
 }
 
@@ -203,36 +212,38 @@ export async function prepareOfflineArea(input: PrepareInput): Promise<PrepareRe
   };
 
   throwIfAborted(signal);
-  report('storage', 'Requesting persistent storage…', 0.01);
+  report('storage', t('offline.requestStorage'), 0.01);
   const persisted = await requestPersistentStorage();
   if (!persisted) {
-    warnings.push(
-      'Persistent storage was not granted. The browser may evict offline data; on iOS, add the app to the Home Screen and open it at least once a week.',
-    );
+    warnings.push(t('offline.storageWarning'));
   }
   const before = await storageInfo();
   throwIfAborted(signal);
 
-  report('ephemeris', 'Downloading the committed ephemeris…', 0.05);
+  report('ephemeris', t('offline.downloadingEphemeris'), 0.05);
   const ephemeris = await fetchJson(
     `${baseUrl}data/apophis-2029.json`,
     signal,
-    'Ephemeris',
+    t('offline.ephemerisLabel'),
   );
   const ephemerisData = ephemeris.json as ApophisDataFile;
   try {
     new TableEphemeris(ephemerisData);
   } catch (error) {
-    throw new OfflinePrepareError('The downloaded ephemeris is invalid.', error);
+    throw new OfflinePrepareError(t('offline.invalidEphemeris'), error);
   }
   if (!ephemerisData.target?.solution || !ephemerisData.source?.retrievedAt) {
-    throw new OfflinePrepareError('The ephemeris is missing its target/solution metadata.');
+    throw new OfflinePrepareError(t('offline.missingMetadata'));
   }
 
-  report('stars', 'Downloading the star catalogue…', 0.1);
+  report('stars', t('offline.downloadingStars'), 0.1);
   let stars: OfflineSnapshot['stars'] = null;
   try {
-    const starFile = await fetchJson(`${baseUrl}data/stars.json`, signal, 'Star catalogue');
+    const starFile = await fetchJson(
+      `${baseUrl}data/stars.json`,
+      signal,
+      t('offline.starsLabel'),
+    );
     const catalogue = validateStarCatalogue(starFile.json);
     stars = {
       text: starFile.text,
@@ -243,12 +254,14 @@ export async function prepareOfflineArea(input: PrepareInput): Promise<PrepareRe
   } catch (error) {
     if (signal?.aborted) throw abortError();
     warnings.push(
-      `Star catalogue unavailable: ${error instanceof Error ? error.message : String(error)}. The sky still works without labels.`,
+      t('offline.starsUnavailable', {
+        message: error instanceof Error ? error.message : String(error),
+      }),
     );
   }
   throwIfAborted(signal);
 
-  report('terrain', 'Downloading and caching DEM tiles…', 0.15);
+  report('terrain', t('offline.downloadingTerrain'), 0.15);
   let grid;
   try {
     grid = await loadTerrainGrid({
@@ -275,7 +288,9 @@ export async function prepareOfflineArea(input: PrepareInput): Promise<PrepareRe
   } catch (error) {
     if (signal?.aborted) throw abortError();
     throw new OfflinePrepareError(
-      `Terrain preparation failed: ${error instanceof Error ? error.message : String(error)}`,
+      t('offline.terrainFailed', {
+        message: error instanceof Error ? error.message : String(error),
+      }),
       error,
     );
   }
@@ -292,21 +307,19 @@ export async function prepareOfflineArea(input: PrepareInput): Promise<PrepareRe
   }
   if (missingTiles > grid.failedTiles) {
     throw new OfflineQuotaError(
-      `${missingTiles} DEM tiles could not be stored in IndexedDB. The browser storage may be full or blocked. Free space and try again.`,
+      t('offline.missingTiles', { count: missingTiles }),
     );
   }
   if (grid.failedTiles > 0) {
-    warnings.push(
-      `${grid.failedTiles} DEM tiles failed to download; offline terrain has gaps there. Re-prepare when the network is stable.`,
-    );
+    warnings.push(t('offline.failedTiles', { count: grid.failedTiles }));
   }
   report(
     'terrain',
-    `Cached ${tiles.length} DEM tiles at z${grid.zoom}.`,
+    t('offline.cachedTiles', { count: tiles.length, zoom: grid.zoom }),
     0.68,
   );
 
-  report('buildings', 'Fetching OSM building footprints…', 0.7);
+  report('buildings', t('offline.fetchingBuildings'), 0.7);
   let buildings: BuildingsResult | null = null;
   try {
     buildings = await fetchBuildings({
@@ -322,12 +335,14 @@ export async function prepareOfflineArea(input: PrepareInput): Promise<PrepareRe
   } catch (error) {
     if (signal?.aborted) throw abortError();
     warnings.push(
-      `Building data unavailable: ${error instanceof Error ? error.message : String(error)}. Best-spot scores will be marked incomplete.`,
+      t('offline.buildingsUnavailable', {
+        message: error instanceof Error ? error.message : String(error),
+      }),
     );
   }
   throwIfAborted(signal);
 
-  report('snapshot', 'Writing the offline snapshot metadata…', 0.92);
+  report('snapshot', t('offline.writingSnapshot'), 0.92);
   const terrainBytes = tiles.length * TERRARIUM_TILE_SIZE * TERRARIUM_TILE_SIZE * 4;
   const buildingData = buildings ? buildingMetadata(buildings) : null;
   const area: OfflineAreaInfo = {
@@ -377,7 +392,7 @@ export async function prepareOfflineArea(input: PrepareInput): Promise<PrepareRe
     baseMap: {
       kind: 'hillshade',
       source: 'AWS Terrarium DEM (Mapzen/joerd)',
-      note: 'Offline base map is rendered locally from cached DEM tiles plus OSM building footprints. OSM raster tiles are not stored because tile.openstreetmap.org forbids bulk/offline use.',
+      note: t('offline.baseMapNote'),
       bytes: 0,
     },
     totalBytes,
@@ -387,10 +402,7 @@ export async function prepareOfflineArea(input: PrepareInput): Promise<PrepareRe
   try {
     await savePreparedSnapshot(snapshot);
   } catch (error) {
-    throw new OfflineQuotaError(
-      'The offline snapshot could not be saved. Browser storage is full or unavailable. Clear the prepared area or free storage and try again.',
-      error,
-    );
+    throw new OfflineQuotaError(t('offline.snapshotFailed'), error);
   }
   const after = await storageInfo();
   if (
@@ -398,14 +410,12 @@ export async function prepareOfflineArea(input: PrepareInput): Promise<PrepareRe
     after.usageBytes !== null &&
     after.usageBytes > after.quotaBytes * 0.9
   ) {
-    warnings.push(
-      'Storage is over 90% full. Further updates may fail; consider a smaller search radius or clearing browser data.',
-    );
+    warnings.push(t('offline.storageNearlyFull'));
   }
   if (before.persisted !== after.persisted && after.persisted) {
-    warnings.push('Persistent storage is now granted for this origin.');
+    warnings.push(t('offline.persistentGranted'));
   }
-  report('done', 'Offline area ready.', 1);
+  report('done', t('offline.done'), 1);
   return { snapshot, warnings };
 }
 
@@ -440,8 +450,11 @@ export async function verifyPreparedSnapshot(): Promise<OfflineIntegrity | null>
   const message = ok
     ? null
     : missingTiles > 0
-      ? `${missingTiles} of ${snapshot.area.terrainTiles.length} DEM tiles are missing. The browser may have evicted site data; re-prepare the area.`
-      : 'The stored ephemeris is missing or truncated. Re-prepare the area.';
+      ? t('offline.verifyMissingTiles', {
+          missing: missingTiles,
+          total: snapshot.area.terrainTiles.length,
+        })
+      : t('offline.verifyEphemeris');
   return {
     ok,
     missingTiles,

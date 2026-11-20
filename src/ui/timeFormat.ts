@@ -1,10 +1,12 @@
 /** Formatting helpers for UTC and the browser's IANA local time zone. */
 
+import { DEFAULT_FORMAT_LOCALE, t } from '../i18n';
+
 /**
  * The UI copy is English in this build. Romanian is the default formatting
  * locale for the 2029 event (24-hour clock, metric units, ro-RO date order).
  */
-export const DEFAULT_FORMAT_LOCALE = 'ro-RO';
+export { DEFAULT_FORMAT_LOCALE };
 
 const PART_OPTIONS: Intl.DateTimeFormatOptions = {
   year: 'numeric',
@@ -29,7 +31,7 @@ function parts(ms: number, timeZone: string): Record<string, string> {
 }
 
 export function formatUtc(ms: number): string {
-  return `${new Date(ms).toISOString().slice(0, 19).replace('T', ' ')} UTC`;
+  return `${new Date(ms).toISOString().slice(0, 19).replace('T', ' ')} ${t('time.utcSuffix')}`;
 }
 
 export interface LocalTimeParts {

@@ -5,6 +5,7 @@
 
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { t } from '../i18n';
 import { enuToLatLon } from './geo';
 import { heatmapColor } from './bestSpot';
 import type { BestSpotSummary, TerrainGrid } from './types';
@@ -17,10 +18,8 @@ export interface TerrainMapOptions {
 }
 
 const OSM_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-const OSM_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
-const OFFLINE_ATTRIBUTION =
-  'Offline hillshade: Terrain Tiles by Mapzen / AWS Open Data · &copy; OpenStreetMap contributors (ODbL)';
+const OSM_ATTRIBUTION = t('map.attributionOsm');
+const OFFLINE_ATTRIBUTION = t('map.attributionOffline');
 
 export class TerrainMap {
   private readonly map: L.Map;
@@ -67,7 +66,7 @@ export class TerrainMap {
       icon,
       draggable: true,
       keyboard: true,
-      title: 'Observer — drag or click the map to move',
+      title: t('map.markerObserverTitle'),
       bubblingMouseEvents: false,
     }).addTo(this.map);
     this.observerMarker.on('dragend', () => {
@@ -118,7 +117,7 @@ export class TerrainMap {
         fillOpacity: 0.9,
         bubblingMouseEvents: false,
       })
-        .bindTooltip('Local 3D viewpoint', { direction: 'top' })
+        .bindTooltip(t('map.viewpointTooltip'), { direction: 'top' })
         .addTo(this.map);
     } else {
       this.viewpointMarker.setLatLng([latitudeDeg, longitudeDeg]);
@@ -227,7 +226,10 @@ export class TerrainMap {
         bubblingMouseEvents: false,
       })
         .bindTooltip(
-          `#${index + 1} · ${(result.scorePessimistic * 100).toFixed(0)}% clear (pessimistic)`,
+          t('map.resultTooltip', {
+            rank: index + 1,
+            percent: (result.scorePessimistic * 100).toFixed(0),
+          }),
           { direction: 'top' },
         )
         .addTo(this.map);

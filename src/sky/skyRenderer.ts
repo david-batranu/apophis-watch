@@ -1,5 +1,6 @@
 import { jdTdbFromDate } from '../core/time';
 import { RAD } from '../core/vec3';
+import { t } from '../i18n';
 import type { SkyPosition } from '../ephemeris/types';
 import type { StarCatalogue } from './catalog';
 import type { BodyPosition } from './bodies';
@@ -113,7 +114,7 @@ export class SkyView {
   constructor(private readonly host: HTMLElement, canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Canvas 2D is unavailable');
+    if (!ctx) throw new Error('Canvas 2D is unavailable'); // developer/browser capability error
     this.ctx = ctx;
     new ResizeObserver(() => {
       this.resize();
@@ -326,10 +327,10 @@ export class SkyView {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     for (const [label, az] of [
-      ['N', 0],
-      ['E', 90],
-      ['S', 180],
-      ['W', 270],
+      [t('sky.cardinalN'), 0],
+      [t('sky.cardinalE'), 90],
+      [t('sky.cardinalS'), 180],
+      [t('sky.cardinalW'), 270],
     ] as const) {
       const pt = this.projection.project(az, 0);
       if (!pt.visible) continue;
@@ -513,8 +514,10 @@ export class SkyView {
       }
       const label =
         body.body === 'Moon' && body.phaseFraction !== undefined
-          ? `Moon ${(body.phaseFraction * 100).toFixed(0)}%`
-          : body.body;
+          ? t('sky.moonPhase', {
+              percent: (body.phaseFraction * 100).toFixed(0),
+            })
+          : body.body; // proper noun from the solar-system catalogue
       const nearMarker =
         markerPoint?.visible &&
         Math.hypot(markerPoint.x - pt.x, markerPoint.y - pt.y) < 58;
@@ -749,7 +752,10 @@ export class SkyView {
     ctx.beginPath();
     ctx.arc(pt.x, pt.y, 6, 0, Math.PI * 2);
     ctx.stroke();
-    const label = `Apophis  V≈${sky.magnitude.toFixed(1)}  ${sky.angularDiameterArcsec.toFixed(2)}″`;
+    const label = t('sky.apophisLabel', {
+      magnitude: sky.magnitude.toFixed(1),
+      diameter: sky.angularDiameterArcsec.toFixed(2),
+    });
     ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
@@ -774,7 +780,7 @@ export class SkyView {
       ctx.font = '600 9px ui-sans-serif, system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
-      ctx.fillText('ENLARGED — NOT TO SCALE', pt.x, pt.y - 20);
+      ctx.fillText(t('sky.enlarged'), pt.x, pt.y - 20);
       ctx.restore();
     }
     ctx.restore();

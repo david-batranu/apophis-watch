@@ -1,5 +1,6 @@
 import type { PlotSample } from '../state/session';
 import type { UiState } from '../state/store';
+import { t } from '../i18n';
 import { localHhMm } from './timeFormat';
 
 interface PlotPalette {
@@ -58,7 +59,7 @@ export class ElevationPlot {
     );
     host.appendChild(this.canvas);
     const ctx = this.canvas.getContext('2d');
-    if (!ctx) throw new Error('Canvas 2D is unavailable');
+    if (!ctx) throw new Error('Canvas 2D is unavailable'); // developer/browser capability error
     this.ctx = ctx;
     new ResizeObserver(() => {
       this.resize();
@@ -157,7 +158,7 @@ export class ElevationPlot {
       ctx.fillStyle = p.good;
       ctx.font = '9px ui-sans-serif, system-ui, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(`good ≥ ${state.minGoodElevationDeg.toFixed(0)}°`, pad.left + 4, threshold - 5);
+      ctx.fillText(t('plot.goodThreshold', { degrees: state.minGoodElevationDeg.toFixed(0) }), pad.left + 4, threshold - 5);
     }
 
     // Magnitude curve (thin amber).
@@ -234,8 +235,8 @@ export class ElevationPlot {
     ctx.font = '9px ui-sans-serif, system-ui, sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText('Elevation', pad.left, 3);
+    ctx.fillText(t('plot.axisElevation'), pad.left, 3);
     ctx.textAlign = 'right';
-    ctx.fillText('V mag', w - 4, 3);
+    ctx.fillText(t('plot.axisMagnitude'), w - 4, 3);
   }
 }
