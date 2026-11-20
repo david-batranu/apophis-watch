@@ -13,10 +13,11 @@ that service forbids prefetch/offline use. See [Deployment](DEPLOYMENT.md),
 [Event-day guide](EVENT-DAY.md) and
 [Real-phone checklist](REAL-PHONE-CHECKLIST.md).
 
-Production build (Phase 5, final numbers are refreshed in the validation
-report): initial JS is about **712 kB** (190 kB gzip), with separate terrain,
-AR and best-spot-worker chunks. Terrain and AR remain lazy-loaded; the service
-worker precaches them for offline use without executing them.
+Production build: initial JS **788.25 kB** (213.97 kB gzip), terrain
+**284.99 kB** (81.35 kB gzip), AR **79.99 kB** (23.35 kB gzip) and a
+best-spot worker **13.63 kB**. Terrain and AR remain separate lazy chunks; the
+service worker precaches them for offline use without executing them.
+Precache: 22 entries, 1,245.67 KiB.
 
 ## Run
 
@@ -209,6 +210,27 @@ direction, visible window and expected appearance from the current session.
 It also has a persisted checklist. [EVENT-DAY.md](EVENT-DAY.md) is the printable
 version, and [REAL-PHONE-CHECKLIST.md](REAL-PHONE-CHECKLIST.md) is the ordered
 hardware test list.
+
+## Refreshing data and re-running validation
+
+```bash
+npm ci
+npm run fetch:ephemeris
+npm run fetch:stars
+npm run fetch:buildings -- --lat=45.6427 --lon=25.5887 --radius=2000 --name=brasov
+npm test
+npm run typecheck
+npm run build
+npm run test:e2e
+npm run test:offline
+npm run report:phase1
+```
+
+The ephemeris refresh re-fetches the independent Horizons truth table used by
+the Phase 1 tests; review the new solution ID and retrieval date in
+`public/data/apophis-2029.json` and in the About panel. Building data is
+ODbL and must keep its attribution. A prepared offline snapshot is not
+silently replaced; use **Prepare for offline** again to adopt new data.
 
 ## Known limitations
 

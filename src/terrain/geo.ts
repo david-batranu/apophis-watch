@@ -6,8 +6,6 @@
  * Earth curvature is applied explicitly as a height correction.
  */
 
-import { t } from '../i18n';
-
 export const DEG = Math.PI / 180;
 export const RAD = 180 / Math.PI;
 
@@ -125,51 +123,6 @@ export function elevationAngleDeg(
 export function parallaxArcsec(baselineKm: number, rangeKm: number): number {
   if (!(rangeKm > 0) || !(baselineKm >= 0)) return 0;
   return Math.atan2(baselineKm, rangeKm) * RAD * 3600;
-}
-
-const COMPASS_8 = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'] as const;
-const COMPASS_8_LONG = [
-  t('compass.north'),
-  t('compass.northEast'),
-  t('compass.east'),
-  t('compass.southEast'),
-  t('compass.south'),
-  t('compass.southWest'),
-  t('compass.west'),
-  t('compass.northWest'),
-] as const;
-const COMPASS_16 = [
-  'N',
-  'NNE',
-  'NE',
-  'ENE',
-  'E',
-  'ESE',
-  'SE',
-  'SSE',
-  'S',
-  'SSW',
-  'SW',
-  'WSW',
-  'W',
-  'WNW',
-  'NW',
-  'NNW',
-] as const;
-
-/** Eight-point compass name, e.g. "SW". */
-export function compass8(azimuthDeg: number): string {
-  return COMPASS_8[Math.round(normalizeAzimuth(azimuthDeg) / 45) % 8];
-}
-
-/** Eight-point compass name in prose, e.g. "south-west". */
-export function compass8Long(azimuthDeg: number): string {
-  return COMPASS_8_LONG[Math.round(normalizeAzimuth(azimuthDeg) / 45) % 8];
-}
-
-/** Sixteen-point compass name, e.g. "WSW". */
-export function compass16(azimuthDeg: number): string {
-  return COMPASS_16[Math.round(normalizeAzimuth(azimuthDeg) / 22.5) % 16];
 }
 
 /** Shortest absolute angular difference between two azimuths, degrees. */

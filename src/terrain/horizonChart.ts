@@ -4,7 +4,8 @@
  */
 
 import { horizonElevationAtAzimuth } from './horizon';
-import { compass8, normalizeAzimuth } from './geo';
+import { compass8 } from './compass';
+import { normalizeAzimuth } from './geo';
 import { t } from '../i18n';
 import type { ApophisPathInfo, HorizonProfile } from './types';
 

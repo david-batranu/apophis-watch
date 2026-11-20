@@ -88,7 +88,7 @@ export const en = {
     observerApply: 'Apply coordinates',
     observerUseLocation: 'Use my location',
     observerNote:
-      'Height is eye height above ground: <strong>no terrain/DEM yet</strong>; GPS altitude is ignored. Phase 3 adds the map picker and terrain.',
+      'Height is eye height above ground. In Local 3D the ground elevation comes from the DEM and eye height is added; browser GPS altitude is only a cross-check and is ignored.',
     displayTitle: 'Display',
     displayRefraction: 'Refraction (display only)',
     displayConstellations: 'Constellation lines',

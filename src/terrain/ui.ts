@@ -50,13 +50,13 @@ import {
 import { buildApophisPath, formatSector, observerKey } from './path';
 import { LocalScene3D, type SceneReadout } from './scene3d';
 import {
-  describeBestSpot,
   formatClearPercent,
   generateSearchCandidates,
   searchBestSpots,
   type BestSpotInput,
   type BestSpotRunOptions,
 } from './bestSpot';
+import { describeBestSpot } from './bestSpotText';
 import {
   buildingAtPoint,
   loadTerrainGrid,

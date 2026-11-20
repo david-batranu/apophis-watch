@@ -32,12 +32,12 @@ export {
 export { computeHorizonProfile, computeHorizonSlopes } from './horizon';
 export { buildApophisPath, observerKey, summarizePath } from './path';
 export {
-  describeBestSpot,
   generateSearchCandidates,
   heatmapColor,
   searchBestSpots,
   searchBestSpotsSync,
 } from './bestSpot';
+export { describeBestSpot } from './bestSpotText';
 export {
   curvatureDropM,
   enuToLatLon,

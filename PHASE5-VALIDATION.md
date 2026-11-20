@@ -159,18 +159,20 @@ Headless GPU cost is not a phone measurement. The final report will state
 whether the run used software rendering and will not claim phone GPU
 performance.
 
-## Build (current, before final i18n merge)
+## Build (final)
 
 | Asset | Raw | Gzip |
 |---|---:|---:|
-| initial JS | 738.50 kB | 198.88 kB |
-| terrain chunk | 287.16 kB | 84.66 kB |
-| AR chunk | 81.59 kB | 24.58 kB |
-| best-spot worker | 11.40 kB | — |
+| initial JS | 788.25 kB | 213.97 kB |
+| terrain chunk | 284.99 kB | 81.35 kB |
+| AR chunk | 79.99 kB | 23.35 kB |
+| best-spot worker | 13.63 kB | — |
 | CSS (initial/terrain/AR) | 12.85 / 23.92 / 8.03 kB | 3.33 / 8.61 / 2.29 kB |
 
-Service-worker precache: 22 entries, ~1.2 MB. Terrain and AR remain separate
-lazy chunks; the worker is separate.
+Service-worker precache: 22 entries, 1,245.67 KiB. Terrain and AR remain
+separate lazy chunks; the worker is separate. The worker was 68.7 kB before
+the text/scoring split; moving `describeBestSpot` and compass labels out of the
+worker path brought it back to 13.6 kB.
 
 ## Known limitations / uncertainties
 

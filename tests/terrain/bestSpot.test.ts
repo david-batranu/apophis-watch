@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
-  describeBestSpot,
   formatClearPercent,
   generateSearchCandidates,
   heatmapColor,
   searchBestSpotsSync,
   type BestSpotInput,
 } from '../../src/terrain/bestSpot';
+import { describeBestSpot } from '../../src/terrain/bestSpotText';
 import type { ApophisPathSample, BestSpotResult } from '../../src/terrain/types';
 import { makeBuilding, makeGrid } from './helpers';
 

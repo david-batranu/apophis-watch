@@ -13,6 +13,7 @@ import {
   TILE_TTL_MS,
 } from './cache';
 import { latLonToEnu, pointInPolygon } from './geo';
+import { bilinearNaNAware, sampleGridEnu } from './gridSample';
 import {
   MAX_TERRAIN_ZOOM,
   chooseTerrainZoom,
@@ -305,51 +306,6 @@ export async function loadTerrainGrid(
   return grid;
 }
 
-function bilinearNaNAware(
-  values: Float32Array,
-  width: number,
-  height: number,
-  col: number,
-  row: number,
-): number | null {
-  const epsilon = 1e-6;
-  if (
-    !(col >= -epsilon && col <= width - 1 + epsilon && row >= -epsilon && row <= height - 1 + epsilon)
-  ) {
-    return null;
-  }
-  col = Math.min(width - 1, Math.max(0, col));
-  row = Math.min(height - 1, Math.max(0, row));
-  const c0 = Math.floor(col);
-  const r0 = Math.floor(row);
-  const c1 = Math.min(width - 1, c0 + 1);
-  const r1 = Math.min(height - 1, r0 + 1);
-  const fx = col - c0;
-  const fy = row - r0;
-  const weights = [
-    values[r0 * width + c0],
-    values[r0 * width + c1],
-    values[r1 * width + c0],
-    values[r1 * width + c1],
-  ];
-  const w = [
-    (1 - fx) * (1 - fy),
-    fx * (1 - fy),
-    (1 - fx) * fy,
-    fx * fy,
-  ];
-  let sum = 0;
-  let weightSum = 0;
-  for (let i = 0; i < 4; i++) {
-    if (Number.isFinite(weights[i])) {
-      sum += weights[i] * w[i];
-      weightSum += w[i];
-    }
-  }
-  if (weightSum <= 1e-12) return null;
-  return sum / weightSum;
-}
-
 function sampleStitchedLatLon(
   elevations: Float32Array,
   width: number,
@@ -388,17 +344,6 @@ export function sampleGridLatLon(
   return sample;
 }
 
-/** Bilinear DEM sample at local east/north metres relative to the observer. */
-export function sampleGridEnu(
-  grid: TerrainGrid,
-  eastM: number,
-  northM: number,
-): number | null {
-  const col = (eastM - grid.eastOriginM) / grid.spacingEastM;
-  const row = (grid.northOriginM - northM) / grid.spacingNorthM;
-  return bilinearNaNAware(grid.elevations, grid.width, grid.height, col, row);
-}
-
 /**
  * Ground elevation at the local origin used to anchor the 3D scene.
  *
@@ -408,6 +353,8 @@ export function sampleGridEnu(
  * (Cape Town: 14.49 m vs 15.41 m). Anchoring the camera to the ENU sample
  * keeps the eye height above the actual mesh.
  */
+export { sampleGridEnu };
+
 export function sceneGroundElevationM(grid: TerrainGrid): number {
   const sampled = sampleGridEnu(grid, 0, 0);
   if (sampled !== null && Number.isFinite(sampled)) return sampled;
