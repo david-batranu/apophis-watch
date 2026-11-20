@@ -88,10 +88,14 @@ horizon/3D view uses the local value while the shared sky tab keeps its own.
   subset), using slope space so no `atan2` is needed per terrain sample. It
   records source (terrain/building), distance and top elevation.
 - Terrain is sampled at the nearest cell with a step of ~0.9 × DEM spacing.
-  The independent verifier measured **+0.055°** on a synthetic ridge and
-  **0.127°** against an independent real-DEM march. Both are sub-bin for the
-  1° profile; this is a deliberate speed/accuracy trade-off, not exact
-  ray-tracing.
+  At the default z14 grid, far-field comparisons against an independent
+  bilinear/exact-sagitta march were within **0.127°**; the synthetic ridge was
+  within **0.055°**. Near-field obstruction (roughly 14–200 m from the eye,
+  especially on a z13 grid used for a larger 5 km search) can reach **~2.3°**
+  because nearest-cell sampling attributes an adjacent pixel to the first ray
+  sample. The profile is a 1°-bin planning aid, not exact ray tracing; the
+  local 3D scene is most sensitive near the observer. This is a documented
+  speed/accuracy trade-off, not fake data.
 - Buildings are represented by their footprint edges sampled every 2 m; the
   nearest wall/roof edge determines the obstruction angle. A ground-level point
   inside a footprint scores 0 (not a valid observing spot); a rooftop eye above

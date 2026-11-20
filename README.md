@@ -5,6 +5,11 @@ A static, mobile-first simulator for the **13 April 2029** close approach of
 views, local terrain/buildings/best-spot search, and camera AR. Phase 5
 (offline PWA packaging) is not part of this build.
 
+Production build: initial JS **711.85 kB** (gzip 190.40 kB) plus a **246 kB**
+terrain chunk (73.24 kB gzip), **81.6 kB** AR chunk (24.59 kB gzip), and a
+**7.41 kB** best-spot worker; CSS is split similarly. Terrain and AR load only
+when their tabs are opened.
+
 ## Run
 
 ```bash
@@ -12,9 +17,9 @@ npm install
 npm run dev                 # Vite dev server (HTTP)
 npm run dev:https           # HTTPS for phone camera/orientation testing
 npm run build               # typecheck + production build
-npm test                    # 153 Vitest tests
+npm test                    # 162 Vitest tests
 npm run test:e2e            # 12 merged Playwright smoke tests (needs Chromium)
-npx playwright test -c tests/ar/playwright.ar.config.ts  # AR mock suite
+npx playwright test -c tests/ar/playwright.ar.config.ts  # 12 AR mock tests
 npm run typecheck
 npm run fetch:ephemeris     # refresh the committed JPL Horizons data
 npm run fetch:stars         # rebuild HYG + ConstellationLines JSON
@@ -86,9 +91,11 @@ ignored. The shared sky/AR observer uses the preset/manual ground elevation or
 
 ## Phase 2 measured checks
 
-- Frame time in the sky view, headless Chromium at **4× CPU throttle**, 600×
-  playback: mean **16.5–17.1 ms across runs** (final 16.88 ms), p95
-  **16.7–16.8 ms**, with an occasional **33.4 ms** hitch, over 150 frames.
+- Frame time, headless Chromium at **4× CPU throttle**, 390×844, 180
+  steady-state intervals: Sky, Local 3D and AR all measured **mean 16.67 ms,
+  p95 16.8 ms, max 16.8 ms** (separate sky runs occasionally showed a 33 ms
+  hitch). Sky was measured at 600× playback. These are not physical-phone
+  numbers.
 - Jump targets at Brasov (600 m, eye 0): topocentric CA `21:35:42.000Z`,
   geocentric CA `21:45:03.557Z`, rise `17:15:43.765Z`, max elevation
   `20:45:04.939Z`, set `22:44:06.557Z`, visibility start `17:32:35.247Z`,

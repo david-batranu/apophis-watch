@@ -520,6 +520,16 @@ test('WMM warnings update on host time changes without a sensor event', async ({
     await page.waitForTimeout(150);
   };
   await check(Date.parse('2024-11-01T00:00:00Z'), /WMM2025 starts 2024-11-13/i);
+  // Package boundary is 03:00 UTC mid-day: exercise the intra-day transition.
+  await page.evaluate((utcMs) => {
+    (
+      window as unknown as { __arHarness: { setState: (patch: object) => void } }
+    ).__arHarness.setState({ utcMs });
+  }, Date.parse('2029-11-13T02:00:00Z'));
+  await page.waitForTimeout(150);
+  expect((await debugData(page)).declinationStatus).toBe('supported');
+  await expect(page.locator('.ar-message').filter({ hasText: /Extrapolated WMM2025/i })).toHaveCount(0);
+  await check(Date.parse('2029-11-13T04:00:00Z'), /Extrapolated WMM2025/i);
   await check(Date.parse('2029-11-14T00:00:00Z'), /Extrapolated WMM2025/i);
   await check(Date.parse('2030-01-01T00:00:00Z'), /officially valid to 2029-12-31/i);
   const after = await debugData(page);

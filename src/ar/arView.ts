@@ -1219,8 +1219,11 @@ export class ArView implements ArWorkstream {
       this.declination = null;
       return null;
     }
-    const day = Math.floor(ms / 86_400_000);
-    const key = `${observerKey(observer)}|${day}`;
+    // Recompute on a 10-minute bucket, not a UTC day: the WMM package
+    // window starts/ends at 03:00 UTC mid-day (2024-11-13 / 2029-11-13), so
+    // a day-granular key leaves the status/warning stale across the boundary.
+    const bucket = Math.floor(ms / 600_000);
+    const key = `${observerKey(observer)}|${bucket}`;
     if (key !== this.declinationKey) {
       this.declinationKey = key;
       this.declination = computeDeclination(observer, new Date(ms));

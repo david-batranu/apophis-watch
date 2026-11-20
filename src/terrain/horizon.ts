@@ -152,9 +152,11 @@ export function computeHorizonSlopes(
     options.maxDistanceM ?? cornerDistance,
     cornerDistance,
   );
-  // Nearest-cell sampling at ~0.9 x DEM spacing keeps the march cheap. The
-  // verifier measured <=0.055 deg on a synthetic ridge and 0.127 deg against
-  // an independent real-DEM march; both are sub-bin for a 1-degree profile.
+  // Nearest-cell sampling at ~0.9 x DEM spacing keeps the march cheap.
+  // Far-field z14 comparisons were within 0.127 deg; near-field (14-200 m,
+  // especially z13) can reach ~2.3 deg because an adjacent cell is attributed
+  // to the first sample. This is a 1-degree planning profile, not exact
+  // ray tracing; see src/terrain/README.md.
   const stepM =
     options.stepM ??
     Math.max(4, Math.min(grid.spacingEastM, grid.spacingNorthM) * 0.9);
