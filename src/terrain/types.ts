@@ -24,6 +24,9 @@ export interface BuildingFeature {
   tags: Record<string, string>;
 }
 
+/** Where the footprints in a result came from. */
+export type BuildingsSource = 'network' | 'cache' | 'bundled' | 'import';
+
 export interface BuildingsResult {
   buildings: BuildingFeature[];
   /** Number of buildings using the 8 m fallback height. */
@@ -34,9 +37,21 @@ export interface BuildingsResult {
   centerLonDeg: number;
   queryRadiusM: number;
   fetchedAt: number;
-  source: 'network' | 'cache';
+  source: BuildingsSource;
   /** Overpass `timestamp_osm_base`, when supplied. */
   osmTimestamp: string | null;
+  /** Human-readable provenance, e.g. "Bundled area: Brasov". */
+  sourceLabel?: string;
+  /** Upstream source endpoint or dataset URL, when known. */
+  sourceUrl?: string;
+  /** Exact Overpass QL (or importer note) used to obtain the data. */
+  sourceQuery?: string;
+  /** ISO-8601 retrieval time reported by the source, when known. */
+  retrievedAt?: string;
+  /** Licence identifier, e.g. "ODbL". */
+  license?: string;
+  /** Bundled or imported file name, when the result came from a file. */
+  fileName?: string;
 }
 
 /**

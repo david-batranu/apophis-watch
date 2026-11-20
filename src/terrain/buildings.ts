@@ -11,13 +11,48 @@ import {
   putCachedBuildings,
   BUILDINGS_TTL_MS,
 } from './cache';
-import type { BuildingFeature, BuildingsResult, HeightSource } from './types';
+import {
+  DEFAULT_AREAS_BASE_URL,
+  findBundledArea,
+  loadBundledAreaManifest,
+  loadBundledBuildings,
+  OSM_LICENSE,
+} from './bundledAreas';
+import type {
+  BuildingFeature,
+  BuildingsResult,
+  BuildingsSource,
+  HeightSource,
+} from './types';
 
 export const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter';
+/** EU mirror recommended first for European longitudes. */
+export const OVERPASS_DRESEL_EU_ENDPOINT =
+  'https://ovp.dresel.systems/api/interpreter';
+/** North-American mirror at the same host. */
+export const OVERPASS_DRESEL_NA_ENDPOINT =
+  'https://ovp.dresel.systems/api-na/interpreter';
 export const DEFAULT_BUILDING_RADIUS_M = 1_000;
 export const MAX_BUILDING_QUERY_RADIUS_M = 5_000;
 export const DEFAULT_BUILDING_HEIGHT_M = 8;
 export const METRES_PER_LEVEL = 3;
+/** Documented Overpass backoff for 502/504; a bounded retry, never a loop. */
+export const LIVE_RETRY_BACKOFF_MS = [30_000, 60_000, 120_000] as const;
+/** The fallback endpoint may be retried at most this many times. */
+export const LIVE_MAX_ATTEMPTS_PER_ENDPOINT = 3;
+
+/**
+ * Two live endpoints only: the recommended mirror nearest the view, then
+ * overpass-api.de. Serial by construction; callers never overlap requests.
+ */
+export function liveOverpassEndpoints(longitudeDeg: number): string[] {
+  const northAmerica =
+    longitudeDeg >= -170 && longitudeDeg <= -30;
+  return [
+    northAmerica ? OVERPASS_DRESEL_NA_ENDPOINT : OVERPASS_DRESEL_EU_ENDPOINT,
+    OVERPASS_ENDPOINT,
+  ];
+}
 
 export class OverpassRateLimitError extends Error {
   readonly retryAfterMs: number;
@@ -141,7 +176,7 @@ export function parseOverpassBuildings(
   centerLatDeg: number,
   centerLonDeg: number,
   queryRadiusM: number,
-  source: 'network' | 'cache' = 'network',
+  source: BuildingsSource = 'network',
 ): BuildingsResult {
   if (!Array.isArray(response.elements)) {
     throw new OverpassRequestError('Overpass response has no elements array');
@@ -233,55 +268,88 @@ export interface FetchBuildingsOptions {
   longitudeDeg: number;
   radiusM: number;
   useCache?: boolean;
+  /** App base URL for `data/areas/index.json`; defaults to `/`. */
+  baseUrl?: string;
+  /** Try a fully-covering bundled area after a cache miss. Default true. */
+  allowBundled?: boolean;
   signal?: AbortSignal;
   timeoutMs?: number;
   onProgress?: (message: string) => void;
+  /**
+   * Bounded backoff for retryable live failures. Defaults to the documented
+   * 30/60/120 s; callers only override it in tests.
+   */
+  retryBackoffMs?: readonly number[];
 }
 
-/**
- * One Overpass request (or one cache read). Never retries. Throws typed
- * errors so the UI can show cooldown/timeout messages.
- */
-export async function fetchBuildings(
-  options: FetchBuildingsOptions,
-): Promise<BuildingsResult> {
-  const {
-    latitudeDeg,
-    longitudeDeg,
-    radiusM,
-    useCache = true,
-    signal,
-    timeoutMs = 30_000,
-    onProgress,
-  } = options;
-  const radius = Math.max(
-    1,
-    Math.min(MAX_BUILDING_QUERY_RADIUS_M, radiusM),
-  );
-  if (signal?.aborted) {
-    const aborted = new Error('Building query cancelled');
-    aborted.name = 'AbortError';
-    throw aborted;
-  }
-  if (useCache) {
-    onProgress?.('Checking the local building cache…');
-    const cached = await getCachedBuildings(
-      latitudeDeg,
-      longitudeDeg,
-      radius,
-      BUILDINGS_TTL_MS,
-    );
-    if (cached) {
-      onProgress?.(
-        `Loaded ${cached.buildings.length} buildings from cache (${cached.source}).`,
-      );
-      return { ...cached, source: 'cache' };
-    }
-  }
+function abortError(): Error {
+  const aborted = new Error('Building query cancelled');
+  aborted.name = 'AbortError';
+  return aborted;
+}
 
-  onProgress?.(
-    `Querying Overpass for buildings within ${(radius / 1000).toFixed(1)} km…`,
-  );
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError';
+}
+
+function sleepAbortable(ms: number, signal?: AbortSignal): Promise<void> {
+  if (ms <= 0) {
+    return signal?.aborted ? Promise.reject(abortError()) : Promise.resolve();
+  }
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(abortError());
+      return;
+    }
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, ms);
+    const onAbort = (): void => {
+      cleanup();
+      reject(abortError());
+    };
+    const cleanup = (): void => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+function endpointLabel(endpoint: string): string {
+  try {
+    return new URL(endpoint).hostname;
+  } catch {
+    return endpoint;
+  }
+}
+
+function cleanErrorBody(text: string): string {
+  return text
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+interface EndpointOutcome {
+  result: BuildingsResult | null;
+  error: unknown;
+  retryable: boolean;
+  /** 406 or an unreachable host: do not repeat it on this endpoint. */
+  moveToNextEndpoint: boolean;
+  nextEndpointReason?: 'http-406' | 'network';
+}
+
+async function requestBuildingsFromEndpoint(
+  endpoint: string,
+  query: string,
+  latitudeDeg: number,
+  longitudeDeg: number,
+  radius: number,
+  timeoutMs: number,
+  signal: AbortSignal | undefined,
+): Promise<EndpointOutcome> {
   const controller = new AbortController();
   let timedOut = false;
   const onAbort = (): void => controller.abort();
@@ -292,11 +360,8 @@ export async function fetchBuildings(
   }, timeoutMs);
 
   try {
-    // GET keeps the small building query simple and cache-friendly. The
-    // endpoint rejects some POST clients behind its nginx front end; GET with
-    // an encoded `data` parameter is the documented Overpass form.
-    const query = buildOverpassQuery(latitudeDeg, longitudeDeg, radius);
-    const url = `${OVERPASS_ENDPOINT}?data=${encodeURIComponent(query)}`;
+    // GET with an encoded `data` parameter is the documented Overpass form.
+    const url = `${endpoint}?data=${encodeURIComponent(query)}`;
     const response = await fetch(url, {
       method: 'GET',
       headers: { Accept: 'application/json' },
@@ -316,17 +381,29 @@ export async function fetchBuildings(
         retryAfterMs,
       );
     }
-    if (response.status === 502 || response.status === 503 || response.status === 504) {
-      throw new OverpassRequestError(
-        `Overpass is unavailable or at capacity (HTTP ${response.status}). No automatic retry; try again later.`,
-        response.status,
-      );
+    if (
+      response.status === 406 ||
+      response.status === 502 ||
+      response.status === 503 ||
+      response.status === 504
+    ) {
+      const body = cleanErrorBody(await response.text().catch(() => ''));
+      return {
+        result: null,
+        error: new OverpassRequestError(
+          `Overpass endpoint ${endpointLabel(endpoint)} responded HTTP ${
+            response.status
+          }${body ? `: ${body.slice(0, 160)}` : ''}`,
+          response.status,
+        ),
+        retryable: true,
+        moveToNextEndpoint: response.status === 406,
+        nextEndpointReason:
+          response.status === 406 ? 'http-406' : undefined,
+      };
     }
     if (!response.ok) {
-      const body = (await response.text().catch(() => ''))
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
+      const body = cleanErrorBody(await response.text().catch(() => ''));
       throw new OverpassRequestError(
         `Overpass responded HTTP ${response.status}${
           body ? `: ${body.slice(0, 160)}` : ''
@@ -334,8 +411,19 @@ export async function fetchBuildings(
         response.status,
       );
     }
-    const json = (await response.json()) as OverpassResponse;
-    if (json.remark && /timed out|runtime error|out of memory/i.test(json.remark)) {
+    let json: OverpassResponse;
+    try {
+      json = (await response.json()) as OverpassResponse;
+    } catch {
+      throw new OverpassRequestError(
+        'Overpass returned a response that is not valid JSON.',
+        response.status,
+      );
+    }
+    if (
+      json.remark &&
+      /timed out|runtime error|out of memory/i.test(json.remark)
+    ) {
       throw new OverpassRequestError(`Overpass: ${json.remark}`, null);
     }
     const result = parseOverpassBuildings(
@@ -345,29 +433,236 @@ export async function fetchBuildings(
       radius,
       'network',
     );
-    void putCachedBuildings(latitudeDeg, longitudeDeg, radius, result);
-    onProgress?.(
-      `Loaded ${result.buildings.length} buildings; ${
-        result.defaultHeightCount
-      } use the ${DEFAULT_BUILDING_HEIGHT_M} m default.`,
-    );
-    return result;
+    return {
+      result,
+      error: null,
+      retryable: false,
+      moveToNextEndpoint: false,
+    };
   } catch (error) {
     if (timedOut) {
-      throw new OverpassTimeoutError(
-        `Overpass did not answer within ${Math.round(timeoutMs / 1000)} s.`,
-      );
+      return {
+        result: null,
+        error: new OverpassTimeoutError(
+          `Overpass did not answer within ${Math.round(timeoutMs / 1000)} s.`,
+        ),
+        retryable: false,
+        moveToNextEndpoint: false,
+      };
     }
-    if (signal?.aborted) {
-      const aborted = new Error('Building query cancelled');
-      aborted.name = 'AbortError';
-      throw aborted;
-    }
-    throw error;
+    if (signal?.aborted) throw abortError();
+    if (error instanceof OverpassRateLimitError) throw error;
+    if (error instanceof OverpassRequestError) throw error;
+    // Network failure (DNS, offline, CORS): try the other endpoint once, but
+    // do not sit through a 30 s backoff for what is usually a local failure.
+    return {
+      result: null,
+      error,
+      retryable: true,
+      moveToNextEndpoint: true,
+      nextEndpointReason: 'network',
+    };
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener('abort', onAbort);
   }
+}
+
+/**
+ * Use a bundled area only when it covers the whole requested circle. A partial
+ * area is never used: that would silently under-report nearby obstructions.
+ */
+async function loadBundledIfCovered(
+  baseUrl: string,
+  allowBundled: boolean,
+  latitudeDeg: number,
+  longitudeDeg: number,
+  radius: number,
+  signal: AbortSignal | undefined,
+  onProgress: ((message: string) => void) | undefined,
+): Promise<BuildingsResult | null> {
+  if (!allowBundled) return null;
+  try {
+    onProgress?.('Checking for a bundled building area…');
+    const manifest = await loadBundledAreaManifest(baseUrl, { signal });
+    const area = findBundledArea(
+      manifest,
+      latitudeDeg,
+      longitudeDeg,
+      radius,
+    );
+    if (!area) {
+      if (manifest.areas.length > 0) {
+        onProgress?.(
+          'No bundled area covers this view; querying Overpass…',
+        );
+      }
+      return null;
+    }
+    if (signal?.aborted) throw abortError();
+    onProgress?.(
+      `Loading bundled area "${area.name}" for buildings within ${(
+        radius / 1000
+      ).toFixed(1)} km…`,
+    );
+    const bundled = await loadBundledBuildings(baseUrl, area, { signal });
+    if (signal?.aborted) throw abortError();
+    onProgress?.(
+      `Loaded ${bundled.buildings.length} buildings from the bundled area "${area.name}".`,
+    );
+    // The caller asked about this centre/radius; the file covers at least it.
+    return {
+      ...bundled,
+      centerLatDeg: latitudeDeg,
+      centerLonDeg: longitudeDeg,
+      queryRadiusM: radius,
+    };
+  } catch (error) {
+    if (signal?.aborted || isAbortError(error)) throw abortError();
+    onProgress?.('Bundled building area unavailable; querying Overpass…');
+    return null;
+  }
+}
+
+/**
+ * Cached or bundled footprints when available, otherwise one serial live
+ * query against at most two Overpass endpoints. Retries are bounded (30, 60,
+ * 120 s) and stop on 429; there is no polling or background loop.
+ */
+export async function fetchBuildings(
+  options: FetchBuildingsOptions,
+): Promise<BuildingsResult> {
+  const {
+    latitudeDeg,
+    longitudeDeg,
+    radiusM,
+    useCache = true,
+    baseUrl = DEFAULT_AREAS_BASE_URL,
+    allowBundled = true,
+    signal,
+    timeoutMs = 30_000,
+    onProgress,
+    retryBackoffMs = LIVE_RETRY_BACKOFF_MS,
+  } = options;
+  const radius = Math.max(
+    1,
+    Math.min(MAX_BUILDING_QUERY_RADIUS_M, radiusM),
+  );
+  if (signal?.aborted) throw abortError();
+  if (useCache) {
+    onProgress?.('Checking the local building cache…');
+    const cached = await getCachedBuildings(
+      latitudeDeg,
+      longitudeDeg,
+      radius,
+      BUILDINGS_TTL_MS,
+    );
+    if (cached) {
+      onProgress?.(
+        `Loaded ${cached.buildings.length} buildings from cache (${cached.source}).`,
+      );
+      return { ...cached, source: 'cache' };
+    }
+  }
+
+  const bundled = await loadBundledIfCovered(
+    baseUrl,
+    allowBundled,
+    latitudeDeg,
+    longitudeDeg,
+    radius,
+    signal,
+    onProgress,
+  );
+  if (bundled) return bundled;
+
+  const query = buildOverpassQuery(latitudeDeg, longitudeDeg, radius);
+  const endpoints = liveOverpassEndpoints(longitudeDeg);
+  let lastError: unknown = null;
+  let backoffIndex = 0;
+  let skipBackoff = false;
+
+  for (let endpointIndex = 0; endpointIndex < endpoints.length; endpointIndex++) {
+    const endpoint = endpoints[endpointIndex];
+    const attempts =
+      endpointIndex === 0 ? 1 : LIVE_MAX_ATTEMPTS_PER_ENDPOINT;
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      if ((endpointIndex > 0 || attempt > 0) && !skipBackoff) {
+        const wait =
+          retryBackoffMs[
+            Math.min(backoffIndex, Math.max(0, retryBackoffMs.length - 1))
+          ] ?? 60_000;
+        backoffIndex++;
+        onProgress?.(
+          `${
+            attempt > 0 ? 'Retrying' : 'Trying the fallback endpoint'
+          } ${endpointLabel(endpoint)} in ${Math.round(wait / 1000)} s…`,
+        );
+        await sleepAbortable(wait, signal);
+      }
+      skipBackoff = false;
+      if (signal?.aborted) throw abortError();
+      onProgress?.(
+        `Querying ${endpointLabel(endpoint)} for buildings within ${(
+          radius / 1000
+        ).toFixed(1)} km…`,
+      );
+      const outcome = await requestBuildingsFromEndpoint(
+        endpoint,
+        query,
+        latitudeDeg,
+        longitudeDeg,
+        radius,
+        timeoutMs,
+        signal,
+      );
+      if (outcome.result) {
+        const result: BuildingsResult = {
+          ...outcome.result,
+          sourceUrl: outcome.result.sourceUrl ?? endpoint,
+          sourceQuery: outcome.result.sourceQuery ?? query,
+          license: outcome.result.license ?? OSM_LICENSE,
+          retrievedAt:
+            outcome.result.retrievedAt ?? new Date().toISOString(),
+        };
+        void putCachedBuildings(
+          latitudeDeg,
+          longitudeDeg,
+          radius,
+          result,
+        );
+        onProgress?.(
+          `Loaded ${result.buildings.length} buildings; ${
+            result.defaultHeightCount
+          } use the ${DEFAULT_BUILDING_HEIGHT_M} m default.`,
+        );
+        return result;
+      }
+      lastError = outcome.error;
+      if (!outcome.retryable) throw outcome.error;
+      if (outcome.moveToNextEndpoint) {
+        if (endpointIndex < endpoints.length - 1) {
+          onProgress?.(
+            outcome.nextEndpointReason === 'network'
+              ? `${endpointLabel(
+                  endpoint,
+                )} could not be reached; trying the fallback endpoint once.`
+              : `${endpointLabel(
+                  endpoint,
+                )} blocked the request (HTTP 406); switching endpoints without retrying it.`,
+          );
+        }
+        skipBackoff = true;
+        break;
+      }
+      if (endpointIndex === 0) break;
+    }
+  }
+
+  if (lastError instanceof Error) throw lastError;
+  throw new OverpassRequestError(
+    'All Overpass endpoints failed. No building data was written or cached.',
+  );
 }
 
 /** Default-height share, 0..1. */
