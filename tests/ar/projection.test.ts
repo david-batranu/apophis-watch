@@ -80,7 +80,7 @@ describe('perspective projection', () => {
   it('uses the screen-adjusted quaternion so landscape poses project identically', () => {
     const projection = createProjection(W, H, 60);
     const portrait = quatFromDeviceOrientation(0, 90, 0, 0);
-    const landscape = quatFromDeviceOrientation(270, 0, 90, 90);
+    const landscape = quatFromDeviceOrientation(270, 0, 90, 270);
     for (const [az, el] of [
       [0, 0],
       [30, 10],

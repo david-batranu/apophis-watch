@@ -24,9 +24,44 @@ export interface CalibrationState {
   /** Screen-width horizontal field of view, degrees. */
   horizontalFovDeg: number;
   alignments: AlignmentSample[];
-  /** Half the disagreement between the last two-point alignment, degrees. */
+  /** Half the disagreement between the last two-point heading alignment, degrees. */
   twoPointResidualDeg: number | null;
+  /** Result of the real two-target FOV solve (pixel taps), or null. */
+  twoPointFov: FovCalibration | null;
 }
+
+export interface FovTap {
+  x: number;
+  y: number;
+}
+
+export interface FovCalibration {
+  horizontalFovDeg: number;
+  /** Known angular separation of the two targets, degrees. */
+  separationDeg: number;
+  /** RMS registration residual of the two taps at the solved FOV, pixels. */
+  residualPx: number;
+  /** Residual expressed as an angle at the solved focal length, degrees. */
+  residualDeg: number;
+  targetAId: string;
+  targetAName: string;
+  targetBId: string;
+  targetBName: string;
+  atMs: number;
+}
+
+export const MIN_FOV_TARGET_SEPARATION_DEG = 5;
+export const MIN_FOV_TAP_SEPARATION_PX = 12;
+
+export type FovSolveResult =
+  | {
+      ok: true;
+      focalPx: number;
+      horizontalFovDeg: number;
+      separationDeg: number;
+      tapSeparationPx: number;
+    }
+  | { ok: false; error: string };
 
 export interface CalibrationInput {
   targetId: string;
@@ -40,6 +75,122 @@ export interface TwoPointResult {
   headingOffsetDeg: number;
   /** Half the angular disagreement between the two implied offsets. */
   residualDeg: number;
+}
+
+/** Angular separation between two horizontal coordinates, degrees. */
+export function angularSeparationDeg(
+  az1Deg: number,
+  el1Deg: number,
+  az2Deg: number,
+  el2Deg: number,
+): number {
+  const toRad = Math.PI / 180;
+  const el1 = el1Deg * toRad;
+  const el2 = el2Deg * toRad;
+  const dAz = (az2Deg - az1Deg) * toRad;
+  const cosSep =
+    Math.sin(el1) * Math.sin(el2) +
+    Math.cos(el1) * Math.cos(el2) * Math.cos(dAz);
+  return Math.acos(clamp(cosSep, -1, 1)) * (180 / Math.PI);
+}
+
+export function horizontalFovFromFocalPx(width: number, focalPx: number): number {
+  if (!(width > 0) || !(focalPx > 0)) return Number.NaN;
+  return 2 * Math.atan(width / 2 / focalPx) * (180 / Math.PI);
+}
+
+export function focalPxFromHorizontalFov(width: number, fovDeg: number): number {
+  if (!(width > 0) || !(fovDeg > 0 && fovDeg < 180)) return Number.NaN;
+  return width / 2 / Math.tan((fovDeg * Math.PI) / 360);
+}
+
+/**
+ * Solve a pinhole horizontal FOV from two screen taps and the known angular
+ * separation of the objects being tapped.
+ *
+ * The camera orientation and heading offset are deliberately not inputs: the
+ * angle between two pixel rays depends only on the pixel positions and the
+ * focal length. This keeps the FOV solve independent of compass calibration.
+ * A reprojection residual can still be computed by the caller to show how well
+ * the current heading registration matches the taps.
+ */
+export function solveFovFromAngularSeparation(
+  width: number,
+  height: number,
+  a: FovTap,
+  b: FovTap,
+  separationDeg: number,
+): FovSolveResult {
+  if (!(width > 0) || !(height > 0)) {
+    return { ok: false, error: 'The camera viewport has no size yet.' };
+  }
+  if (![a.x, a.y, b.x, b.y].every((value) => Number.isFinite(value))) {
+    return { ok: false, error: 'The tap coordinates are invalid.' };
+  }
+  if (!(separationDeg > 0) || separationDeg >= 179) {
+    return { ok: false, error: 'The two targets do not have a usable angular separation.' };
+  }
+  if (separationDeg < MIN_FOV_TARGET_SEPARATION_DEG) {
+    return {
+      ok: false,
+      error: `Choose targets at least ${MIN_FOV_TARGET_SEPARATION_DEG}° apart; these are only ${separationDeg.toFixed(1)}° apart.`,
+    };
+  }
+  const tapSeparationPx = Math.hypot(b.x - a.x, b.y - a.y);
+  if (tapSeparationPx < MIN_FOV_TAP_SEPARATION_PX) {
+    return {
+      ok: false,
+      error: `The two taps are only ${tapSeparationPx.toFixed(0)} px apart; tap each object more precisely.`,
+    };
+  }
+  const cx = width / 2;
+  const cy = height / 2;
+  const u1 = a.x - cx;
+  const v1 = cy - a.y;
+  const u2 = b.x - cx;
+  const v2 = cy - b.y;
+
+  const angleAt = (focalPx: number): number => {
+    const dot = u1 * u2 + v1 * v2 + focalPx * focalPx;
+    const n1 = Math.hypot(u1, v1, focalPx);
+    const n2 = Math.hypot(u2, v2, focalPx);
+    return Math.acos(clamp(dot / (n1 * n2), -1, 1)) * (180 / Math.PI);
+  };
+
+  let low = 0.01;
+  let high = 1e7;
+  const angleLow = angleAt(low);
+  const angleHigh = angleAt(high);
+  if (angleLow < separationDeg || angleHigh > separationDeg) {
+    return {
+      ok: false,
+      error: 'The taps do not fit any pinhole FOV in the supported range. Re-centre the objects and tap again.',
+    };
+  }
+  for (let i = 0; i < 90; i++) {
+    const mid = Math.sqrt(low * high);
+    if (angleAt(mid) > separationDeg) low = mid;
+    else high = mid;
+  }
+  const focalPx = Math.sqrt(low * high);
+  const horizontalFovDeg = horizontalFovFromFocalPx(width, focalPx);
+  if (
+    !Number.isFinite(horizontalFovDeg) ||
+    horizontalFovDeg < MIN_HORIZONTAL_FOV_DEG ||
+    horizontalFovDeg > MAX_HORIZONTAL_FOV_DEG
+  ) {
+    return {
+      ok: false,
+      error: `Solved FOV ${horizontalFovDeg.toFixed(1)}° is outside the ${MIN_HORIZONTAL_FOV_DEG}–${MAX_HORIZONTAL_FOV_DEG}° supported range. Check the targets and taps.`,
+    };
+  }
+  return {
+    ok: true,
+    focalPx,
+    horizontalFovDeg,
+    separationDeg,
+    tapSeparationPx,
+  };
 }
 
 export interface PointingErrorEstimate {
@@ -67,6 +218,7 @@ export function defaultCalibration(): CalibrationState {
     horizontalFovDeg: DEFAULT_HORIZONTAL_FOV_DEG,
     alignments: [],
     twoPointResidualDeg: null,
+    twoPointFov: null,
   };
 }
 
@@ -107,6 +259,35 @@ export function sanitizeCalibration(raw: unknown): CalibrationState {
     }
   }
   const residual = Number(value.twoPointResidualDeg);
+  let twoPointFov: FovCalibration | null = null;
+  if (value.twoPointFov && typeof value.twoPointFov === 'object') {
+    const f = value.twoPointFov as Partial<FovCalibration>;
+    const solvedFov = Number(f.horizontalFovDeg);
+    if (
+      Number.isFinite(solvedFov) &&
+      solvedFov >= MIN_HORIZONTAL_FOV_DEG &&
+      solvedFov <= MAX_HORIZONTAL_FOV_DEG &&
+      Number.isFinite(f.separationDeg) &&
+      Number.isFinite(f.residualPx) &&
+      Number.isFinite(f.residualDeg) &&
+      typeof f.targetAId === 'string' &&
+      typeof f.targetAName === 'string' &&
+      typeof f.targetBId === 'string' &&
+      typeof f.targetBName === 'string'
+    ) {
+      twoPointFov = {
+        horizontalFovDeg: solvedFov,
+        separationDeg: Number(f.separationDeg),
+        residualPx: Math.max(0, Number(f.residualPx)),
+        residualDeg: Math.max(0, Number(f.residualDeg)),
+        targetAId: f.targetAId,
+        targetAName: f.targetAName,
+        targetBId: f.targetBId,
+        targetBName: f.targetBName,
+        atMs: Number.isFinite(f.atMs) ? Number(f.atMs) : 0,
+      };
+    }
+  }
   return {
     version: 1,
     headingOffsetDeg: Number.isFinite(offset) ? signedDeg(offset) : 0,
@@ -116,6 +297,7 @@ export function sanitizeCalibration(raw: unknown): CalibrationState {
     alignments,
     twoPointResidualDeg:
       Number.isFinite(residual) && residual >= 0 ? Math.min(45, residual) : null,
+    twoPointFov,
   };
 }
 
@@ -152,6 +334,7 @@ export function setHeadingOffset(
   return {
     ...state,
     headingOffsetDeg: signedDeg(Number.isFinite(offsetDeg) ? offsetDeg : 0),
+    twoPointResidualDeg: null,
   };
 }
 
@@ -171,6 +354,23 @@ export function setHorizontalFov(
     horizontalFovDeg: Number.isFinite(fovDeg)
       ? clamp(fovDeg, MIN_HORIZONTAL_FOV_DEG, MAX_HORIZONTAL_FOV_DEG)
       : DEFAULT_HORIZONTAL_FOV_DEG,
+    twoPointFov: null,
+  };
+}
+
+/** Apply a solved two-target FOV result and keep its provenance/residual. */
+export function recordFovCalibration(
+  state: CalibrationState,
+  fov: FovCalibration,
+): CalibrationState {
+  return {
+    ...state,
+    horizontalFovDeg: clamp(
+      fov.horizontalFovDeg,
+      MIN_HORIZONTAL_FOV_DEG,
+      MAX_HORIZONTAL_FOV_DEG,
+    ),
+    twoPointFov: fov,
   };
 }
 
@@ -207,6 +407,7 @@ export function recordAlignment(
     ...state,
     headingOffsetDeg: impliedOffsetDeg,
     alignments: [...state.alignments, sample].slice(-8),
+    twoPointResidualDeg: null,
   };
 }
 
@@ -270,8 +471,8 @@ export function estimatePointingError(
   const compassAccuracy =
     reportedCompassAccuracyDeg !== null &&
     Number.isFinite(reportedCompassAccuracyDeg) &&
-    reportedCompassAccuracyDeg >= 0
-      ? Math.max(1, reportedCompassAccuracyDeg)
+    reportedCompassAccuracyDeg > 0
+      ? reportedCompassAccuracyDeg
       : null;
 
   let calibrationResidual: number | null = state.twoPointResidualDeg;

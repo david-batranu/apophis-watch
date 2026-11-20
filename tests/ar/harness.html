@@ -124,7 +124,9 @@
       // Start looking west and 30° up. The raw absolute alpha is magnetic
       // north; WMM2025 declination at Brasov (~+6.715°) makes true heading
       // 269°, where Apophis is at closest approach (az 268.9°, el 30.3°).
-      dispatchOrientation({ alpha: 97.86, beta: 120, gamma: 0, absolute: true });
+      if (window.__arHarnessAutoOrientation !== false) {
+        dispatchOrientation({ alpha: 97.86, beta: 120, gamma: 0, absolute: true });
+      }
 
       window.__arHarness = {
         ready: true,
@@ -164,6 +166,9 @@
         },
         getAlignTargets() {
           return workstream.getAlignTargets();
+        },
+        getProjectedTarget(id) {
+          return workstream.projectTarget(id);
         },
       };
 

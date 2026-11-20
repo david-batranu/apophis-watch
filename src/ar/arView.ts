@@ -4,17 +4,22 @@ import { toObserverLocation, type UiState } from '../state/store';
 import type { SimulationSession } from '../state/session';
 import {
   CALIBRATION_STORAGE_KEY,
+  angularSeparationDeg,
   defaultCalibration,
   estimatePointingError,
   loadCalibration,
   nudgeHeadingOffset,
   recordAlignment,
+  recordFovCalibration,
   recordTwoPointAlignment,
   saveCalibration,
   setHeadingOffset,
   setHorizontalFov,
+  solveFovFromAngularSeparation,
   type CalibrationInput,
   type CalibrationState,
+  type FovCalibration,
+  type FovTap,
 } from './calibration';
 import { computeDeclination, type DeclinationResult } from './declination';
 import type { ArHostApi, ArWorkstream } from './host';
@@ -78,6 +83,14 @@ interface DeviceOrientationLike extends Event {
   absolute?: boolean;
   webkitCompassHeading?: number;
   webkitCompassAccuracy?: number;
+}
+
+interface FovTapMark extends FovTap {
+  targetId: string;
+  targetName: string;
+  azimuthDeg: number;
+  elevationDeg: number;
+  atMs: number;
 }
 
 interface Palette {
@@ -208,6 +221,13 @@ export class ArView implements ArWorkstream {
   private offsetValue!: HTMLElement;
   private fovInput!: HTMLInputElement;
   private fovValue!: HTMLElement;
+  private fovTargetASelect!: HTMLSelectElement;
+  private fovTargetBSelect!: HTMLSelectElement;
+  private fovTapAButton!: HTMLButtonElement;
+  private fovTapBButton!: HTMLButtonElement;
+  private fovStatusEl!: HTMLElement;
+  private tapCapture!: HTMLElement;
+  private tapPrompt!: HTMLElement;
   private errorEl!: HTMLElement;
   private timeInput!: HTMLInputElement;
   private modeButtons: HTMLButtonElement[] = [];
@@ -225,6 +245,7 @@ export class ArView implements ArWorkstream {
   private stream: MediaStream | null = null;
   private sensorState: SensorState = 'idle';
   private sensorMessage = 'Sensors not started.';
+  private sensorUiSignature = '';
   private latestSample: OrientationSample | null = null;
   private lastAbsoluteAt = 0;
   private permissionRequested = false;
@@ -234,6 +255,7 @@ export class ArView implements ArWorkstream {
   private virtualPitchDeg = 12;
   private pointerId: number | null = null;
   private lastPointer: { x: number; y: number } | null = null;
+  private clickHandler: ((event: MouseEvent) => void) | null = null;
 
   private screenAngleDeg = 0;
   private projection: ArProjection = createProjection(1, 1, 60);
@@ -244,6 +266,7 @@ export class ArView implements ArWorkstream {
   private displayPitchDeg: number | null = null;
   private declination: DeclinationResult | null = null;
   private declinationKey = '';
+  private lastDeclinationSignature = '';
   private timeMode: ArTimeMode = 'rehearsal';
   private snapshot: ArSkySnapshot | null = null;
   private snapshotKey = '';
@@ -252,6 +275,10 @@ export class ArView implements ArWorkstream {
   private lastTrailAt = 0;
   private lastAlignSignature = '__unset__';
   private twoPointFirst: CalibrationInput | null = null;
+  private fovTapArmed: 'A' | 'B' | null = null;
+  private fovArmedTarget: SkyTarget | null = null;
+  private fovTapA: FovTapMark | null = null;
+  private fovTapB: FovTapMark | null = null;
   private selectedAlignId = '';
   private lastApophisPoint: ProjectedScreenPoint | null = null;
   private selectedPoint: ProjectedScreenPoint | null = null;
@@ -269,12 +296,27 @@ export class ArView implements ArWorkstream {
   mount(): void {
     if (this.mounted) return;
     this.mounted = true;
+    this.cameraState = 'idle';
+    this.cameraMessage = 'Camera not started.';
+    this.touchMode = false;
+    this.displayQuat = null;
+    this.snapNextFrame = true;
+    this.lastFrame = 0;
+    this.lastSnapshotAt = 0;
+    this.lastTrailAt = 0;
+    this.twoPointFirst = null;
+    this.fovTapArmed = null;
+    this.resetFovTaps();
+    this.lastAlignSignature = '__unset__';
+    this.snapshotKey = '';
+    this.trailCache = { key: '', points: [] };
     this.root.classList.add('ar-root');
     this.root.innerHTML = this.template();
     this.bindRefs();
     this.bindEvents();
     this.updateScreenAngle();
     this.applyState();
+    this.renderCalibrationUi();
     this.setCameraState('idle', 'Requesting rear camera…');
     this.startCamera();
     this.startOrientationListeners();
@@ -291,6 +333,10 @@ export class ArView implements ArWorkstream {
     this.rafId = null;
     this.unsubscribe?.();
     this.unsubscribe = null;
+    if (this.clickHandler) {
+      this.root.removeEventListener('click', this.clickHandler);
+      this.clickHandler = null;
+    }
     this.stopCamera();
     this.stopOrientationListeners();
     if (this.sensorWatchdog !== null) window.clearTimeout(this.sensorWatchdog);
@@ -300,8 +346,32 @@ export class ArView implements ArWorkstream {
     }
     window.removeEventListener('orientationchange', this.screenOrientationHandler);
     window.removeEventListener('resize', this.screenOrientationHandler);
+
+    // Do not let local-only modes leak into the next mount. The next mount
+    // starts cleanly with sensors; the watchdog re-enables touch fallback if
+    // the sensors are still unavailable.
+    this.touchMode = false;
+    if (this.touchToggle) this.touchToggle.checked = false;
+    this.root.classList.remove('ar-touch');
+    this.cameraState = 'idle';
+    this.cameraMessage = 'Camera not started.';
+    this.sensorUiSignature = '';
+    this.displayQuat = null;
+    this.snapNextFrame = true;
+    this.lastFrame = 0;
+    this.lastSnapshotAt = 0;
+    this.lastTrailAt = 0;
+    this.twoPointFirst = null;
+    this.resetFovTaps();
+    this.fovTapArmed = null;
+    this.localMessage = '';
+    this.snapshotKey = '';
+    this.trailCache = { key: '', points: [] };
+    this.lastAlignSignature = '__unset__';
+    this.lastDeclinationSignature = '';
+
     this.root.innerHTML = '';
-    this.root.classList.remove('ar-root', 'ar-night', 'ar-touch');
+    this.root.classList.remove('ar-root', 'ar-night');
     this.api.setStatus(null);
   }
 
@@ -319,6 +389,24 @@ export class ArView implements ArWorkstream {
       azimuthDeg: target.azimuthDeg,
       elevationDeg: target.elevationDeg,
     }));
+  }
+
+  /** Test/diagnostic hook: project a current AR target to screen pixels. */
+  projectTarget(
+    id: string,
+  ): { x: number; y: number; inFront: boolean; visible: boolean } | null {
+    const target =
+      this.snapshot?.targets.find((t) => t.id === id) ??
+      this.snapshot?.stars.find((t) => t.id === id);
+    if (!target || !this.displayQuat) return null;
+    const point = projectAzEl(
+      target.azimuthDeg,
+      target.elevationDeg,
+      this.displayQuat,
+      this.projection,
+      0,
+    );
+    return { x: point.x, y: point.y, inFront: point.inFront, visible: point.visible };
   }
 
   private template(): string {
@@ -339,6 +427,12 @@ export class ArView implements ArWorkstream {
         <div class="ar-reading" data-role="reading">Waiting for the host clock…</div>
         <div class="ar-messages" data-role="messages"></div>
         <div class="ar-debug" data-role="debug" hidden></div>
+        <div class="ar-tap-capture" data-role="tap-capture" hidden>
+          <div class="ar-tap-prompt">
+            <span data-role="tap-prompt">Tap a target in the image</span>
+            <button type="button" data-role="tap-cancel">Cancel</button>
+          </div>
+        </div>
         <div class="ar-bottom">
           <details class="ar-panel">
             <summary>Calibration</summary>
@@ -358,15 +452,24 @@ export class ArView implements ArWorkstream {
                 <input type="range" data-role="fov" min="30" max="100" step="0.5" value="60" />
               </label>
               <div class="ar-row">
+                <select data-role="fov-target-a" aria-label="FOV target A"></select>
+                <button type="button" data-role="fov-tap-a">Tap A</button>
+              </div>
+              <div class="ar-row">
+                <select data-role="fov-target-b" aria-label="FOV target B"></select>
+                <button type="button" data-role="fov-tap-b">Tap B</button>
+              </div>
+              <p class="ar-note" data-role="fov-status">FOV from two taps: choose two objects at least 5° apart, then tap each in the camera image.</p>
+              <div class="ar-row">
                 <select data-role="align-select" aria-label="Calibration target"></select>
                 <button class="ar-primary" type="button" data-role="align">Align on target</button>
               </div>
               <div class="ar-row">
-                <button type="button" data-role="two-point">Two-point: mark target A</button>
+                <button type="button" data-role="two-point">Two-point heading: mark A</button>
                 <button type="button" data-role="reset-cal">Reset</button>
               </div>
               <p class="ar-note" data-role="error-estimate">±—° estimated pointing error.</p>
-              <p class="ar-note">One tap centres the overlay on a known object. Two-point calibration averages two marks and reports their disagreement; it cannot make a phone compass better than it is.</p>
+              <p class="ar-note">One tap centres the overlay on a known object. Two-point heading averages two heading marks and reports their disagreement. FOV from two taps is separate: it solves the lens FOV from the pixel spacing of two known objects and does not claim to fix heading.</p>
             </div>
           </details>
           <details class="ar-panel">
@@ -423,6 +526,13 @@ export class ArView implements ArWorkstream {
     this.offsetValue = this.ref('offset-value');
     this.fovInput = this.ref<HTMLInputElement>('fov');
     this.fovValue = this.ref('fov-value');
+    this.fovTargetASelect = this.ref<HTMLSelectElement>('fov-target-a');
+    this.fovTargetBSelect = this.ref<HTMLSelectElement>('fov-target-b');
+    this.fovTapAButton = this.ref<HTMLButtonElement>('fov-tap-a');
+    this.fovTapBButton = this.ref<HTMLButtonElement>('fov-tap-b');
+    this.fovStatusEl = this.ref('fov-status');
+    this.tapCapture = this.ref('tap-capture');
+    this.tapPrompt = this.ref('tap-prompt');
     this.errorEl = this.ref('error-estimate');
     this.timeInput = this.ref<HTMLInputElement>('time-input');
     this.statusCamera = this.ref('status-camera');
@@ -438,7 +548,7 @@ export class ArView implements ArWorkstream {
   }
 
   private bindEvents(): void {
-    this.root.addEventListener('click', (event) => {
+    this.clickHandler = (event: MouseEvent) => {
       const target = (event.target as HTMLElement).closest<HTMLElement>('button');
       if (!target) return;
       if (target.dataset.nudge) {
@@ -460,6 +570,15 @@ export class ArView implements ArWorkstream {
         case 'two-point':
           this.markTwoPoint();
           break;
+        case 'fov-tap-a':
+          this.armFovTap('A');
+          break;
+        case 'fov-tap-b':
+          this.armFovTap('B');
+          break;
+        case 'tap-cancel':
+          this.cancelFovTap();
+          break;
         case 'reset-cal':
           this.resetCalibration();
           break;
@@ -479,7 +598,8 @@ export class ArView implements ArWorkstream {
           void this.requestFullscreen();
           break;
       }
-    });
+    };
+    this.root.addEventListener('click', this.clickHandler);
 
     this.offsetInput.addEventListener('input', () => {
       this.calibration = setHeadingOffset(this.calibration, Number(this.offsetInput.value));
@@ -488,9 +608,19 @@ export class ArView implements ArWorkstream {
     });
     this.fovInput.addEventListener('input', () => {
       this.calibration = setHorizontalFov(this.calibration, Number(this.fovInput.value));
+      this.resetFovTaps();
       this.persistCalibration();
       this.renderCalibrationUi();
     });
+    this.fovTargetASelect.addEventListener('change', () => {
+      this.fovTapA = null;
+      this.updateFovStatus();
+    });
+    this.fovTargetBSelect.addEventListener('change', () => {
+      this.fovTapB = null;
+      this.updateFovStatus();
+    });
+    this.tapCapture.addEventListener('click', this.onTapCaptureClick);
     this.touchToggle.addEventListener('change', () => {
       this.touchMode = this.touchToggle.checked;
       this.root.classList.toggle('ar-touch', this.touchMode);
@@ -564,7 +694,7 @@ export class ArView implements ArWorkstream {
       this.timeMode === 'tonight' ? 'Tonight · real clock' : '2029 rehearsal · host clock';
     this.updateSensorStatus();
     this.updateCameraStatus();
-    this.renderCalibrationUi();
+    this.declinationForCurrentTime();
     this.renderMessages();
   }
 
@@ -635,6 +765,7 @@ export class ArView implements ArWorkstream {
       }
       this.setCameraState('live', 'Rear camera live.');
     } catch (error) {
+      if (!this.mounted) return;
       const name = error instanceof DOMException ? error.name : '';
       const denied = name === 'NotAllowedError' || name === 'SecurityError';
       this.setCameraState(
@@ -748,12 +879,17 @@ export class ArView implements ArWorkstream {
   }
 
   private updateSensorState(): void {
+    const previousState = this.sensorState;
+    const previousMessage = this.sensorMessage;
     if (!this.latestSample) {
       if (this.sensorState === 'idle' || this.sensorState === 'requesting') {
         this.sensorMessage = 'Waiting for motion sensors…';
       }
     } else if (this.touchMode) {
-      this.sensorMessage = 'Touch-drag virtual AR. Sensor data is ignored while touch look is on.';
+      if (this.sensorState !== 'denied' && this.sensorState !== 'unavailable') {
+        this.sensorMessage =
+          'Touch-drag virtual AR. Sensor data is ignored while touch look is on.';
+      }
     } else {
       const sample = this.latestSample;
       if (sample.compassAccuracyDeg !== null && sample.compassAccuracyDeg < 0) {
@@ -763,7 +899,7 @@ export class ArView implements ArWorkstream {
       } else if (sample.source === 'compass') {
         this.sensorState = 'compass';
         this.sensorMessage =
-          sample.compassAccuracyDeg === null
+          sample.compassAccuracyDeg === null || sample.compassAccuracyDeg === 0
             ? 'Compass heading (accuracy not reported; 5–15° is typical).'
             : `Compass heading, device reports ±${sample.compassAccuracyDeg.toFixed(0)}°.`;
       } else if (sample.source === 'absolute') {
@@ -776,12 +912,27 @@ export class ArView implements ArWorkstream {
           'Relative orientation only: alpha has an arbitrary zero. Align on a known object to set north, or use touch-drag.';
       }
     }
+    const accuracyBucket =
+      this.latestSample?.compassAccuracyDeg === null ||
+      this.latestSample?.compassAccuracyDeg === undefined
+        ? 'na'
+        : this.latestSample.compassAccuracyDeg.toFixed(1);
+    const signature = [
+      this.touchMode,
+      this.sensorState,
+      this.sensorMessage,
+      accuracyBucket,
+      previousState === this.sensorState ? '' : previousState,
+      previousMessage === this.sensorMessage ? '' : 'msg',
+    ].join('|');
+    if (signature === this.sensorUiSignature) return;
+    this.sensorUiSignature = signature;
     if (this.mounted) {
       this.updateSensorStatus();
       this.renderMessages();
       this.renderCalibrationUi();
+      this.pushHostStatus();
     }
-    this.pushHostStatus();
   }
 
   private updateSensorStatus(): void {
@@ -795,8 +946,17 @@ export class ArView implements ArWorkstream {
       denied: 'Sensors denied',
       unavailable: 'No sensors',
     };
-    this.statusSensor.textContent = this.touchMode ? 'Touch look' : labels[this.sensorState];
-    this.statusSensor.dataset.state = this.touchMode ? 'touch' : this.sensorState;
+    this.statusSensor.textContent = this.touchMode
+      ? this.sensorState === 'denied'
+        ? 'Sensors denied · touch'
+        : this.sensorState === 'unavailable'
+          ? 'No sensors · touch'
+          : 'Touch look'
+      : labels[this.sensorState];
+    this.statusSensor.dataset.state =
+      this.touchMode && this.sensorState !== 'denied' && this.sensorState !== 'unavailable'
+        ? 'touch'
+        : this.sensorState;
     this.statusSensor.classList.toggle(
       'ar-good',
       !this.touchMode && (this.sensorState === 'compass' || this.sensorState === 'absolute'),
@@ -884,6 +1044,7 @@ export class ArView implements ArWorkstream {
       this.touchToggle.checked = true;
       this.root.classList.add('ar-touch');
     }
+    if (!this.mounted) return;
     this.updateSensorState();
     this.updateSensorStatus();
     this.renderMessages();
@@ -893,6 +1054,17 @@ export class ArView implements ArWorkstream {
   private checkSensorWatchdog(): void {
     if (!this.mounted) return;
     if (this.latestSample) return;
+    if (this.sensorState === 'denied') {
+      // Preserve the denial reason instead of replacing it with the generic
+      // "no sensor data" text.
+      this.touchMode = true;
+      this.touchToggle.checked = true;
+      this.root.classList.add('ar-touch');
+      this.updateSensorState();
+      this.updateSensorStatus();
+      this.renderMessages();
+      return;
+    }
     if (this.sensorState === 'requesting') {
       this.sensorWatchdog = window.setTimeout(() => this.checkSensorWatchdog(), 2000);
       return;
@@ -1039,6 +1211,20 @@ export class ArView implements ArWorkstream {
       return this.snapshot;
     }
     this.declinationForCurrentTime();
+    const declSignature = [
+      this.declination?.status ?? 'none',
+      this.declination?.declinationDeg?.toFixed(3) ?? 'na',
+      this.declination?.warning ?? '',
+    ].join('|');
+    if (declSignature !== this.lastDeclinationSignature) {
+      this.lastDeclinationSignature = declSignature;
+      if (this.mounted) this.renderMessages();
+    }
+    const inSessionWindow = Boolean(
+      session &&
+        roundedMs >= session.windowStartMs &&
+        roundedMs <= session.windowEndMs,
+    );
 
     const trailKey = [
       mode,
@@ -1053,7 +1239,7 @@ export class ArView implements ArWorkstream {
         this.trailCache = {
           key: trailKey,
           points:
-            mode === 'rehearsal'
+            mode === 'rehearsal' && inSessionWindow
               ? buildArTrail(session, roundedMs, refraction, this.state.timeZone, 2)
               : [],
         };
@@ -1101,8 +1287,9 @@ export class ArView implements ArWorkstream {
           : `±${estimate.totalDeg.toFixed(estimate.totalDeg < 10 ? 1 : 0)}° est.`;
     this.statusAccuracy.title = estimate.detail;
     this.twoPointButton.textContent = this.twoPointFirst
-      ? 'Two-point: mark target B & apply'
-      : 'Two-point: mark target A';
+      ? 'Two-point heading: mark B & apply'
+      : 'Two-point heading: mark A';
+    this.updateFovStatus();
   }
 
   private refreshAlignTargets(): void {
@@ -1115,21 +1302,232 @@ export class ArView implements ArWorkstream {
     if (!targets.some((t) => t.id === previous)) {
       this.selectedAlignId = targets[0]?.id ?? '';
     }
-    this.alignSelect.innerHTML = targets.length
+    this.alignSelect.innerHTML = this.targetOptions(targets, this.selectedAlignId);
+    this.alignSelect.disabled = targets.length === 0;
+    this.alignButton.disabled = targets.length === 0;
+
+    const currentA = this.fovTargetASelect.value;
+    const currentB = this.fovTargetBSelect.value;
+    const defaultA = targets[0]?.id ?? '';
+    const defaultB = targets[1]?.id ?? defaultA;
+    const fovA = targets.some((t) => t.id === currentA) ? currentA : defaultA;
+    const fovB =
+      targets.some((t) => t.id === currentB) && currentB !== fovA
+        ? currentB
+        : defaultB !== fovA
+          ? defaultB
+          : targets[0]?.id ?? '';
+    this.fovTargetASelect.innerHTML = this.targetOptions(targets, fovA);
+    this.fovTargetBSelect.innerHTML = this.targetOptions(targets, fovB);
+    this.fovTargetASelect.disabled = targets.length === 0;
+    this.fovTargetBSelect.disabled = targets.length < 2;
+    this.fovTapAButton.disabled = targets.length === 0;
+    this.fovTapBButton.disabled = targets.length < 2;
+    this.updateFovStatus();
+  }
+
+  private targetOptions(targets: SkyTarget[], selectedId: string): string {
+    return targets.length
       ? targets
           .map(
             (t) =>
-              `<option value="${escapeHtml(t.id)}"${t.id === this.selectedAlignId ? ' selected' : ''}>${escapeHtml(t.name)} · ${t.elevationDeg.toFixed(0)}°</option>`,
+              `<option value="${escapeHtml(t.id)}"${t.id === selectedId ? ' selected' : ''}>${escapeHtml(t.name)} · ${t.elevationDeg.toFixed(0)}°</option>`,
           )
           .join('')
       : '<option value="">No named target above the horizon</option>';
-    this.alignSelect.disabled = targets.length === 0;
-    this.alignButton.disabled = targets.length === 0;
   }
 
   private selectedTarget(): SkyTarget | null {
     if (!this.snapshot) return null;
     return this.snapshot.alignTargets.find((t) => t.id === this.selectedAlignId) ?? null;
+  }
+
+  private selectedFovTarget(slot: 'A' | 'B'): SkyTarget | null {
+    if (!this.snapshot) return null;
+    const id = slot === 'A' ? this.fovTargetASelect.value : this.fovTargetBSelect.value;
+    return this.snapshot.alignTargets.find((t) => t.id === id) ?? null;
+  }
+
+  private armFovTap(slot: 'A' | 'B'): void {
+    const target = this.selectedFovTarget(slot);
+    if (!target) {
+      this.setLocalMessage('Choose a named target above the horizon first.');
+      return;
+    }
+    if (!this.displayQuat) {
+      this.setLocalMessage('No orientation yet. Enable the compass or use touch look first.');
+      return;
+    }
+    const projected = projectAzEl(
+      target.azimuthDeg,
+      target.elevationDeg,
+      this.displayQuat,
+      this.projection,
+      0,
+    );
+    if (!projected.inFront || !projected.visible) {
+      this.setLocalMessage(
+        projected.inFront
+          ? `${target.name} is outside the current camera view. Point the phone towards it before tapping.`
+          : `${target.name} is behind the camera. Point the phone towards it before tapping.`,
+      );
+      return;
+    }
+    this.fovTapArmed = slot;
+    this.fovArmedTarget = target;
+    for (const detail of this.root.querySelectorAll<HTMLDetailsElement>('details')) {
+      detail.open = false;
+    }
+    this.tapPrompt.textContent = `Tap ${target.name} in the camera image`;
+    this.tapCapture.hidden = false;
+    this.updateFovStatus();
+  }
+
+  private cancelFovTap(): void {
+    this.fovTapArmed = null;
+    this.fovArmedTarget = null;
+    if (this.tapCapture) this.tapCapture.hidden = true;
+    this.updateFovStatus();
+  }
+
+  private onTapCaptureClick = (event: MouseEvent): void => {
+    const element = event.target as HTMLElement;
+    if (element.closest('[data-role="tap-cancel"]')) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.cancelFovTap();
+      return;
+    }
+    if (!this.fovTapArmed || !this.fovArmedTarget) return;
+    const rect = this.canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    if (x < 0 || y < 0 || x > rect.width || y > rect.height) {
+      this.setLocalMessage('Tap inside the camera image.');
+      return;
+    }
+    const mark: FovTapMark = {
+      x,
+      y,
+      targetId: this.fovArmedTarget.id,
+      targetName: this.fovArmedTarget.name,
+      azimuthDeg: this.fovArmedTarget.azimuthDeg,
+      elevationDeg: this.fovArmedTarget.elevationDeg,
+      atMs: this.currentUtcMs() ?? Date.now(),
+    };
+    if (this.fovTapArmed === 'A') this.fovTapA = mark;
+    else this.fovTapB = mark;
+    this.fovTapArmed = null;
+    this.fovArmedTarget = null;
+    this.tapCapture.hidden = true;
+    event.preventDefault();
+    event.stopPropagation();
+    if (this.fovTapA && this.fovTapB) this.computeFovFromTaps();
+    else this.updateFovStatus();
+  };
+
+  private resetFovTaps(): void {
+    this.fovTapA = null;
+    this.fovTapB = null;
+    this.fovTapArmed = null;
+    this.fovArmedTarget = null;
+    if (this.tapCapture) this.tapCapture.hidden = true;
+  }
+
+  private updateFovStatus(): void {
+    if (!this.fovStatusEl) return;
+    if (this.fovTapArmed && this.fovArmedTarget) {
+      this.fovStatusEl.textContent = `Tap ${this.fovArmedTarget.name} in the image (${this.fovTapArmed}).`;
+      this.fovTapAButton.textContent = this.fovTapArmed === 'A' ? 'Tap A on image…' : 'Tap A';
+      this.fovTapBButton.textContent = this.fovTapArmed === 'B' ? 'Tap B on image…' : 'Tap B';
+      return;
+    }
+    this.fovTapAButton.textContent = this.fovTapA ? 'Tap A again' : 'Tap A';
+    this.fovTapBButton.textContent = this.fovTapB ? 'Tap B again' : 'Tap B';
+    if (this.calibration.twoPointFov) {
+      const f = this.calibration.twoPointFov;
+      this.fovStatusEl.textContent = `Solved FOV ${f.horizontalFovDeg.toFixed(1)}° from ${f.targetAName}–${f.targetBName} (${f.separationDeg.toFixed(1)}° apart), tap residual ${f.residualPx.toFixed(1)} px / ${f.residualDeg.toFixed(1)}°.`;
+    } else if (this.fovTapA && !this.fovTapB) {
+      this.fovStatusEl.textContent = `${this.fovTapA.targetName} marked. Choose target B and tap it in the image.`;
+    } else if (!this.fovTapA && this.fovTapB) {
+      this.fovStatusEl.textContent = `${this.fovTapB.targetName} marked. Choose target A and tap it in the image.`;
+    } else {
+      this.fovStatusEl.textContent =
+        'FOV from two taps: choose two objects at least 5° apart, then tap each in the camera image.';
+    }
+  }
+
+  private computeFovFromTaps(): void {
+    const a = this.fovTapA;
+    const b = this.fovTapB;
+    if (!a || !b) return;
+    if (a.targetId === b.targetId) {
+      this.setLocalMessage('Choose two different targets for FOV calibration.');
+      this.resetFovTaps();
+      this.updateFovStatus();
+      return;
+    }
+    const separationDeg = angularSeparationDeg(
+      a.azimuthDeg,
+      a.elevationDeg,
+      b.azimuthDeg,
+      b.elevationDeg,
+    );
+    const solution = solveFovFromAngularSeparation(
+      this.projection.width,
+      this.projection.height,
+      a,
+      b,
+      separationDeg,
+    );
+    if (!solution.ok) {
+      this.setLocalMessage(`FOV calibration failed: ${solution.error}`);
+      this.resetFovTaps();
+      this.updateFovStatus();
+      return;
+    }
+
+    let residualPx = 0;
+    let residualDeg = 0;
+    if (this.displayQuat) {
+      const solvedProjection = createProjection(
+        this.projection.width,
+        this.projection.height,
+        solution.horizontalFovDeg,
+      );
+      const pa = projectAzEl(a.azimuthDeg, a.elevationDeg, this.displayQuat, solvedProjection, 1e6);
+      const pb = projectAzEl(b.azimuthDeg, b.elevationDeg, this.displayQuat, solvedProjection, 1e6);
+      if (pa.inFront && pb.inFront) {
+        residualPx = Math.sqrt(
+          ((pa.x - a.x) ** 2 +
+            (pa.y - a.y) ** 2 +
+            (pb.x - b.x) ** 2 +
+            (pb.y - b.y) ** 2) /
+            2,
+        );
+        residualDeg = Math.atan(residualPx / solution.focalPx) * (180 / Math.PI);
+      }
+    }
+
+    const result: FovCalibration = {
+      horizontalFovDeg: solution.horizontalFovDeg,
+      separationDeg,
+      residualPx,
+      residualDeg,
+      targetAId: a.targetId,
+      targetAName: a.targetName,
+      targetBId: b.targetId,
+      targetBName: b.targetName,
+      atMs: Math.max(a.atMs, b.atMs),
+    };
+    this.calibration = recordFovCalibration(this.calibration, result);
+    this.resetFovTaps();
+    this.persistCalibration();
+    this.renderCalibrationUi();
+    this.updateFovStatus();
+    this.setLocalMessage(
+      `FOV calibrated to ${result.horizontalFovDeg.toFixed(1)}° from ${result.targetAName}–${result.targetBName}; tap residual ${result.residualPx.toFixed(1)} px (${result.residualDeg.toFixed(1)}°).`,
+    );
   }
 
   private alignOnSelectedTarget(): void {
@@ -1154,7 +1552,7 @@ export class ArView implements ArWorkstream {
     this.persistCalibration();
     this.renderCalibrationUi();
     this.setLocalMessage(
-      `Aligned on ${target.name}: heading offset ${this.calibration.headingOffsetDeg >= 0 ? '+' : ''}${this.calibration.headingOffsetDeg.toFixed(2)}°.`,
+      `Aligned on ${target.name}: heading offset ${this.calibration.headingOffsetDeg >= 0 ? '+' : ''}${this.calibration.headingOffsetDeg.toFixed(1)}°.`,
     );
   }
 
@@ -1190,13 +1588,14 @@ export class ArView implements ArWorkstream {
     this.renderCalibrationUi();
     const residual = this.calibration.twoPointResidualDeg ?? 0;
     this.setLocalMessage(
-      `Two-point calibration applied: offset ${this.calibration.headingOffsetDeg.toFixed(2)}°, disagreement ±${residual.toFixed(1)}°.`,
+      `Two-point heading calibration applied: offset ${this.calibration.headingOffsetDeg.toFixed(1)}°, disagreement ±${residual.toFixed(1)}°.`,
     );
   }
 
   private resetCalibration(): void {
     this.calibration = defaultCalibration();
     this.twoPointFirst = null;
+    this.resetFovTaps();
     try {
       localStorage.removeItem(CALIBRATION_STORAGE_KEY);
     } catch {
@@ -1225,6 +1624,7 @@ export class ArView implements ArWorkstream {
     if (mode === this.timeMode) return;
     this.timeMode = mode;
     this.twoPointFirst = null;
+    this.resetFovTaps();
     this.snapshotKey = '';
     this.trailCache.key = '';
     for (const button of this.modeButtons) {
@@ -1251,6 +1651,7 @@ export class ArView implements ArWorkstream {
     }
     this.timeMode = 'rehearsal';
     this.twoPointFirst = null;
+    this.resetFovTaps();
     for (const button of this.modeButtons) {
       button.setAttribute('aria-pressed', String(button.dataset.mode === 'rehearsal'));
     }
@@ -1273,6 +1674,7 @@ export class ArView implements ArWorkstream {
     }
     this.timeMode = 'rehearsal';
     this.twoPointFirst = null;
+    this.resetFovTaps();
     for (const button of this.modeButtons) {
       button.setAttribute('aria-pressed', String(button.dataset.mode === 'rehearsal'));
     }
@@ -1335,6 +1737,7 @@ export class ArView implements ArWorkstream {
   }
 
   private pushHostStatus(): void {
+    if (!this.mounted) return;
     const status =
       this.cameraState === 'live'
         ? `${this.sensorMessage}`

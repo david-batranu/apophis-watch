@@ -127,10 +127,11 @@ export function quatFromDeviceEuler(
 /**
  * Screen-adjusted device orientation.
  *
- * `screenAngleDeg` is `screen.orientation.angle` (0/90/180/270, clockwise
- * rotation of the screen from its natural orientation). The spec's
- * screen-adjusted matrix is R_screen = R_device * Rz(theta), so the matching
- * quaternion is q_device * q_z(+theta).
+ * `screenAngleDeg` is `screen.orientation.angle` (0/90/180/270). W3C and the
+ * Chrome/Firefox implementations require the screen-adjusted matrix
+ * `R_screen = R_device * Rz(-theta)` for DeviceOrientation angles; using the
+ * opposite sign rolls landscape by 180°. The matching quaternion is therefore
+ * `q_device * q_z(-theta)`.
  */
 export function quatFromDeviceOrientation(
   alphaDeg: number,
@@ -139,7 +140,7 @@ export function quatFromDeviceOrientation(
   screenAngleDeg: number,
 ): Quat {
   const device = quatFromDeviceEuler(alphaDeg, betaDeg, gammaDeg);
-  const screen = quatFromAxisAngle(WORLD_UP, screenAngleDeg * DEG);
+  const screen = quatFromAxisAngle(WORLD_UP, -screenAngleDeg * DEG);
   return quatMultiply(device, screen);
 }
 
