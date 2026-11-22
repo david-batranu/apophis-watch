@@ -317,6 +317,10 @@ Changes:
   calculated”, About and the notices.
 - Unsaved latitude/longitude edits are no longer overwritten when eye height is
   changed.
+- The Space view now marks the **edge of space** (FAI Kármán line, 100 km above
+  sea level) as a faint shell and ring around Earth, and relabels the
+  geostationary ring as the **satellite limit** (35,786 km above the surface).
+  Both appear in the on-screen legend and the canvas description.
 
 Verification after the pass: **215/215** unit tests, **29/29** merged Playwright
 tests, **12/12** AR mock tests, **1/1** production offline test, typecheck and
@@ -326,9 +330,9 @@ granted-location startup, the consolidated observer card, onboarding
 dismissal/forgetting, AR restore suppression, preference persistence and the
 Share payload.
 
-Build: initial JS **801.52 kB** (216.97 kB gzip), terrain 290.05 kB (82.28 kB
+Build: initial JS **802.50 kB** (217.24 kB gzip), terrain 290.05 kB (82.28 kB
 gzip), AR 79.99 kB (23.33 kB gzip), best-spot worker 13.63 kB; precache 22
-entries, 1,268.15 KiB. Sky frame timing under the existing 4× CPU test remained
+entries, 1,269.11 KiB. Sky frame timing under the existing 4× CPU test remained
 vsync-bound (p95 16.80 ms over 180 frames).
 
 The existing real-phone caveats still apply; this pass was verified in headless

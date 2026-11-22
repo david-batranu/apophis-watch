@@ -10,7 +10,12 @@ import type { UiState } from '../state/store';
 const KM_PER_UNIT = 1000;
 const EARTH_RADIUS_KM = 6378.137;
 const MOON_RADIUS_KM = 1737.4;
+/** FAI Kármán line: the conventional edge of space. */
+const KARMAN_ALTITUDE_KM = 100;
+const KARMAN_RADIUS_KM = EARTH_RADIUS_KM + KARMAN_ALTITUDE_KM;
+/** Geostationary orbit: the practical outer limit for satellites. */
 const GEO_RADIUS_KM = 42_164;
+const GEO_ALTITUDE_KM = 35_786;
 const AU_KM = 149_597_870.7;
 
 interface Palette {
@@ -20,6 +25,7 @@ interface Palette {
   moon: number;
   orbit: number;
   geo: number;
+  atmosphere: number;
   trail: number;
   ruler: number;
   marker: number;
@@ -35,7 +41,8 @@ function palette(night: boolean): Palette {
         earthWire: 0xff3b30,
         moon: 0x7a1510,
         orbit: 0x8a1a12,
-        geo: 0x7a1510,
+        geo: 0xff6a5a,
+        atmosphere: 0xff8a7a,
         trail: 0xff2a1a,
         ruler: 0xb02a20,
         marker: 0xff0000,
@@ -48,7 +55,8 @@ function palette(night: boolean): Palette {
         earthWire: 0x4f8fc4,
         moon: 0x8a8f99,
         orbit: 0x3d5f80,
-        geo: 0x2b4a63,
+        geo: 0x4f8fc4,
+        atmosphere: 0x7fd4e8,
         trail: 0xff5a5f,
         ruler: 0x4f6782,
         marker: 0xff5a5f,
@@ -113,6 +121,7 @@ export class SpaceView {
   private readonly moonGroup = new THREE.Group();
   private readonly moonOrbit = new THREE.Group();
   private readonly geoRing = new THREE.Group();
+  private readonly atmosphereGroup = new THREE.Group();
   private readonly trailGroup = new THREE.Group();
   private readonly rulerGroup = new THREE.Group();
   private readonly markerGroup = new THREE.Group();
@@ -122,6 +131,7 @@ export class SpaceView {
   private readonly moonLabel = labelSprite(t('space.moon'), '#c9d6e8');
   private readonly earthLabel = labelSprite(t('space.earth'), '#c9d6e8');
   private readonly geoLabel = labelSprite(t('space.geoRing'), '#c9d6e8');
+  private readonly karmanLabel = labelSprite(t('space.karmanLine'), '#c9d6e8');
   private readonly moonOrbitLabel = labelSprite(t('space.moonOrbit'), '#c9d6e8');
   private readonly markerLabel = labelSprite(t('space.apophis'), '#ff8a7a');
   private readonly enlargedLabel = labelSprite(t('space.enlarged'), '#ffb347');
@@ -196,6 +206,7 @@ export class SpaceView {
     this.moonOrbitLabel.position.set(270, 4, 270);
     this.scene.add(this.moonOrbitLabel);
     this.scene.add(this.geoRing);
+    this.scene.add(this.atmosphereGroup);
     this.scene.add(this.trailGroup);
     this.scene.add(this.rulerGroup);
     this.scene.add(this.markerGroup);
@@ -228,6 +239,7 @@ export class SpaceView {
     this.markerGroup.add(this.enlargedLabel);
 
     this.buildGeoRing();
+    this.buildAtmosphere();
     this.buildRuler();
     this.setCameraPreset('flyby');
     new ResizeObserver(() => this.resize()).observe(host);
@@ -240,6 +252,30 @@ export class SpaceView {
     const diagonal = GEO_RADIUS_KM / KM_PER_UNIT / Math.SQRT2;
     this.geoLabel.position.set(diagonal, 3, diagonal);
     this.scene.add(this.geoLabel);
+  }
+
+  /**
+   * Edge of space (FAI Kármán line, 100 km above sea level): a faint shell
+   * around Earth plus an equatorial ring so the boundary stays legible from
+   * every camera preset. At 1 unit = 1,000 km the shell hugs the globe.
+   */
+  private buildAtmosphere(): void {
+    const radius = KARMAN_RADIUS_KM / KM_PER_UNIT;
+    const shell = new THREE.LineSegments(
+      new THREE.WireframeGeometry(new THREE.SphereGeometry(radius, 24, 12)),
+      new THREE.LineBasicMaterial({
+        color: this.paletteRef.atmosphere,
+        transparent: true,
+        opacity: 0.16,
+        depthWrite: false,
+      }),
+    );
+    this.atmosphereGroup.add(shell);
+    this.atmosphereGroup.add(circleLine(radius, this.paletteRef.atmosphere, 128));
+    const diagonal = radius / Math.SQRT2;
+    this.karmanLabel.position.set(diagonal, 1.6, diagonal);
+    this.karmanLabel.scale.set(16, 3, 1);
+    this.scene.add(this.karmanLabel);
   }
 
   private buildRuler(): void {
@@ -434,6 +470,13 @@ export class SpaceView {
         (o.material as THREE.LineBasicMaterial).color.setHex(this.paletteRef.geo);
       }
     });
+    this.atmosphereGroup.traverse((o) => {
+      if (o instanceof THREE.Line) {
+        (o.material as THREE.LineBasicMaterial).color.setHex(
+          this.paletteRef.atmosphere,
+        );
+      }
+    });
     this.rulerGroup.traverse((o) => {
       if (o instanceof THREE.Line) {
         (o.material as THREE.LineBasicMaterial).color.setHex(this.paletteRef.ruler);
@@ -447,6 +490,7 @@ export class SpaceView {
       this.moonLabel,
       this.moonOrbitLabel,
       this.geoLabel,
+      this.karmanLabel,
       this.markerLabel,
       this.enlargedLabel,
     ]) {

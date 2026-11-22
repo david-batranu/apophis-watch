@@ -67,7 +67,7 @@ export const en = {
     skyCanvasAria:
       'Sky dome. Drag or use arrow keys to look; plus and minus zoom; zero resets.',
     spaceCanvasAria:
-      'Space view: Apophis, Earth and Moon to scale. Camera preset buttons are beside the view.',
+      'Space view: Apophis, Earth and Moon to scale, with the edge of space (100 km) and the satellite limit (geostationary orbit) marked. Camera preset buttons are beside the view.',
     plotCanvasAria:
       'Height and brightness of Apophis over time. The same values are in the live readout.',
     skyHint: 'Drag to look · pinch/scroll to zoom · double-click reset',
@@ -78,7 +78,9 @@ export const en = {
     spaceCameraTop: 'Top-down',
     spaceResetCameras: 'Reset cameras',
     spaceLegendScale:
-      '1 scene unit = 1,000 km · Earth radius 6,378 km · GEO ring 42,164 km · Moon orbit 384,400 km',
+      '1 scene unit = 1,000 km · Earth radius 6,378 km · Moon orbit 384,400 km',
+    spaceLegendBoundaries:
+      'Edge of space (Kármán line): 100 km above Earth · Satellite limit: geostationary orbit, 35,786 km above Earth',
     spaceLegendTrueScale:
       'Apophis is a true-scale point; its 340 m disc is invisible at this scale.',
     readoutTitle: 'Right now',
@@ -806,7 +808,8 @@ export const en = {
   space: {
     moon: 'Moon',
     earth: 'Earth',
-    geoRing: 'GEO ring 42,164 km',
+    geoRing: 'Satellite limit — GEO 35,786 km',
+    karmanLine: 'Edge of space — 100 km',
     moonOrbit: 'Moon orbit 384,400 km',
     apophis: 'Apophis — true-scale point',
     enlarged: 'ENLARGED — NOT TO SCALE',

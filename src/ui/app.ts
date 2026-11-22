@@ -284,6 +284,7 @@ export class AppUi {
                 </div>
                 <div class="space-legend">
                   ${t('shell.spaceLegendScale')}<br />
+                  ${t('shell.spaceLegendBoundaries')}<br />
                   ${t('shell.spaceLegendTrueScale')}
                 </div>
               </div>

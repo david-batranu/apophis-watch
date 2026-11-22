@@ -307,6 +307,17 @@ test('space view renders and camera presets respond', async ({ page }) => {
   await gotoAt(page, '2029-04-13T21:45:03.557Z');
   await page.getByRole('tab', { name: 'Space view' }).click();
   await expect(page.locator('.space-stage')).toBeVisible();
+  const legend = page.locator('.space-legend');
+  await expect(legend).toContainText(
+    'Edge of space (Kármán line): 100 km above Earth',
+  );
+  await expect(legend).toContainText(
+    'Satellite limit: geostationary orbit, 35,786 km above Earth',
+  );
+  await expect(page.locator('.space-stage canvas')).toHaveAttribute(
+    'aria-label',
+    /edge of space \(100 km\)/i,
+  );
   for (const name of ['Earth', 'Moon orbit', 'Top-down', 'Flyby']) {
     await page.getByRole('button', { name, exact: true }).click();
   }

@@ -13,11 +13,11 @@ that service forbids prefetch/offline use. See [Deployment](DEPLOYMENT.md),
 [Event-day guide](EVENT-DAY.md) and
 [Real-phone checklist](REAL-PHONE-CHECKLIST.md).
 
-Production build: initial JS **801.52 kB** (216.97 kB gzip), terrain
+Production build: initial JS **802.50 kB** (217.24 kB gzip), terrain
 **290.05 kB** (82.28 kB gzip), AR **79.99 kB** (23.33 kB gzip) and a
 best-spot worker **13.63 kB**. Terrain and AR remain separate lazy chunks; the
 service worker precaches them for offline use without executing them.
-Precache: 22 entries, 1,268.15 KiB.
+Precache: 22 entries, 1,269.11 KiB.
 
 ## Run
 
@@ -148,6 +148,11 @@ changed by **Prepare for offline** or **Clear prepared area**.
   visibility end `22:44:06.557Z`.
 - Europe/Bucharest DST: `2029-04-13 21:45:03 UTC` displays as
   `2029-04-14 00:45:03 EEST`.
+- Space view boundaries: the **edge of space** (FAI Kármán line, 100 km above
+  sea level) is drawn as a faint shell and ring hugging Earth, and the
+  **satellite limit** is the geostationary ring — 42,164 km from Earth's centre,
+  35,786 km above the surface. Both are labelled in the scene and listed in the
+  on-screen legend.
 - Playwright screenshots: `test-results/phase2/sky-2045.png`,
   `sky-topoca.png`, `sky-near-setting.png`, plus debug-panel versions, night
   sky/space and space presets.
